@@ -1,0 +1,26 @@
+{
+  "name": "@mei-friend2/core",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "echo 'built by root tsc -b'",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0",
+    "typescript": "~5.8.3",
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "zustand": "^5.0.12"
+  }
+}

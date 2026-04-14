@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo",
+    "paths": {
+      "@mei-friend/core": ["../core/src/index.ts"]
+    }
+  },
+  "include": ["src"],
+  "references": [{ "path": "../core" }]
+}

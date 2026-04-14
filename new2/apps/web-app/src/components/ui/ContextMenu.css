@@ -1,0 +1,38 @@
+.contextMenu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--dropdownBackgroundColor);
+  border: 1px solid var(--dropdownBorderColor);
+  border-radius: 4px;
+  padding: 4px 0;
+  min-width: 160px;
+  box-shadow: 0px 8px 12px 0px rgba(0, 0, 0, 0.2);
+}
+
+.contextMenuItem {
+  display: block;
+  width: 100%;
+  padding: 5px 16px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--textColor);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.contextMenuItem:hover:not(.disabled) {
+  background: var(--dropdownHeadingColor);
+}
+
+.contextMenuItem.disabled {
+  color: var(--dropdownBorderColor);
+  cursor: default;
+}
+
+.contextMenuSeparator {
+  border: none;
+  border-top: 1px solid var(--dropdownBorderColor, #444);
+  margin: 4px 0;
+}

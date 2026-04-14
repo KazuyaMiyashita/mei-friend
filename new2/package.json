@@ -1,0 +1,26 @@
+{
+  "name": "mei-friend-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @mei-friend2/web-app",
+    "build": "tsc -b && biome check . && npm run build --workspaces --if-present",
+    "test": "npm test --workspaces",
+    "lint": "biome check .",
+    "format": "biome format --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.11",
+    "@types/jsdom": "^28.0.1",
+    "jsdom": "^26.0.0",
+    "typescript": "~5.8.3",
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "zustand": "^5.0.12"
+  }
+}

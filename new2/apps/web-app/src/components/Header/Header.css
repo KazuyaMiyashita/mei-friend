@@ -1,0 +1,209 @@
+.header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 42px;
+  justify-content: flex-start;
+  flex-shrink: 0;
+  background-color: var(--headerBackgroundColor);
+  border-bottom: 1px solid var(--dropdownBorderColor);
+}
+
+.title {
+  padding: 0 20px 0 10px;
+  font-weight: bold;
+  font-size: 18pt;
+}
+
+.title img {
+  height: 1.6em;
+  display: block;
+}
+
+/* ---- Navbar ---- */
+.navbar {
+  float: left;
+  overflow: visible;
+  background-color: var(--navbarBackgroundColor);
+  border-radius: 4px;
+  display: flex;
+  flex-wrap: nowrap;
+  z-index: 15;
+}
+
+.navbar > *:first-child {
+  flex-shrink: 5;
+}
+
+/* ---- Dropdown ---- */
+.dropdown {
+  float: left;
+  overflow: visible;
+  white-space: nowrap;
+  position: relative;
+}
+
+.dropbtn {
+  cursor: pointer;
+  font-size: 12pt;
+  border: none;
+  outline: none;
+  color: var(--textColor);
+  padding: 3px 12px;
+  background-color: inherit;
+  font-family: inherit;
+  margin: 0;
+}
+
+.navbar a:hover,
+.dropbtn:hover,
+.dropbtn.active {
+  background-color: var(--dropdownHeadingColor);
+}
+
+.navbar > .dropdown:first-child > .dropbtn {
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+.navbar > .dropdown:last-child > .dropbtn {
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.dropdownContent {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: var(--dropdownBackgroundColor);
+  opacity: 0.99;
+  min-width: 220px;
+  border: 1px solid darkgray;
+  border-top-right-radius: 4px;
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0px 8px 12px 0px rgba(0, 0, 0, 0.2);
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: 90vh;
+  z-index: 99;
+  padding-bottom: 6px;
+}
+
+.dropdownContent.open {
+  display: block;
+}
+
+.dropdownContent a {
+  cursor: pointer;
+  float: none;
+  color: var(--textColor);
+  padding: 3px 12px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.dropdownContent a:hover {
+  background-color: var(--dropdownHeadingColor);
+  text-decoration: none;
+}
+
+.dropdownLine {
+  border: 1px solid var(--dropdownBorderColor);
+  border-radius: 1px;
+  margin: 4px 10px;
+}
+
+.keyShortCut {
+  color: var(--keyboardShortCutColor);
+  font-weight: bold;
+  align-self: flex-end;
+  margin-left: 5px;
+  font-size: 10pt;
+  white-space: nowrap;
+}
+
+/* ---- GitHub button ---- */
+.githubButton {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.githubButton svg {
+  fill: var(--textColor);
+  height: 0.75em;
+}
+
+/* ---- File status ---- */
+.fileStatus {
+  font-size: 10pt;
+  font-family: monospace;
+  padding: 0 6px;
+  color: var(--fileStatusColor);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 1ch;
+  cursor: default;
+  flex-shrink: 6;
+  overflow: hidden;
+}
+
+.fileStatus.changed {
+  color: var(--fileStatusChangedColor);
+}
+
+.schemaStatus {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 6pt;
+  font-weight: bold;
+  border-width: 1.5px;
+  border-style: solid;
+  border-radius: 4px;
+  padding: 2px 1ch;
+  /* max-height: calc(1em + 2px); */
+  color: var(--fileStatusColor);
+  border-color: var(--fileStatusColor);
+}
+
+.fileName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Settings buttons ---- */
+.settingsButtonWrapper {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settingsButton {
+  box-sizing: content-box;
+  width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  cursor: pointer;
+  fill: var(--textColor);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: inherit;
+}
+
+.settingsButton:hover {
+  opacity: 0.7;
+}
+
+.settingsButton svg {
+  fill: var(--textColor);
+}

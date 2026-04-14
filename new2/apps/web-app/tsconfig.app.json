@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "moduleDetection": "force",
+    "noEmit": false,
+    "outDir": "dist/types",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "paths": {
+      "@mei-friend/core": ["../../packages/core/src/index.ts"],
+      "@mei-friend/plugins": ["../../packages/plugins/src/index.ts"]
+    }
+  },
+  "include": ["src"],
+  "references": [{ "path": "../../packages/core" }, { "path": "../../packages/plugins" }]
+}
