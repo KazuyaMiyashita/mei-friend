@@ -1,0 +1,270 @@
+.tabGroup {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0%;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  background-color: var(--backgroundColor);
+  position: relative;
+}
+
+/* ── Tab bar ──────────────────────────────────────────────────────────────── */
+
+.tabBar {
+  display: flex;
+  flex-shrink: 0;
+  height: 35px;
+  background-color: var(--notationBackgroundColor);
+  border-bottom: 1px solid var(--dropdownBorderColor);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tabBar::-webkit-scrollbar {
+  display: none;
+}
+
+.tabBar.dropTarget {
+  background-color: color-mix(
+    in srgb,
+    var(--dropdownBorderColor) 20%,
+    var(--notationBackgroundColor)
+  );
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  min-width: 80px;
+  max-width: 180px;
+  height: 100%;
+  font-size: 11pt;
+  cursor: pointer;
+  border-right: 1px solid var(--dropdownBorderColor);
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
+  color: var(--textColor);
+  opacity: 0.7;
+  position: relative;
+}
+
+.tab.active {
+  background-color: var(--backgroundColor);
+  opacity: 1;
+  border-bottom: 2px solid var(--dropdownBorderColor);
+}
+
+.tab:hover {
+  opacity: 1;
+  background-color: color-mix(
+    in srgb,
+    var(--dropdownBorderColor) 15%,
+    var(--notationBackgroundColor)
+  );
+}
+
+.tab.dragging {
+  opacity: 0.3;
+}
+
+.tabLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10pt;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tabTypeIcon {
+  flex-shrink: 0;
+  font-size: 9pt;
+  opacity: 0.8;
+}
+
+.tabActionArea {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 100%;
+  position: relative;
+}
+
+.tabCloseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: var(--textColor);
+  font-size: 13pt;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0; /* Hidden by default */
+  border-radius: 3px;
+  padding: 0;
+  flex-shrink: 0;
+  transition: opacity 0.1s;
+  z-index: 1;
+}
+
+.dirtyDot {
+  position: absolute;
+  font-size: 16pt;
+  color: var(--highlightColor);
+  opacity: 0.8;
+  pointer-events: none;
+  transition: opacity 0.1s;
+}
+
+/* Hover logic: show Close button, hide Dirty dot */
+.tab:hover .tabCloseBtn {
+  opacity: 0.6;
+}
+
+.tab:hover .dirtyDot {
+  opacity: 0;
+}
+
+.tab:hover .tabCloseBtn:hover {
+  opacity: 1;
+  background-color: color-mix(in srgb, var(--dropdownBorderColor) 30%, transparent);
+}
+
+/* ── Content area ─────────────────────────────────────────────────────────── */
+
+.tabContent {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.tabContent.dragging {
+  pointer-events: none;
+}
+
+.panelContent {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.emptyPanel {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dropdownBorderColor);
+  font-size: 11pt;
+  user-select: none;
+}
+
+/* ── Drop zones ───────────────────────────────────────────────────────────── */
+
+.dropZone {
+  position: absolute;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Edge zones: 25% on each side */
+.dropZone-top {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 25%;
+}
+.dropZone-bottom {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 25%;
+}
+.dropZone-left {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 25%;
+}
+.dropZone-right {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 25%;
+}
+/* Center zone: the remaining central part */
+.dropZone-center {
+  top: 25%;
+  bottom: 25%;
+  left: 25%;
+  right: 25%;
+}
+
+/* Visualize drop zones only during dragging */
+.dropZone.active {
+  pointer-events: none; /* Visual only while active */
+}
+
+.dropZone-top.active {
+  background: linear-gradient(to bottom, rgba(0, 120, 215, 0.35) 0%, transparent 100%);
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+}
+.dropZone-bottom.active {
+  background: linear-gradient(to top, rgba(0, 120, 215, 0.35) 0%, transparent 100%);
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+}
+.dropZone-left.active {
+  background: linear-gradient(to right, rgba(0, 120, 215, 0.35) 0%, transparent 100%);
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 50%;
+}
+.dropZone-right.active {
+  background: linear-gradient(to left, rgba(0, 120, 215, 0.35) 0%, transparent 100%);
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 50%;
+}
+.dropZone-center.active {
+  background: rgba(0, 120, 215, 0.15);
+  outline: 2px solid rgba(0, 120, 215, 0.5);
+  outline-offset: -2px;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+/* File drop overlay (covers entire tabGroup including tab bar) */
+.fileDropOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 120, 215, 0.15);
+  outline: 2px solid rgba(0, 120, 215, 0.5);
+  outline-offset: -2px;
+  z-index: 20;
+  pointer-events: none;
+}

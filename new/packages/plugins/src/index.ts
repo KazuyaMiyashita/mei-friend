@@ -1,0 +1,11 @@
+export * from './plugins/AnnotationPlugin'
+export * from './plugins/FacsimilePlugin'
+export * from './plugins/FileIOPlugin'
+export * from './plugins/HistoryPlugin'
+export * from './plugins/MeiEditorPlugin'
+export * from './plugins/SelectionPlugin'
+export * from './plugins/VerovioPlugin'
+export * from './plugins/WorkspaceFileIOPlugin'
+export * from './plugins/WorkspaceLocalPersistencePlugin'
+
+export * from './verovio-protocol'

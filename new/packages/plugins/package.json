@@ -1,0 +1,25 @@
+{
+  "name": "@mei-friend/plugins",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "echo 'built by root tsc -b'",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@mei-friend/core": "*",
+    "verovio": "^6.1.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.3"
+  }
+}

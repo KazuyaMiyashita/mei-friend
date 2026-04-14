@@ -1,0 +1,433 @@
+/* ── Entire Panel ───────────────────────────────────────────────────────────── */
+.annotationPanel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--backgroundColor);
+  font-size: 12px;
+  color: var(--textColor);
+}
+
+/* ── Toolbar ───────────────────────────────────────────────────────────── */
+.annotationControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--controlMenuBackgroundColor);
+  border-bottom: 1px solid var(--dropdownBorderColor);
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.annotationControlsSpacer {
+  flex: 1;
+}
+
+/* ── File Path Display ─────────────────────────────────────────────────────── */
+.annotationFilePath {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: var(--dropdownBackgroundColor);
+  border-bottom: 1px solid var(--dropdownBorderColor);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.annotationFilePathLabel {
+  font-weight: bold;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.annotationFilePathValue {
+  font-family: monospace;
+  color: var(--textColor);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Body (List + Details) ──────────────────────────────────────────────── */
+.annotationBody {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Empty State ──────────────────────────────────────────────────────────────── */
+.annotationEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 6px;
+  text-align: center;
+  padding: 16px;
+  opacity: 0.45;
+}
+
+.annotationEmpty p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Placeholder ─────────────────────────────────────────────────────── */
+.annotationPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 8px;
+  color: var(--textColor);
+  opacity: 0.5;
+  text-align: center;
+  padding: 16px;
+}
+
+.annotationPlaceholder strong {
+  font-size: 14px;
+}
+
+.annotationPlaceholder p {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* ── Annotation List ─────────────────────────────────────────────────── */
+.annotationList {
+  overflow-y: auto;
+  flex-shrink: 0;
+  max-height: 50%;
+}
+
+/* ── Section Header ───────────────────────────────────────────────────── */
+.annotationSectionHeader {
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.45;
+  background: var(--controlMenuBackgroundColor);
+  border-bottom: 1px solid var(--dropdownBorderColor);
+  user-select: none;
+}
+
+/* ── Annotation Row ────────────────────────────────────────────────────── */
+.annotationItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.1s;
+  min-height: 28px;
+  appearance: none;
+  border: none;
+  border-bottom: 1px solid var(--dropdownBorderColor);
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
+  background: none;
+  color: inherit;
+}
+
+.annotationItem:hover {
+  background: var(--dropdownBackgroundColor);
+}
+
+.annotationItem--selected {
+  background: var(--dropdownHeadingColor);
+}
+
+/* ── Type Tag ───────────────────────────────────────────────────────────── */
+.annotationTypeTag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.annotationTypeTag[data-type="annotateHighlight"] {
+  background: rgba(255, 220, 0, 0.3);
+  color: #9a7d00;
+}
+
+.annotationTypeTag[data-type="annotateCircle"] {
+  background: rgba(80, 160, 255, 0.25);
+  color: #1a5ea0;
+}
+
+.annotationTypeTag[data-type="annotateDescribe"] {
+  background: rgba(100, 220, 100, 0.25);
+  color: #226a22;
+}
+
+.annotationTypeTag[data-type="annotateLink"] {
+  background: rgba(200, 80, 220, 0.2);
+  color: #8a1a99;
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .annotationTypeTag[data-type="annotateHighlight"] {
+    color: #f0d050;
+  }
+  .annotationTypeTag[data-type="annotateCircle"] {
+    color: #78b8ff;
+  }
+  .annotationTypeTag[data-type="annotateDescribe"] {
+    color: #70dd70;
+  }
+  .annotationTypeTag[data-type="annotateLink"] {
+    color: #e080f0;
+  }
+}
+
+/* ── Markup Tag (for editing markup elements) ─────────────────────────── */
+.annotationTypeTag--markup {
+  background: rgba(160, 160, 160, 0.15);
+  color: var(--textColor);
+  opacity: 0.8;
+  font-family: monospace;
+}
+
+.annotationTypeTag--markup[data-markup-type="supplied"] {
+  background: rgba(255, 160, 50, 0.2);
+  color: #a05800;
+}
+.annotationTypeTag--markup[data-markup-type="corr"] {
+  background: rgba(50, 200, 100, 0.2);
+  color: #1a6a30;
+}
+.annotationTypeTag--markup[data-markup-type="sic"] {
+  background: rgba(220, 80, 80, 0.2);
+  color: #8a1515;
+}
+.annotationTypeTag--markup[data-markup-type="unclear"] {
+  background: rgba(180, 140, 40, 0.2);
+  color: #7a5e00;
+}
+.annotationTypeTag--markup[data-markup-type="add"] {
+  background: rgba(60, 180, 60, 0.2);
+  color: #205020;
+}
+.annotationTypeTag--markup[data-markup-type="del"] {
+  background: rgba(200, 60, 60, 0.2);
+  color: #701010;
+}
+.annotationTypeTag--markup[data-markup-type="choice"],
+.annotationTypeTag--markup[data-markup-type="subst"] {
+  background: rgba(100, 100, 220, 0.2);
+  color: #2a2a90;
+}
+
+@media (prefers-color-scheme: dark) {
+  .annotationTypeTag--markup[data-markup-type="supplied"] {
+    color: #ffa040;
+  }
+  .annotationTypeTag--markup[data-markup-type="corr"] {
+    color: #50d870;
+  }
+  .annotationTypeTag--markup[data-markup-type="sic"] {
+    color: #ff7070;
+  }
+  .annotationTypeTag--markup[data-markup-type="unclear"] {
+    color: #d4b040;
+  }
+  .annotationTypeTag--markup[data-markup-type="add"] {
+    color: #60cc60;
+  }
+  .annotationTypeTag--markup[data-markup-type="del"] {
+    color: #ee6060;
+  }
+  .annotationTypeTag--markup[data-markup-type="choice"],
+  .annotationTypeTag--markup[data-markup-type="subst"] {
+    color: #8080ee;
+  }
+}
+
+/* ── Selection ID Display ────────────────────────────────────────────────────────── */
+.annotationSelection {
+  font-family: monospace;
+  font-size: 11px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+.annotationMore {
+  opacity: 0.5;
+}
+
+/* ── MEI Badge ──────────────────────────────────────────────────────────── */
+.annotationBadge {
+  font-size: 9px;
+  font-weight: bold;
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.annotationBadge--inline {
+  background: var(--overlayBackgroundColor, cornflowerblue);
+  color: #fff;
+  opacity: 0.85;
+}
+
+/* ── Text Preview ───────────────────────────────────────────────────── */
+.annotationPreview {
+  font-size: 11px;
+  opacity: 0.55;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100px;
+}
+
+/* ── Delete Button ───────────────────────────────────────────────────────────── */
+.annotationDeleteBtn {
+  background: none;
+  border: none;
+  color: var(--textColor);
+  cursor: pointer;
+  opacity: 0.35;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.annotationDeleteBtn:hover {
+  opacity: 0.8;
+  color: var(--fileStatusWarnColor, tomato);
+}
+
+/* ── Detail Panel ───────────────────────────────────────────────────────────── */
+.annotationDetail {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border-top: 2px solid var(--dropdownBorderColor);
+  background: var(--dropdownBackgroundColor);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.annotationDetailHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.annotationDetailStorage {
+  font-size: 11px;
+  opacity: 0.55;
+  flex: 1;
+}
+
+.annotationDetailClose {
+  background: none;
+  border: none;
+  color: var(--textColor);
+  cursor: pointer;
+  opacity: 0.4;
+  font-size: 14px;
+  padding: 0 2px;
+  transition: opacity 0.15s;
+}
+
+.annotationDetailClose:hover {
+  opacity: 0.8;
+}
+
+/* ── Detail Row ───────────────────────────────────────────────────────────────── */
+.annotationDetailRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.annotationDetailLabel {
+  font-size: 11px;
+  font-weight: bold;
+  opacity: 0.6;
+  white-space: nowrap;
+  padding-top: 1px;
+  min-width: 70px;
+}
+
+.annotationDetailValue {
+  font-size: 11px;
+  word-break: break-all;
+  flex: 1;
+}
+
+.annotationDetailIds {
+  font-family: monospace;
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.annotationDetailUrl {
+  color: var(--overlayBackgroundColor, cornflowerblue);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.annotationDetailUrl:hover {
+  opacity: 0.8;
+}
+
+/* ── Text Input ─────────────────────────────────────────────────────────── */
+.annotationInput {
+  flex: 1;
+  background: var(--backgroundColor);
+  color: var(--textColor);
+  border: 1px solid var(--overlayBackgroundColor, cornflowerblue);
+  border-radius: 3px;
+  padding: 3px 6px;
+  font-size: 11px;
+  outline: none;
+}
+
+/* ── Action Button ─────────────────────────────────────────────────────── */
+.annotationDetailActions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+/* primary style (Write to MEI button) */
+.ctrlBtn--primary {
+  background: var(--overlayBackgroundColor, cornflowerblue);
+  color: #fff;
+  border-color: transparent;
+}
+
+.ctrlBtn--primary:hover:not(:disabled) {
+  opacity: 0.85;
+  background: var(--overlayBackgroundColor, cornflowerblue);
+}

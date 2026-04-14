@@ -1,0 +1,258 @@
+.notationPanel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--backgroundColor);
+}
+
+.notationPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--textColor);
+  opacity: 0.5;
+  text-align: center;
+}
+
+/* ─── Control Bar ─── */
+.notationControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--controlMenuBackgroundColor);
+  border-bottom: 1px solid var(--dropdownBorderColor);
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.ctrlLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  color: var(--textColor);
+}
+
+.ctrlCheckLabel {
+  cursor: pointer;
+}
+
+.ctrlLabelText {
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--textColor);
+  opacity: 0.7;
+}
+
+.ctrlRange {
+  width: 100px;
+  accent-color: var(--overlayBackgroundColor);
+}
+
+.ctrlValue {
+  min-width: 36px;
+  text-align: right;
+  color: var(--textColor);
+}
+
+.ctrlSelect {
+  background: var(--dropdownBackgroundColor);
+  color: var(--textColor);
+  border: 1px solid var(--dropdownBorderColor);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.ctrlSelect:focus {
+  outline: 1px solid var(--overlayBackgroundColor);
+}
+
+.ctrlPageNav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.ctrlBtn {
+  background: var(--dropdownBackgroundColor);
+  color: var(--textColor);
+  border: 1px solid var(--dropdownBorderColor);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: background-color 0.2s;
+}
+
+.ctrlBtn:hover:not(:disabled) {
+  background: var(--dropdownHeadingColor);
+}
+
+.ctrlBtn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.ctrlPageInfo {
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--textColor);
+  white-space: nowrap;
+}
+
+.ctrlPageInput {
+  width: 32px;
+  text-align: center;
+  font-size: 11px;
+  background: var(--dropdownBackgroundColor);
+  color: var(--textColor);
+  border: 1px solid var(--dropdownBorderColor);
+  border-radius: 4px;
+  padding: 1px 2px;
+  /* Hide spin buttons */
+  -moz-appearance: textfield;
+}
+
+.ctrlPageInput::-webkit-outer-spin-button,
+.ctrlPageInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.ctrlPageInput:focus {
+  outline: 1px solid var(--overlayBackgroundColor);
+}
+
+.ctrlPageTotal {
+  opacity: 0.8;
+  min-width: 28px;
+}
+
+.ctrlSpinner {
+  animation: spin 1s linear infinite;
+  color: var(--overlayBackgroundColor);
+  font-size: 14px;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── SVG Area ─── */
+.notationSvgArea {
+  flex: 1;
+  overflow: auto;
+  cursor: default;
+  background-color: var(--notationBackgroundColor);
+}
+
+.notationRendering {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--textColor);
+  opacity: 0.5;
+  font-size: 13px;
+}
+
+/* SVG Selection Highlight */
+.notationSvgArea g.selected path:not(.mf-overlay),
+.notationSvgArea g.selected use:not(.mf-overlay),
+.notationSvgArea g.selected rect:not(.mf-overlay),
+.notationSvgArea g.selected ellipse:not(.mf-overlay),
+.notationSvgArea g.selected polygon:not(.mf-overlay),
+.notationSvgArea g.selected polyline:not(.mf-overlay),
+.notationSvgArea g.selected line:not(.mf-overlay),
+.notationSvgArea g.selected circle:not(.mf-overlay),
+.notationSvgArea g.selected text:not(.mf-overlay) {
+  fill: var(--highlightColor);
+  stroke: var(--highlightColor);
+}
+
+/* Cursor (Input Target) Highlight */
+.notationSvgArea g.cursor-target path,
+.notationSvgArea g.cursor-target use,
+.notationSvgArea g.cursor-target rect,
+.notationSvgArea g.cursor-target ellipse,
+.notationSvgArea g.cursor-target polygon,
+.notationSvgArea g.cursor-target polyline,
+.notationSvgArea g.cursor-target line,
+.notationSvgArea g.cursor-target circle,
+.notationSvgArea g.cursor-target text {
+  fill: #ff6b6b;
+  stroke: #ff6b6b;
+}
+
+/* ─── SVG Overlays ─── */
+
+/* Marker classes (for cleanup on JavaScript side) */
+/* .mf-overlay {} */
+
+/* Measure debug */
+.mf-overlay-measure {
+  fill: rgba(255, 0, 0, 0.05);
+  stroke: rgba(255, 0, 0, 0.8);
+  stroke-width: 40px;
+  stroke-dasharray: 100, 100;
+  pointer-events: none;
+}
+
+/* Staff click target (always added, transparent, interactive) */
+.mf-overlay-staff {
+  fill: transparent;
+  stroke: none;
+  stroke-width: 0;
+}
+
+/* Visible style for staff debug */
+.mf-overlay-staff--debug {
+  fill: rgba(0, 255, 0, 0.05);
+  stroke: rgba(0, 255, 0, 0.8);
+  stroke-width: 40px;
+  stroke-dasharray: 100, 100;
+}
+
+/* Note click target (always added, transparent) */
+.mf-overlay-note {
+  fill: transparent;
+  stroke: none;
+  stroke-width: 0;
+}
+
+/* Visible style for note debug */
+.mf-overlay-note--debug {
+  fill: rgba(0, 0, 255, 0.05);
+  stroke: rgba(0, 0, 255, 0.8);
+  stroke-width: 40px;
+  stroke-dasharray: 100, 100;
+}
+
+/* Input cursor */
+.mf-overlay-caret {
+  fill: var(--notationInputCaretColor);
+  pointer-events: none;
+}
+
+/* Debug cursor (semi-transparent) */
+.mf-overlay-caret--debug {
+  opacity: 0.8;
+}

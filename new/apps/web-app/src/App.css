@@ -1,0 +1,18 @@
+.workArea {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.workAreaPanels {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Hide resize handle for Explorer when collapsed */
+.explorerResizeHandle.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
