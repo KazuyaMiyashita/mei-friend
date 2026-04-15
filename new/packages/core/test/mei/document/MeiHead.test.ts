@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MeiFriend, MeiHead } from "../../src/index.js";
+import { MeiFriend } from "../../../src/index.js";
 
 describe("MeiHead API", () => {
   it("should get the title from a complete MEI document", () => {
@@ -14,28 +14,27 @@ describe("MeiHead API", () => {
    </meiHead>
 </mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
-    const root = meiFriend.getRootElement()!;
-    const head = new MeiHead(root);
+    const head = meiFriend.mei!.head;
     expect(head.getTitle()).toBe("My Work");
   });
 
   it("should return undefined if title is missing", () => {
     const xml = `<mei xmlns="http://www.music-encoding.org/ns/mei"><meiHead/></mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
-    const head = new MeiHead(meiFriend.getRootElement()!);
+    const head = meiFriend.mei!.head;
     expect(head.getTitle()).toBeUndefined();
   });
 
   it("should set the title and create structure if needed", () => {
     // Create initial structure
     const xml = `<mei xmlns="http://www.music-encoding.org/ns/mei"></mei>`;
-    const friend = MeiFriend.fromXmlString(xml);
-    const head = new MeiHead(friend.getRootElement()!);
+    const meiFriend = MeiFriend.fromXmlString(xml);
+    const head = meiFriend.mei!.head;
 
-    friend.update((tx) => head.setTitle(tx, "New Title"));
+    meiFriend.update((tx) => head.setTitle(tx, "New Title"));
 
     expect(head.getTitle()).toBe("New Title");
-    const serialized = friend.toXmlString(false);
+    const serialized = meiFriend.toXmlString(false);
     expect(serialized).toContain("<title>New Title</title>");
     expect(serialized).toContain("<titleStmt");
     expect(serialized).toContain("<fileDesc");
@@ -54,7 +53,7 @@ describe("MeiHead API", () => {
    </meiHead>
 </mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
-    const head = new MeiHead(meiFriend.getRootElement()!);
+    const head = meiFriend.mei!.head;
     meiFriend.update((tx) => head.setTitle(tx, "Updated Title"));
     expect(head.getTitle()).toBe("Updated Title");
   });
@@ -62,7 +61,7 @@ describe("MeiHead API", () => {
   it("should work within an update transaction", () => {
     const xml = `<mei xmlns="http://www.music-encoding.org/ns/mei"></mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
-    const head = new MeiHead(meiFriend.getRootElement()!);
+    const head = meiFriend.mei!.head;
 
     const result = meiFriend.update((tx) => {
       head.setTitle(tx, "Transacted Title");

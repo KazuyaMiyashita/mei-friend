@@ -1,5 +1,5 @@
-import type { MeiElement } from "../MeiElement.js";
-import type { MeiTransaction } from "../MeiFriend.js";
+import type { MeiElement } from "../../MeiElement.js";
+import type { MeiTransaction } from "../../MeiFriend.js";
 
 /**
  * Adapter for MEI header operations.

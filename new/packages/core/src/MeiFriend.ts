@@ -1,6 +1,7 @@
 import { DOMParser } from "@xmldom/xmldom";
 import * as Y from "yjs";
 import { MeiElement } from "./MeiElement.js";
+import { Mei } from "./mei/Mei.js";
 
 /**
  * A token representing an active transaction.
@@ -132,6 +133,14 @@ export class MeiFriend {
       ? '<?xml version="1.0" encoding="UTF-8"?>\n'
       : "";
     return `${declaration}${serialized}\n`;
+  }
+
+  /**
+   * Returns a Mei wrapper for high-level operations on the score content.
+   */
+  public get mei(): Mei | undefined {
+    const root = this.getRootElement();
+    return root ? new Mei(root) : undefined;
   }
 
   /**
