@@ -1,0 +1,20 @@
+{
+  "name": "mei-friend-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "npm run lint && npm run type-check && npm run build -w packages/*",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.12",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.4"
+  }
+}
