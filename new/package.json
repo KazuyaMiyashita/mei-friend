@@ -6,7 +6,8 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "npm run lint && npm run type-check && npm run build -w packages/*",
+    "build": "npm run lint && npm run type-check && npm run build --workspaces",
+    "build-skiplint": "npm run type-check && npm run build --workspaces",
     "lint": "biome check .",
     "format": "biome format --write .",
     "type-check": "tsc --noEmit",

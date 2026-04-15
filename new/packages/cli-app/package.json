@@ -1,0 +1,17 @@
+{
+  "name": "@mei-friend/cli-app",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@mei-friend/core": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "typescript": "^6.0.2"
+  }
+}

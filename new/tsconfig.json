@@ -12,7 +12,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@mei-friend/core": ["./packages/core/src/index.ts"]
+      "@mei-friend/core": ["./packages/core/dist/index.d.ts"]
     }
   },
   "exclude": ["node_modules", "**/dist"]
