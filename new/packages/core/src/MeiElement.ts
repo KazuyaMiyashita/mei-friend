@@ -28,6 +28,67 @@ export class MeiElement {
   }
 
   /**
+   * Returns all direct child elements.
+   */
+  get children(): MeiElement[] {
+    return this.yNode
+      .toArray()
+      .filter((child): child is Y.XmlElement => child instanceof Y.XmlElement)
+      .map((child) => new MeiElement(child, this.doc));
+  }
+
+  /**
+   * Returns the parent element, or undefined if it is the root.
+   */
+  get parentElement(): MeiElement | undefined {
+    const parent = this.yNode.parent;
+    if (parent instanceof Y.XmlElement) {
+      return new MeiElement(parent, this.doc);
+    }
+    return undefined;
+  }
+
+  /**
+   * Returns the next sibling element.
+   */
+  get nextElementSibling(): MeiElement | undefined {
+    const parent = this.yNode.parent;
+    if (parent instanceof Y.XmlElement || parent instanceof Y.XmlFragment) {
+      const siblings = parent.toArray();
+      const index = siblings.indexOf(this.yNode);
+      if (index !== -1) {
+        for (let i = index + 1; i < siblings.length; i++) {
+          const sibling = siblings[i];
+          if (sibling instanceof Y.XmlElement) {
+            return new MeiElement(sibling, this.doc);
+          }
+        }
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Returns the previous sibling element.
+   */
+  get previousElementSibling(): MeiElement | undefined {
+    const parent = this.yNode.parent;
+    if (parent instanceof Y.XmlElement || parent instanceof Y.XmlFragment) {
+      const siblings = parent.toArray();
+      const index = siblings.indexOf(this.yNode);
+      if (index !== -1) {
+        for (let i = index - 1; i >= 0; i--) {
+          const sibling = siblings[i];
+          if (sibling instanceof Y.XmlElement) {
+            return new MeiElement(sibling, this.doc);
+          }
+        }
+      }
+    }
+    return undefined;
+  }
+
+  /**
    * Returns the value of the specified attribute.
    */
   getAttribute(name: string): string | undefined {
@@ -70,7 +131,21 @@ export class MeiElement {
    * Returns all descendant elements with the given tag name.
    */
   getElementsByTagName(tagName: string): MeiElement[] {
-    return this.doc.getElementsByTagNameInternal(this.yNode, tagName);
+    const result: MeiElement[] = [];
+    const traverse = (node: Y.XmlElement) => {
+      const length = node.length;
+      for (let i = 0; i < length; i++) {
+        const child = node.get(i);
+        if (child instanceof Y.XmlElement) {
+          if (child.nodeName === tagName) {
+            result.push(new MeiElement(child, this.doc));
+          }
+          traverse(child);
+        }
+      }
+    };
+    traverse(this.yNode);
+    return result;
   }
 
   /**

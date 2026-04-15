@@ -12,15 +12,33 @@ export type MeiTransaction = { readonly _brand: unique symbol };
 
 /**
  * Represents a change event in the MEI document.
- * This abstracts away the underlying Yjs event structure.
+ * This abstracts away the underlying Yjs event structure and provides
+ * details necessary for efficient UI updates and synchronization.
  */
 export interface MeiChangeEvent {
-  /** The element that was modified. */
+  /**
+   * The element that was modified.
+   * If a text node changed, this is its parent element.
+   */
   target: MeiElement;
-  /** Attributes that were changed, mapped to their new values (or null if deleted). */
-  attributesChanged: Map<string, string | null>;
-  /** Whether children were added or removed. */
-  childListChanged: boolean;
+  /**
+   * Attributes that were changed, mapped to their old and new values.
+   */
+  attributesChanged: Map<
+    string,
+    { oldValue: string | null; newValue: string | null }
+  >;
+  /** Elements that were added as direct children of the target. */
+  addedElements: MeiElement[];
+  /** Elements that were removed from the target. */
+  removedElements: MeiElement[];
+  /** Whether the text content of the target or its descendants changed. */
+  textChanged: boolean;
+  /** The origin of the change, as provided to update(). */
+  // biome-ignore lint/suspicious/noExplicitAny: origin can be any type provided by the user.
+  origin: any;
+  /** Whether the change originated locally. */
+  isLocal: boolean;
 }
 
 /**
@@ -50,6 +68,8 @@ export class MeiFriend {
   private readonly xmlRoot: Y.XmlFragment;
   /** Internal index for fast O(1) element lookup by xml:id. */
   private readonly idMap = new Map<string, Y.XmlElement>();
+  /** Internal index for fast O(1) element lookup by tag name. */
+  private readonly tagMap = new Map<string, Set<Y.XmlElement>>();
   /** Reverse index to track which ID belongs to which element, for efficient updates. */
   private readonly elementToIdMap = new Map<Y.XmlElement, string>();
 
@@ -58,7 +78,7 @@ export class MeiFriend {
     this.xmlRoot = this.doc.getXmlFragment("mei");
     this.undoManager = new Y.UndoManager(this.xmlRoot);
 
-    this.initializeIdIndex();
+    this.initializeIndex();
   }
 
   /**
@@ -177,35 +197,40 @@ export class MeiFriend {
    */
   public getElementById(xmlId: string): MeiElement | undefined {
     const yNode = this.idMap.get(xmlId);
+    if (yNode && !yNode.doc) {
+      // Lazy cleanup: the node was detached but still in our index.
+      this.idMap.delete(xmlId);
+      this.elementToIdMap.delete(yNode);
+      return undefined;
+    }
     return yNode ? new MeiElement(yNode, this) : undefined;
   }
 
   /**
    * Returns all elements with the given tag name (e.g., "note", "measure").
+   * This uses an internal index and is extremely fast O(1) (excluding wrapper creation).
    * @param tagName The name of the tag to search for.
    * @returns An array of matching elements.
    */
   public getElementsByTagName(tagName: string): MeiElement[] {
-    return this.getElementsByTagNameInternal(this.xmlRoot, tagName);
-  }
+    const nodes = this.tagMap.get(tagName);
+    if (!nodes) return [];
 
-  /** @internal Helper for recursive tag name search. Used by MeiElement. */
-  public getElementsByTagNameInternal(
-    root: Y.XmlFragment | Y.XmlElement,
-    tagName: string,
-  ): MeiElement[] {
     const result: MeiElement[] = [];
-    const traverse = (node: Y.XmlFragment | Y.XmlElement) => {
-      for (const child of node.toArray()) {
-        if (child instanceof Y.XmlElement) {
-          if (child.nodeName === tagName) {
-            result.push(new MeiElement(child, this));
-          }
-          traverse(child);
-        }
+    for (const node of nodes) {
+      if (node.doc) {
+        result.push(new MeiElement(node, this));
+      } else {
+        // Lazy cleanup
+        nodes.delete(node);
+        this.elementToIdMap.delete(node);
       }
-    };
-    traverse(root);
+    }
+
+    if (nodes.size === 0) {
+      this.tagMap.delete(tagName);
+    }
+
     return result;
   }
 
@@ -216,40 +241,113 @@ export class MeiFriend {
   /**
    * Registers a callback for when the document changes.
    * This abstracts away Yjs events to keep the core API clean.
+   * @returns A function to unregister the callback.
    */
-  public onChange(callback: (events: MeiChangeEvent[]) => void): void {
-    this.xmlRoot.observeDeep((yEvents) => {
+  public onChange(callback: (events: MeiChangeEvent[]) => void): () => void {
+    // biome-ignore lint/suspicious/noExplicitAny: yEvents can contain various types of events.
+    const observer = (yEvents: Y.YEvent<any>[], transaction: Y.Transaction) => {
       const meiEvents: MeiChangeEvent[] = yEvents.map((e) => {
         const yEvent = e as Y.YXmlEvent;
         const target = yEvent.target;
-        const attributesChanged = new Map<string, string | null>();
 
+        let meiTarget: MeiElement;
+        let textChanged = false;
+
+        // Determine the target MeiElement.
+        // If the target is a text node, we treat the parent element as the event target.
         if (target instanceof Y.XmlElement) {
-          yEvent.attributesChanged.forEach((_, key) => {
-            attributesChanged.set(key, target.getAttribute(key) ?? null);
-          });
-
-          return {
-            target: new MeiElement(target, this),
-            attributesChanged,
-            childListChanged:
-              yEvent.changes.added.size > 0 || yEvent.changes.deleted.size > 0,
-          };
+          meiTarget = new MeiElement(target, this);
+        } else if (target instanceof Y.XmlText) {
+          const parent = target.parent;
+          if (parent instanceof Y.XmlElement) {
+            meiTarget = new MeiElement(parent, this);
+            textChanged = true;
+          } else {
+            // Fallback for isolated text nodes
+            meiTarget = new MeiElement(target as unknown as Y.XmlElement, this);
+            textChanged = true;
+          }
+        } else {
+          // Fallback for fragments or other types
+          meiTarget = new MeiElement(target as unknown as Y.XmlElement, this);
         }
 
-        // Fallback for non-element targets (fragments, etc. - should be rare here)
+        const attributesChanged = new Map<
+          string,
+          { oldValue: string | null; newValue: string | null }
+        >();
+        if (target instanceof Y.XmlElement) {
+          yEvent.attributesChanged.forEach((change, key) => {
+            attributesChanged.set(key, {
+              // biome-ignore lint/suspicious/noExplicitAny: Yjs attribute change object has oldValue.
+              oldValue: (change as any).oldValue ?? null,
+              newValue: target.getAttribute(key) ?? null,
+            });
+          });
+        }
+
+        const addedElements: MeiElement[] = [];
+        const removedElements: MeiElement[] = [];
+
+        yEvent.changes.added.forEach((item) => {
+          if (item.content instanceof Y.ContentType) {
+            const type = item.content.type;
+            if (type instanceof Y.XmlElement) {
+              addedElements.push(new MeiElement(type, this));
+            } else if (type instanceof Y.XmlText) {
+              textChanged = true;
+            }
+          } else if (item.content instanceof Y.ContentString) {
+            textChanged = true;
+          }
+        });
+
+        yEvent.changes.deleted.forEach((item) => {
+          if (item.content instanceof Y.ContentType) {
+            const type = item.content.type;
+            if (type instanceof Y.XmlElement) {
+              removedElements.push(new MeiElement(type, this));
+            } else if (type instanceof Y.XmlText) {
+              textChanged = true;
+            }
+          } else if (item.content instanceof Y.ContentString) {
+            textChanged = true;
+          }
+        });
+
         return {
-          target: new MeiElement(
-            target as unknown as Y.XmlElement,
-            this,
-          ) /* Not ideal, but fits types */,
+          target: meiTarget,
           attributesChanged,
-          childListChanged:
-            yEvent.changes.added.size > 0 || yEvent.changes.deleted.size > 0,
+          addedElements,
+          removedElements,
+          textChanged:
+            textChanged ||
+            yEvent.changes.added.size > 0 ||
+            yEvent.changes.deleted.size > 0,
+          origin: transaction.origin,
+          isLocal: transaction.local,
         };
       });
       callback(meiEvents);
-    });
+    };
+
+    this.xmlRoot.observeDeep(observer);
+    return () => {
+      this.xmlRoot.unobserveDeep(observer);
+    };
+  }
+
+  // --------------------------------------------------------------------------
+  // Lifecycle
+  // --------------------------------------------------------------------------
+
+  /**
+   * Destroys the document and associated undo manager, releasing all resources.
+   * This should be called when the document is no longer needed to prevent memory leaks.
+   */
+  public destroy(): void {
+    this.undoManager.destroy();
+    this.doc.destroy();
   }
 
   // --------------------------------------------------------------------------
@@ -308,12 +406,15 @@ export class MeiFriend {
     });
   }
 
-  /** Sets up observers to maintain the idMap. */
-  private initializeIdIndex(): void {
+  /** Sets up observers to maintain the idMap and tagMap. */
+  private initializeIndex(): void {
+    // Initial indexing
+    this.buildIndex(this.xmlRoot);
+
     this.xmlRoot.observeDeep((events) => {
       for (const event of events) {
         if (event instanceof Y.YXmlEvent) {
-          // Attribute changes
+          // Attribute changes (only affects ID map)
           if (
             event.attributesChanged.has("xml:id") ||
             event.attributesChanged.has("id")
@@ -326,17 +427,19 @@ export class MeiFriend {
             if (item.content instanceof Y.ContentType) {
               const content = item.content.type;
               if (content instanceof Y.XmlElement) {
-                this.buildIdMap(content);
+                this.buildIndex(content);
               }
             }
           });
 
           // Deleted nodes
           event.changes.deleted.forEach((item) => {
+            // In Yjs observeDeep, deleted items are passed.
+            // We need to unindex them and their nested children.
             if (item.content instanceof Y.ContentType) {
               const content = item.content.type;
               if (content instanceof Y.XmlElement) {
-                this.removeFromIdMap(content);
+                this.removeFromIndex(content);
               }
             }
           });
@@ -360,34 +463,59 @@ export class MeiFriend {
     }
   }
 
-  /** Recursively populates idMap from a Yjs XML node. */
-  private buildIdMap(node: Y.XmlFragment | Y.XmlElement): void {
+  /** Recursively populates idMap and tagMap from a Yjs XML node. */
+  private buildIndex(node: Y.XmlFragment | Y.XmlElement): void {
     if (node instanceof Y.XmlElement) {
+      // ID index
       const id = node.getAttribute("xml:id") || node.getAttribute("id");
       if (id) {
         this.idMap.set(id, node);
         this.elementToIdMap.set(node, id);
       }
+      // Tag index
+      let set = this.tagMap.get(node.nodeName);
+      if (!set) {
+        set = new Set();
+        this.tagMap.set(node.nodeName, set);
+      }
+      set.add(node);
     }
     for (const child of node.toArray()) {
       if (child instanceof Y.XmlElement) {
-        this.buildIdMap(child);
+        this.buildIndex(child);
       }
     }
   }
 
-  /** Recursively removes detached nodes and their children from the idMap. */
-  private removeFromIdMap(node: Y.XmlElement): void {
-    const id = this.elementToIdMap.get(node);
-    if (id) {
-      this.idMap.delete(id);
-      this.elementToIdMap.delete(node);
-    }
-    for (const child of node.toArray()) {
-      if (child instanceof Y.XmlElement) {
-        this.removeFromIdMap(child);
+  /** Recursively removes detached nodes and their children from the indexes. */
+  private removeFromIndex(node: Y.XmlElement): void {
+    const traverse = (n: Y.XmlElement) => {
+      // Remove ID
+      const id = this.elementToIdMap.get(n);
+      if (id) {
+        this.idMap.delete(id);
+        this.elementToIdMap.delete(n);
       }
-    }
+      // Remove Tag
+      const set = this.tagMap.get(n.nodeName);
+      if (set) {
+        set.delete(n);
+        if (set.size === 0) {
+          this.tagMap.delete(n.nodeName);
+        }
+      }
+
+      // Recursively traverse children.
+      // Even if detached, we can still iterate over the children.
+      const len = n.length;
+      for (let i = 0; i < len; i++) {
+        const child = n.get(i);
+        if (child instanceof Y.XmlElement) {
+          traverse(child);
+        }
+      }
+    };
+    traverse(node);
   }
 
   private populateFromDom(
@@ -411,14 +539,6 @@ export class MeiFriend {
 
           yParent.push([yElement]);
           this.populateFromDom(el, yElement);
-
-          // Initial indexing
-          const id =
-            yElement.getAttribute("xml:id") || yElement.getAttribute("id");
-          if (id) {
-            this.idMap.set(id, yElement);
-            this.elementToIdMap.set(yElement, id);
-          }
           break;
         }
         case 3: {
