@@ -1,15 +1,32 @@
 import { DOMParser } from "@xmldom/xmldom";
 import * as Y from "yjs";
+import { MeiElement } from "./MeiElement.js";
+
+/**
+ * A token representing an active transaction.
+ * This is used to ensure that all operations are performed
+ * within an `update()` block and to group multiple low-level changes
+ * into a single undo/redo step.
+ */
+export type MeiTransaction = { readonly _brand: unique symbol };
+
+/**
+ * Represents a change event in the MEI document.
+ * This abstracts away the underlying Yjs event structure.
+ */
+export interface MeiChangeEvent {
+  /** The element that was modified. */
+  target: MeiElement;
+  /** Attributes that were changed, mapped to their new values (or null if deleted). */
+  attributesChanged: Map<string, string | null>;
+  /** Whether children were added or removed. */
+  childListChanged: boolean;
+}
 
 /**
  * MeiFriend represents a single Music Encoding Initiative (MEI) score.
  * It provides utility APIs for querying and updating XML elements and
  * manages the complete history of changes.
- *
- * While offering an interface tailored to the general needs of MEI score
- * handling, it also supports advanced editing operations such as bidirectional
- * synchronization within complex applications and real-time collaborative editing.
- * To enable these features, it is built on top of the Yjs framework.
  *
  * MeiFriend handles only well-formed XML and manages internal state by focusing
  * strictly on structural elements and attributes. Consequently, it intentionally
@@ -19,20 +36,22 @@ import * as Y from "yjs";
  * - CDATA sections.
  * - XML Declarations (`<?xml ... ?>`).
  * - The order of attributes.
+ *
+ * This class encapsulates Yjs for real-time collaboration and undo/redo support.
+ * Direct access to the underlying Yjs document is restricted to the `yDoc` getter
+ * for synchronization purposes.
  */
 export class MeiFriend {
-  // --------------------------------------------------------------------------
-  // Public Properties & Lifecycle
-  // --------------------------------------------------------------------------
-
   /** The underlying Yjs document. */
-  public readonly doc: Y.Doc;
+  private readonly doc: Y.Doc;
   /** Manager for undo/redo history. */
-  public readonly undoManager: Y.UndoManager;
+  private readonly undoManager: Y.UndoManager;
   /** The root XML fragment (usually containing the <mei> element). */
   private readonly xmlRoot: Y.XmlFragment;
   /** Internal index for fast O(1) element lookup by xml:id. */
   private readonly idMap = new Map<string, Y.XmlElement>();
+  /** Reverse index to track which ID belongs to which element, for efficient updates. */
+  private readonly elementToIdMap = new Map<Y.XmlElement, string>();
 
   constructor(doc?: Y.Doc) {
     this.doc = doc ?? new Y.Doc();
@@ -40,6 +59,15 @@ export class MeiFriend {
     this.undoManager = new Y.UndoManager(this.xmlRoot);
 
     this.initializeIdIndex();
+  }
+
+  /**
+   * The underlying Yjs document.
+   * This should only be used to connect synchronization providers
+   * (e.g., y-webrtc, y-indexeddb). For all editing operations, use `update()`.
+   */
+  public get yDoc(): Y.Doc {
+    return this.doc;
   }
 
   /**
@@ -59,7 +87,7 @@ export class MeiFriend {
       throw new Error(`XML Parsing Error: ${parserError[0].textContent}`);
     }
 
-    instance.doc.transact(() => {
+    instance.update(() => {
       // Populate from DOM
       instance.populateFromDom(dom as unknown as Node, instance.xmlRoot);
     });
@@ -73,38 +101,83 @@ export class MeiFriend {
   /**
    * Serializes the current state back to an MEI XML string.
    * The output is formatted with 2-space indentation and a trailing newline.
+   * @param includeDeclaration If true, prepends the XML declaration.
    * @returns The MEI XML string.
    */
-  public toXmlString(): string {
+  public toXmlString(includeDeclaration = true): string {
     const serialized = this.serializeYNode(this.xmlRoot, 0);
-    return serialized ? `${serialized}\n` : "";
+    if (!serialized) return "";
+
+    const declaration = includeDeclaration
+      ? '<?xml version="1.0" encoding="UTF-8"?>\n'
+      : "";
+    return `${declaration}${serialized}\n`;
   }
 
   /**
-   * Wraps multiple operations into a single transaction/undo-step.
-   * Aligns with Yjs's transact interface.
-   * @param fn The function to execute within the transaction.
-   * @param origin The origin of the transaction (optional).
+   * Performs multiple editing operations in a single transaction.
+   * Changes are grouped for undo/redo and synchronization.
+   *
+   * @example
+   * ```typescript
+   * const root = meiFriend.getElementById("m-1")!;
+   *
+   * meiFriend.update((tx) => {
+   *   const note = root.appendElement(tx, "note");
+   *   note.setAttribute(tx, "xml:id", "n-1");
+   *
+   *   // Notice: This will be undefined because the MeiFriend's internal index is updated AFTER the transaction.
+   *   const sameNote = meiFriend.getElementById("n-1");
+   * });
+   *
+   * // OK: Now it's searchable.
+   * const sameNote = meiFriend.getElementById("n-1");
+   * ```
+   *
+   * @param fn The function to execute. It receives a `MeiTransaction` token.
+   * @param origin The origin of the change (optional).
+   * @returns The result of the provided function.
    */
-  public transact(
-    fn: (transaction: Y.Transaction) => void,
+  public update<T>(
+    fn: (tx: MeiTransaction) => T,
     // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
     origin?: any,
-  ): void {
-    this.doc.transact(fn, origin);
+  ): T {
+    let result: T;
+    this.doc.transact(() => {
+      const tx = {} as unknown as MeiTransaction;
+      result = fn(tx);
+    }, origin);
+    // biome-ignore lint/style/noNonNullAssertion: result is guaranteed to be set in the synchronous transaction block.
+    return result!;
   }
 
   // --------------------------------------------------------------------------
-  // Query API
+  // Basic Query API
   // --------------------------------------------------------------------------
+
+  /**
+   * Returns the root <mei> element wrapped in a MeiElement.
+   */
+  public getRootElement(): MeiElement | undefined {
+    const meiNode = this.xmlRoot
+      .toArray()
+      .find(
+        (child): child is Y.XmlElement =>
+          child instanceof Y.XmlElement && child.nodeName === "mei",
+      );
+    return meiNode ? new MeiElement(meiNode, this) : undefined;
+  }
 
   /**
    * Returns an element by its xml:id. Fast O(1) lookup.
+   * Note: This reflects the state AFTER the last completed `update()`.
    * @param xmlId The xml:id of the element to find.
    * @returns The element if found, otherwise undefined.
    */
-  public getElementById(xmlId: string): Y.XmlElement | undefined {
-    return this.idMap.get(xmlId);
+  public getElementById(xmlId: string): MeiElement | undefined {
+    const yNode = this.idMap.get(xmlId);
+    return yNode ? new MeiElement(yNode, this) : undefined;
   }
 
   /**
@@ -112,121 +185,28 @@ export class MeiFriend {
    * @param tagName The name of the tag to search for.
    * @returns An array of matching elements.
    */
-  public getElementsByTagName(tagName: string): Y.XmlElement[] {
-    const result: Y.XmlElement[] = [];
+  public getElementsByTagName(tagName: string): MeiElement[] {
+    return this.getElementsByTagNameInternal(this.xmlRoot, tagName);
+  }
+
+  /** @internal Helper for recursive tag name search. Used by MeiElement. */
+  public getElementsByTagNameInternal(
+    root: Y.XmlFragment | Y.XmlElement,
+    tagName: string,
+  ): MeiElement[] {
+    const result: MeiElement[] = [];
     const traverse = (node: Y.XmlFragment | Y.XmlElement) => {
       for (const child of node.toArray()) {
         if (child instanceof Y.XmlElement) {
           if (child.nodeName === tagName) {
-            result.push(child);
+            result.push(new MeiElement(child, this));
           }
           traverse(child);
         }
       }
     };
-    traverse(this.xmlRoot);
+    traverse(root);
     return result;
-  }
-
-  /**
-   * Returns the parent element of the specified element.
-   * @param xmlId The xml:id of the child element.
-   * @returns The parent element if found and is an XmlElement, otherwise undefined.
-   */
-  public getParentElement(xmlId: string): Y.XmlElement | undefined {
-    const el = this.getElementById(xmlId);
-    return el?.parent instanceof Y.XmlElement ? el.parent : undefined;
-  }
-
-  // --------------------------------------------------------------------------
-  // Mutation API
-  // --------------------------------------------------------------------------
-
-  /**
-   * Sets an attribute on the specified element.
-   * @param xmlId The xml:id of the element to modify.
-   * @param name The name of the attribute to set.
-   * @param value The value of the attribute.
-   * @param origin Optional transaction origin.
-   */
-  public setAttribute(
-    xmlId: string,
-    name: string,
-    value: string,
-    // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
-    origin?: any,
-  ): void {
-    const el = this.getElementById(xmlId);
-    if (el) {
-      this.transact(() => el.setAttribute(name, value), origin);
-    }
-  }
-
-  /**
-   * Removes an attribute from the specified element.
-   * @param xmlId The xml:id of the element to modify.
-   * @param name The name of the attribute to remove.
-   * @param origin Optional transaction origin.
-   */
-  public removeAttribute(
-    xmlId: string,
-    name: string,
-    // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
-    origin?: any,
-  ): void {
-    const el = this.getElementById(xmlId);
-    if (el) {
-      this.transact(() => el.removeAttribute(name), origin);
-    }
-  }
-
-  /**
-   * Inserts a new element or moves an existing one.
-   * @param parentXmlId The xml:id of the parent element.
-   * @param element The Y.XmlElement to insert.
-   * @param index The position to insert at. If omitted, appends to the end.
-   * @param origin Optional transaction origin.
-   */
-  public insertElement(
-    parentXmlId: string,
-    element: Y.XmlElement,
-    index?: number,
-    // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
-    origin?: any,
-  ): void {
-    const parent = this.getElementById(parentXmlId);
-    if (parent) {
-      this.transact(() => {
-        if (index === undefined) {
-          parent.push([element]);
-        } else {
-          parent.insert(index, [element]);
-        }
-      }, origin);
-    }
-  }
-
-  /**
-   * Removes an element from the score.
-   * @param xmlId The xml:id of the element to remove.
-   * @param origin Optional transaction origin.
-   */
-  public removeElement(
-    xmlId: string,
-    // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
-    origin?: any,
-  ): void {
-    const el = this.getElementById(xmlId);
-    if (el) {
-      const parent = el.parent;
-      if (parent instanceof Y.XmlElement || parent instanceof Y.XmlFragment) {
-        // Use indexOf on toArray() to avoid O(N^2) loop
-        const index = parent.toArray().indexOf(el);
-        if (index !== -1) {
-          this.transact(() => parent.delete(index, 1), origin);
-        }
-      }
-    }
   }
 
   // --------------------------------------------------------------------------
@@ -234,20 +214,99 @@ export class MeiFriend {
   // --------------------------------------------------------------------------
 
   /**
-   * Registers a callback for when the score changes.
+   * Registers a callback for when the document changes.
+   * This abstracts away Yjs events to keep the core API clean.
    */
-  public onChange(
-    callback: (events: Y.YXmlEvent[], transaction: Y.Transaction) => void,
-  ): void {
-    this.xmlRoot.observeDeep(
-      // biome-ignore lint/suspicious/noExplicitAny: Y.YEvent expects a type extending AbstractType<any>
-      callback as (events: Y.YEvent<any>[], transaction: Y.Transaction) => void,
-    );
+  public onChange(callback: (events: MeiChangeEvent[]) => void): void {
+    this.xmlRoot.observeDeep((yEvents) => {
+      const meiEvents: MeiChangeEvent[] = yEvents.map((e) => {
+        const yEvent = e as Y.YXmlEvent;
+        const target = yEvent.target;
+        const attributesChanged = new Map<string, string | null>();
+
+        if (target instanceof Y.XmlElement) {
+          yEvent.attributesChanged.forEach((_, key) => {
+            attributesChanged.set(key, target.getAttribute(key) ?? null);
+          });
+
+          return {
+            target: new MeiElement(target, this),
+            attributesChanged,
+            childListChanged:
+              yEvent.changes.added.size > 0 || yEvent.changes.deleted.size > 0,
+          };
+        }
+
+        // Fallback for non-element targets (fragments, etc. - should be rare here)
+        return {
+          target: new MeiElement(
+            target as unknown as Y.XmlElement,
+            this,
+          ) /* Not ideal, but fits types */,
+          attributesChanged,
+          childListChanged:
+            yEvent.changes.added.size > 0 || yEvent.changes.deleted.size > 0,
+        };
+      });
+      callback(meiEvents);
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // Undo / Redo
+  // --------------------------------------------------------------------------
+
+  public undo(): void {
+    this.undoManager.undo();
+  }
+
+  public redo(): void {
+    this.undoManager.redo();
+  }
+
+  /**
+   * Returns true if there are operations that can be undone.
+   */
+  public get canUndo(): boolean {
+    return this.undoManager.undoStack.length > 0;
+  }
+
+  /**
+   * Returns true if there are operations that can be redone.
+   */
+  public get canRedo(): boolean {
+    return this.undoManager.redoStack.length > 0;
+  }
+
+  /**
+   * Clears the undo/redo history.
+   */
+  public clearHistory(): void {
+    this.undoManager.clear();
   }
 
   // --------------------------------------------------------------------------
   // Private Methods
   // --------------------------------------------------------------------------
+
+  private escapeXml(unsafe: string): string {
+    return unsafe.replace(/[<>&"']/g, (m) => {
+      switch (m) {
+        case "<":
+          return "&lt;";
+        case ">":
+          return "&gt;";
+        case "&":
+          return "&amp;";
+        case '"':
+          return "&quot;";
+        case "'":
+          return "&apos;";
+        default:
+          return m;
+      }
+    });
+  }
 
   /** Sets up observers to maintain the idMap. */
   private initializeIdIndex(): void {
@@ -259,7 +318,7 @@ export class MeiFriend {
             event.attributesChanged.has("xml:id") ||
             event.attributesChanged.has("id")
           ) {
-            this.buildIdMap(event.target as Y.XmlElement);
+            this.updateElementId(event.target as Y.XmlElement);
           }
 
           // Added nodes
@@ -286,12 +345,28 @@ export class MeiFriend {
     });
   }
 
+  /** Updates the indexing for a single element when its ID attribute changes. */
+  private updateElementId(node: Y.XmlElement): void {
+    const oldId = this.elementToIdMap.get(node);
+    if (oldId) {
+      this.idMap.delete(oldId);
+      this.elementToIdMap.delete(node);
+    }
+
+    const newId = node.getAttribute("xml:id") || node.getAttribute("id");
+    if (newId) {
+      this.idMap.set(newId, node);
+      this.elementToIdMap.set(node, newId);
+    }
+  }
+
   /** Recursively populates idMap from a Yjs XML node. */
   private buildIdMap(node: Y.XmlFragment | Y.XmlElement): void {
     if (node instanceof Y.XmlElement) {
       const id = node.getAttribute("xml:id") || node.getAttribute("id");
       if (id) {
         this.idMap.set(id, node);
+        this.elementToIdMap.set(node, id);
       }
     }
     for (const child of node.toArray()) {
@@ -303,9 +378,10 @@ export class MeiFriend {
 
   /** Recursively removes detached nodes and their children from the idMap. */
   private removeFromIdMap(node: Y.XmlElement): void {
-    const id = node.getAttribute("xml:id") || node.getAttribute("id");
-    if (id && this.idMap.get(id) === node) {
+    const id = this.elementToIdMap.get(node);
+    if (id) {
       this.idMap.delete(id);
+      this.elementToIdMap.delete(node);
     }
     for (const child of node.toArray()) {
       if (child instanceof Y.XmlElement) {
@@ -341,6 +417,7 @@ export class MeiFriend {
             yElement.getAttribute("xml:id") || yElement.getAttribute("id");
           if (id) {
             this.idMap.set(id, yElement);
+            this.elementToIdMap.set(yElement, id);
           }
           break;
         }
@@ -373,14 +450,16 @@ export class MeiFriend {
       // Yjs does not maintain the order of attributes.
       // To make it deterministic, the xml:id is placed first, and the rest are in alphabetical order.
       // There is room for improvement, such as placing the most important elements first.
-      const keys = Object.keys(attrs).sort((a, b) => {
-        if (a === "xml:id") return -1;
-        if (b === "xml:id") return 1;
-        return a.localeCompare(b);
-      });
+      const keys = Object.keys(attrs)
+        .filter((key) => attrs[key] !== undefined)
+        .sort((a, b) => {
+          if (a === "xml:id") return -1;
+          if (b === "xml:id") return 1;
+          return a.localeCompare(b);
+        });
 
       for (const key of keys) {
-        attrStr += ` ${key}="${attrs[key]}"`;
+        attrStr += ` ${key}="${this.escapeXml(attrs[key])}"`;
       }
 
       const children = yNode.toArray();
@@ -394,8 +473,10 @@ export class MeiFriend {
         children.length === 1 && children[0] instanceof Y.XmlText;
 
       if (isTextOnly) {
-        const textContent = this.serializeYNode(children[0] as Y.XmlText, 0);
-        return `${indent}<${name}${attrStr}>${textContent}</${name}>`;
+        const textContent = (children[0] as Y.XmlText).toString();
+        return `${indent}<${name}${attrStr}>${this.escapeXml(
+          textContent,
+        )}</${name}>`;
       }
 
       const childrenStrs: string[] = [];
@@ -408,18 +489,19 @@ export class MeiFriend {
         );
       }
 
-      return `${indent}<${name}${attrStr}>\n${childrenStrs.join("\n")}\n${indent}</${name}>`;
+      return `${indent}<${name}${attrStr}>\n${childrenStrs.join(
+        "\n",
+      )}\n${indent}</${name}>`;
     } else if (yNode instanceof Y.XmlText) {
-      return yNode.toString();
+      return this.escapeXml(yNode.toString());
     } else if (yNode instanceof Y.XmlFragment) {
       const childrenStrs: string[] = [];
       for (const child of yNode.toArray()) {
-        childrenStrs.push(
-          this.serializeYNode(
-            child as Y.XmlFragment | Y.XmlElement | Y.XmlText,
-            level, // Fragments don't increase indent
-          ),
+        const serializedChild = this.serializeYNode(
+          child as Y.XmlFragment | Y.XmlElement | Y.XmlText,
+          level,
         );
+        if (serializedChild) childrenStrs.push(serializedChild);
       }
       return childrenStrs.join("\n");
     }
