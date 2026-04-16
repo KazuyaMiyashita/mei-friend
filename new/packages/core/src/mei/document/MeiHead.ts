@@ -1,5 +1,5 @@
 import type { MeiElement } from "../../MeiElement.js";
-import type { MeiTransaction } from "../../MeiFriend.js";
+import { setTextContent } from "../../MeiUpdate.js";
 
 /**
  * Adapter for MEI header operations.
@@ -24,13 +24,19 @@ export class MeiHead {
 
   /**
    * Sets the main title text of the score, creating the necessary structure if needed.
-   * This high-level operation requires an active transaction.
    */
-  public setTitle(tx: MeiTransaction, text: string): void {
-    const head = this.rootMeiElement.ensureChildElement(tx, "meiHead");
-    const fileDesc = head.ensureChildElement(tx, "fileDesc");
-    const titleStmt = fileDesc.ensureChildElement(tx, "titleStmt");
-    const title = titleStmt.ensureChildElement(tx, "title");
-    title.setTextContent(tx, text);
+  public setTitle(text: string): void {
+    this.rootMeiElement.doc.transact(() => {
+      const title = this.rootMeiElement
+        .getOrCreateChild("meiHead")
+        .getOrCreateChild("fileDesc")
+        .getOrCreateChild("titleStmt")
+        .getOrCreateChild("title");
+
+      const targetId = title.id;
+      if (targetId) {
+        this.rootMeiElement.doc.update(setTextContent(targetId, text));
+      }
+    });
   }
 }

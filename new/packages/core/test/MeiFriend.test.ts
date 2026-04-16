@@ -1,14 +1,28 @@
-import { describe, expect, it } from "vitest";
-import { type MeiChangeEvent, MeiFriend } from "../src/index.js";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  addElement,
+  MeiFriend,
+  type MeiUpdateEvent,
+  removeElement,
+  setAttribute,
+  setTextContent,
+} from "../src/index.js";
 
 describe("MeiFriend", () => {
+  beforeAll(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
   describe("Lifecycle & Serialization", () => {
     it("should create instance from XML string and serialize back", () => {
       const meiString = `<mei xmlns="http://www.music-encoding.org/ns/mei">
   test
 </mei>\n`;
       const meiFriend = MeiFriend.fromXmlString(meiString);
-      expect(meiFriend.toXmlString(false)).toBe(meiString);
+      const output = meiFriend.toXmlString(false);
+      expect(output).toContain('xmlns="http://www.music-encoding.org/ns/mei"');
+      expect(output).toContain("test");
+      expect(output).toContain('xml:id="mei-');
     });
 
     it("should handle the includeDeclaration option in toXmlString", () => {
@@ -31,27 +45,29 @@ describe("MeiFriend", () => {
   </music>
 </mei>\n`;
       const meiFriend = MeiFriend.fromXmlString(meiString);
-      expect(meiFriend.toXmlString(false)).toBe(meiString);
+      const output = meiFriend.toXmlString(false);
+      expect(output).toContain('xml:id="b-1"');
+      expect(output).toContain("<music");
+      expect(output).toContain("<mRest");
     });
 
-    it("should handle mixed content serialization", () => {
+    it("should handle mixed content serialization and preserve whitespace precisely", () => {
       const meiString = `<mei>
-  <p>Text before <lb/> Text after</p>
+  <p>Text before <lb xml:id="lb-1"/> Text after</p>
 </mei>\n`;
       const meiFriend = MeiFriend.fromXmlString(meiString);
       const output = meiFriend.toXmlString(false);
-      expect(output).toContain("Text before");
-      expect(output).toContain("<lb/>");
-      expect(output).toContain("Text after");
+      expect(output).toMatch(
+        /<p xml:id="p-[a-z0-9]+">Text before <lb xml:id="lb-1"\/> Text after<\/p>/,
+      );
     });
 
     it("should escape special characters in XML", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
-      const root = meiFriend.getRootElement()!;
-      meiFriend.update((tx) => {
-        root.setAttribute(tx, "title", 'A & B "quoted"');
-        root.setTextContent(tx, "5 < 10 & 10 > 5");
-      });
+      meiFriend.update([
+        setAttribute("m1", "title", 'A & B "quoted"'),
+        setTextContent("m1", "5 < 10 & 10 > 5"),
+      ]);
 
       const xml = meiFriend.toXmlString(false);
       expect(xml).toContain('title="A &amp; B &quot;quoted&quot;"');
@@ -97,8 +113,7 @@ describe("MeiFriend", () => {
       const meiFriend = MeiFriend.fromXmlString(
         '<mei><note xml:id="n-1"/></mei>',
       );
-      const note = meiFriend.getElementById("n-1")!;
-      meiFriend.update((tx) => note.setAttribute(tx, "xml:id", "n-new"));
+      meiFriend.update(setAttribute("n-1", "xml:id", "n-new"));
 
       expect(meiFriend.getElementById("n-new")).toBeDefined();
       expect(meiFriend.getElementById("n-1")).toBeUndefined();
@@ -108,8 +123,7 @@ describe("MeiFriend", () => {
       const meiFriend = MeiFriend.fromXmlString(
         '<mei><note xml:id="n1"/><note xml:id="n2"/></mei>',
       );
-      const n1 = meiFriend.getElementById("n1")!;
-      meiFriend.update((tx) => n1.remove(tx));
+      meiFriend.update(removeElement("n1"));
 
       expect(meiFriend.getElementsByTagName("note").length).toBe(1);
       expect(meiFriend.getElementsByTagName("note")[0].id).toBe("n2");
@@ -124,7 +138,7 @@ describe("MeiFriend", () => {
       expect(meiFriend.getElementsByTagName("music").length).toBe(1);
 
       // Perform removal
-      meiFriend.update((tx) => meiFriend.getElementById("m1")!.remove(tx));
+      meiFriend.update(removeElement("m1"));
 
       // The removed element should be gone from the index.
       expect(meiFriend.getElementById("m1")).toBeUndefined();
@@ -132,42 +146,35 @@ describe("MeiFriend", () => {
     });
 
     it("should handle extremely deep nesting for indexes", () => {
-      const meiFriend = MeiFriend.fromXmlString("<mei/>");
-      const root = meiFriend.getRootElement()!;
-      meiFriend.update((tx) => {
-        let current = root;
-        for (let i = 0; i < 50; i++)
-          current = current.appendElement(tx, "layer");
-        current.setAttribute(tx, "xml:id", "deep-node");
-      });
+      const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
+      let parentId = "m1";
+      for (let i = 0; i < 50; i++) {
+        const id = i === 49 ? "deep-node" : `l-${i}`;
+        meiFriend.update(addElement(parentId, "layer", id));
+        parentId = id;
+      }
       expect(meiFriend.getElementById("deep-node")).toBeDefined();
       expect(meiFriend.getElementsByTagName("layer").length).toBe(50);
     });
 
-    it("should NOT find newly created elements by ID until transaction completes", () => {
+    it("should find newly created elements by ID after transaction completes", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m-1"/>');
-      const root = meiFriend.getElementById("m-1")!;
-      meiFriend.update((tx) => {
-        const note = root.appendElement(tx, "note");
-        note.setAttribute(tx, "xml:id", "n-internal");
-        expect(meiFriend.getElementById("n-internal")).toBeUndefined();
-      });
+      meiFriend.update(addElement("m-1", "note", "n-internal"));
       expect(meiFriend.getElementById("n-internal")).toBeDefined();
     });
   });
 
-  describe("Reactivity (onChange)", () => {
-    it("should notify on attribute changes with origin and isLocal", () => {
+  describe("Reactivity (onUpdate)", () => {
+    it("should notify on attribute updates with origin and isLocal", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m-1"/>');
-      const captured: MeiChangeEvent[] = [];
-      meiFriend.onChange((events) => captured.push(...events));
+      const captured: MeiUpdateEvent[] = [];
+      meiFriend.onUpdate((events) => captured.push(...events));
 
-      const root = meiFriend.getElementById("m-1")!;
-      meiFriend.update((tx) => root.setAttribute(tx, "pname", "c"), "plugin-a");
+      meiFriend.update(setAttribute("m-1", "pname", "c"), "plugin-a");
 
       expect(captured.length).toBe(1);
-      const change = captured[0].attributesChanged.get("pname");
-      expect(change?.newValue).toBe("c");
+      const update = captured[0].attributesChanged.get("pname");
+      expect(update?.newValue).toBe("c");
       expect(captured[0].origin).toBe("plugin-a");
       expect(captured[0].isLocal).toBe(true);
     });
@@ -176,29 +183,36 @@ describe("MeiFriend", () => {
       const meiFriend = MeiFriend.fromXmlString(
         '<mei xml:id="m1" attr="old"/>',
       );
-      const captured: MeiChangeEvent[] = [];
+      const captured: MeiUpdateEvent[] = [];
 
-      const root = meiFriend.getElementById("m1")!;
-      meiFriend.onChange((events) => captured.push(...events));
+      meiFriend.onUpdate((events) => captured.push(...events));
 
-      meiFriend.update((tx) => root.setAttribute(tx, "attr", "new"));
+      meiFriend.update(setAttribute("m1", "attr", "new"));
 
       expect(captured.length).toBeGreaterThan(0);
-      const change = captured[0].attributesChanged.get("attr");
-      expect(change?.newValue).toBe("new");
+      const update = captured[0].attributesChanged.get("attr");
+      expect(update?.newValue).toBe("new");
     });
 
-    it("should notify on structural changes and text updates", () => {
+    it("should notify on structural updates and text updates independently", () => {
       const meiFriend = MeiFriend.fromXmlString(
         '<mei xml:id="m-1"><note xml:id="n-1"/></mei>',
       );
-      const captured: MeiChangeEvent[] = [];
-      meiFriend.onChange((events) => captured.push(...events));
+      const captured: MeiUpdateEvent[] = [];
+      meiFriend.onUpdate((events) => captured.push(...events));
 
-      const note = meiFriend.getElementById("n-1")!;
-      meiFriend.update((tx) => note.setTextContent(tx, "C4"));
+      // Structural change (should not flag textChanged)
+      meiFriend.update(addElement("n-1", "accid", "a-1"));
+      expect(captured.length).toBe(1);
+      expect(captured[0].addedElements.length).toBe(1);
+      expect(captured[0].textChanged).toBe(false);
 
-      expect(captured.some((e) => e.target.id === "n-1" && e.textChanged)).toBe(
+      captured.length = 0; // Clear array
+
+      // Text change
+      meiFriend.update(setTextContent("a-1", "sharp"));
+
+      expect(captured.some((e) => e.target.id === "a-1" && e.textChanged)).toBe(
         true,
       );
     });
@@ -206,19 +220,15 @@ describe("MeiFriend", () => {
     it("should allow unregistering the observer", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m-1"/>');
       let count = 0;
-      const unsubscribe = meiFriend.onChange(() => {
+      const unsubscribe = meiFriend.onUpdate(() => {
         count++;
       });
 
-      meiFriend.update((tx) =>
-        meiFriend.getRootElement()?.setAttribute(tx, "a", "1"),
-      );
+      meiFriend.update(setAttribute("m-1", "a", "1"));
       expect(count).toBe(1);
 
       unsubscribe();
-      meiFriend.update((tx) =>
-        meiFriend.getRootElement()?.setAttribute(tx, "a", "2"),
-      );
+      meiFriend.update(setAttribute("m-1", "a", "2"));
       expect(count).toBe(1); // Should not increase
     });
   });
@@ -228,7 +238,7 @@ describe("MeiFriend", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m-1"/>');
       const root = meiFriend.getElementById("m-1")!;
 
-      meiFriend.update((tx) => root.setAttribute(tx, "label", "test"));
+      meiFriend.update(setAttribute("m-1", "label", "test"));
       expect(root.getAttribute("label")).toBe("test");
 
       meiFriend.undo();
@@ -239,12 +249,9 @@ describe("MeiFriend", () => {
     });
 
     it("syncs indexes correctly after undo/redo", () => {
-      const meiFriend = MeiFriend.fromXmlString("<mei/>");
-      const root = meiFriend.getRootElement()!;
+      const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
 
-      meiFriend.update((tx) =>
-        root.appendElement(tx, "note").setAttribute(tx, "xml:id", "n1"),
-      );
+      meiFriend.update(addElement("m1", "note", "n1"));
       expect(meiFriend.getElementById("n1")).toBeDefined();
 
       meiFriend.undo();

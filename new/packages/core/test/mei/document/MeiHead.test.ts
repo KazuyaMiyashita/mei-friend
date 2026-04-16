@@ -27,15 +27,15 @@ describe("MeiHead API", () => {
 
   it("should set the title and create structure if needed", () => {
     // Create initial structure
-    const xml = `<mei xmlns="http://www.music-encoding.org/ns/mei"></mei>`;
+    const xml = `<mei xmlns="http://www.music-encoding.org/ns/mei" xml:id="m1"></mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
     const head = meiFriend.mei!.head;
 
-    meiFriend.update((tx) => head.setTitle(tx, "New Title"));
+    head.setTitle("New Title");
 
     expect(head.getTitle()).toBe("New Title");
     const serialized = meiFriend.toXmlString(false);
-    expect(serialized).toContain("<title>New Title</title>");
+    expect(serialized).toContain("New Title</title>");
     expect(serialized).toContain("<titleStmt");
     expect(serialized).toContain("<fileDesc");
     expect(serialized).toContain("<meiHead");
@@ -43,7 +43,7 @@ describe("MeiHead API", () => {
 
   it("should update an existing title", () => {
     const xml = `
-<mei xmlns="http://www.music-encoding.org/ns/mei">
+<mei xmlns="http://www.music-encoding.org/ns/mei" xml:id="m1">
    <meiHead>
       <fileDesc>
          <titleStmt>
@@ -54,25 +54,25 @@ describe("MeiHead API", () => {
 </mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
     const head = meiFriend.mei!.head;
-    meiFriend.update((tx) => head.setTitle(tx, "Updated Title"));
+    head.setTitle("Updated Title");
     expect(head.getTitle()).toBe("Updated Title");
   });
 
-  it("should work within an update transaction", () => {
-    const xml = `<mei xmlns="http://www.music-encoding.org/ns/mei"></mei>`;
+  it("should work and be undoable", () => {
+    const xml = `<mei xmlns="http://www.music-encoding.org/ns/mei" xml:id="m1"></mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
     const head = meiFriend.mei!.head;
 
-    const result = meiFriend.update((tx) => {
-      head.setTitle(tx, "Transacted Title");
-      return head.getTitle();
-    });
-
-    expect(result).toBe("Transacted Title");
+    head.setTitle("Transacted Title");
     expect(head.getTitle()).toBe("Transacted Title");
 
-    // Verify it's one undo step
+    // Verify it's completely undoable in a single step
     meiFriend.undo();
+
+    // The title should be gone
     expect(head.getTitle()).toBeUndefined();
+    // And the dynamically created <meiHead> structure should also be completely removed
+    const rootChildren = meiFriend.getRootElement()!.children;
+    expect(rootChildren.length).toBe(0);
   });
 });
