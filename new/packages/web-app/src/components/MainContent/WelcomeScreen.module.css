@@ -1,0 +1,33 @@
+.welcomeScreen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: var(--backgroundColor);
+}
+
+.welcomeScreen.fileDragging {
+  background: rgba(0, 120, 215, 0.15);
+  outline-color: rgba(0, 120, 215, 0.5);
+}
+
+.welcomeContent {
+  text-align: center;
+  color: var(--dropdownBorderColor);
+}
+
+.welcomeHint {
+  font-size: 1.1rem;
+  margin-bottom: 0.25rem;
+}
+
+.welcomeOr {
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+}
+
+.welcomeMenu {
+  font-size: 0.85rem;
+  font-family: monospace;
+}

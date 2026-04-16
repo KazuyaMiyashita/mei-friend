@@ -1,0 +1,43 @@
+.dragContainer {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.friendContainer {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ── Panel placeholder styles (used by panel components) ──────────────────── */
+
+.notationPlaceholder {
+  text-align: center;
+  color: var(--dropdownBorderColor);
+  font-size: 14pt;
+  user-select: none;
+  padding: 2em;
+}
+
+.notationPlaceholder p {
+  margin: 0.5em 0;
+  font-size: 11pt;
+  color: var(--dropdownBorderColor);
+}
+
+.editorPlaceholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dropdownBorderColor);
+  font-family: monospace;
+  font-size: 11pt;
+  user-select: none;
+}

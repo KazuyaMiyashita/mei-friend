@@ -1,0 +1,100 @@
+.workspaceTree {
+  user-select: none;
+  font-family: var(--font-family);
+  font-size: 13px;
+  color: var(--explorer-foreground);
+}
+
+.treeNode {
+  cursor: pointer;
+}
+
+.treeLabel {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding-right: 8px;
+  appearance: none;
+  border: none;
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
+  background: none;
+  color: inherit;
+}
+
+.treeLabel:hover {
+  background-color: var(--explorer-item-hover-bg);
+}
+
+.treeLabel .arrow {
+  display: inline-block;
+  width: 16px;
+  text-align: center;
+  font-size: 8px;
+  transition: transform 0.1s;
+  transform: rotate(0deg);
+  margin-right: 4px;
+}
+
+.treeLabel .arrow.open {
+  transform: rotate(90deg);
+}
+
+.treeLabel .icon {
+  margin-right: 6px;
+  font-size: 14px;
+}
+
+.treeLabel .name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fileNode {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding-right: 8px;
+  appearance: none;
+  border: none;
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
+  background: none;
+  color: inherit;
+}
+
+.fileNode:hover {
+  background-color: var(--explorer-item-hover-bg);
+}
+
+.fileNode.active {
+  background-color: var(--explorer-item-active-bg);
+  color: var(--explorer-item-active-fg);
+}
+
+.fileNode .icon {
+  margin-right: 6px;
+  font-size: 14px;
+}
+
+.fileNode .name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.openIndicator {
+  color: var(--accent-color);
+  font-weight: bold;
+  margin-left: 4px;
+}
+
+/* Use default cursor for non-clickable files (annotation, other, etc.) */
+.fileNode.nonClickable {
+  cursor: default;
+  opacity: 0.6;
+}

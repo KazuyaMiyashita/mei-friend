@@ -1,0 +1,13 @@
+.panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: var(--backgroundColor);
+}
+
+.welcomeContent {
+  text-align: center;
+  color: var(--dropdownBorderColor);
+}
