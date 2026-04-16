@@ -17,7 +17,8 @@
     { "path": "./packages/core" },
     { "path": "./packages/plugin-codemirror" },
     { "path": "./packages/cli-app" },
-    { "path": "./packages/web-app" }
+    { "path": "./packages/web-app" },
+    { "path": "./packages/web-app-verovio-example" }
   ],
   "exclude": ["node_modules", "**/dist"]
 }
