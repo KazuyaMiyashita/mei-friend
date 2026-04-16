@@ -1,0 +1,169 @@
+.notationPanel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #fff;
+}
+
+.notationControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.ctrlLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.ctrlLabelText {
+  font-size: 11px;
+  font-weight: bold;
+  opacity: 0.7;
+}
+
+.ctrlRange {
+  width: 100px;
+}
+
+.ctrlValue {
+  min-width: 36px;
+  text-align: right;
+}
+
+.ctrlBtn {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.ctrlBtn:hover {
+  background: #eee;
+}
+
+.notationSvgArea {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  cursor: default;
+  background-color: #fff;
+  position: relative;
+}
+
+.notationSvgArea.fitWidth {
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: block;
+  text-align: center;
+}
+
+.notationSvgArea.fitWidth > :global(svg) {
+  /* biome-ignore lint/complexity/noImportantStyles: Required to override Verovio inline styles */
+  width: 100% !important;
+  /* biome-ignore lint/complexity/noImportantStyles: Required to override Verovio inline styles */
+  height: auto !important;
+  /* biome-ignore lint/complexity/noImportantStyles: Required to override Verovio inline styles */
+  max-width: none !important;
+  /* biome-ignore lint/complexity/noImportantStyles: Required to override Verovio inline styles */
+  max-height: none !important;
+}
+
+.notationSvgArea.fitHeight {
+  overflow-x: auto;
+  overflow-y: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notationSvgArea.fitHeight > :global(svg) {
+  /* biome-ignore lint/complexity/noImportantStyles: Required to override Verovio inline styles */
+  width: auto !important;
+  /* biome-ignore lint/complexity/noImportantStyles: Required to override Verovio inline styles */
+  height: 100% !important;
+  /* biome-ignore lint/complexity/noImportantStyles: Required to override Verovio inline styles */
+  max-width: none !important;
+  /* biome-ignore lint/complexity/noImportantStyles: Required to override Verovio inline styles */
+  max-height: none !important;
+}
+
+.notationRendering {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  opacity: 0.5;
+  font-size: 13px;
+}
+
+/* SVG Selection Highlight */
+:global(.notationSvgArea g.selected path:not(.mf-overlay)),
+:global(.notationSvgArea g.selected use:not(.mf-overlay)),
+:global(.notationSvgArea g.selected rect:not(.mf-overlay)),
+:global(.notationSvgArea g.selected ellipse:not(.mf-overlay)),
+:global(.notationSvgArea g.selected polygon:not(.mf-overlay)),
+:global(.notationSvgArea g.selected polyline:not(.mf-overlay)),
+:global(.notationSvgArea g.selected line:not(.mf-overlay)),
+:global(.notationSvgArea g.selected circle:not(.mf-overlay)),
+:global(.notationSvgArea g.selected text:not(.mf-overlay)) {
+  fill: #007bff;
+  stroke: #007bff;
+}
+
+/* ─── SVG Overlays ─── */
+
+:global(.mf-overlay-measure) {
+  fill: rgba(255, 0, 0, 0.05);
+  stroke: rgba(255, 0, 0, 0.8);
+  stroke-width: 40px;
+  stroke-dasharray: 100, 100;
+  pointer-events: none;
+}
+
+:global(.mf-overlay-staff) {
+  fill: transparent;
+  stroke: none;
+  stroke-width: 0;
+}
+
+:global(.mf-overlay-staff--debug) {
+  fill: rgba(0, 255, 0, 0.05);
+  stroke: rgba(0, 255, 0, 0.8);
+  stroke-width: 40px;
+  stroke-dasharray: 100, 100;
+}
+
+:global(.mf-overlay-note) {
+  fill: transparent;
+  stroke: none;
+  stroke-width: 0;
+}
+
+:global(.mf-overlay-note--debug) {
+  fill: rgba(0, 0, 255, 0.05);
+  stroke: rgba(0, 0, 255, 0.8);
+  stroke-width: 40px;
+  stroke-dasharray: 100, 100;
+}
+
+:global(.mf-overlay-caret) {
+  fill: #ff6b6b;
+  pointer-events: none;
+}
+
+:global(.mf-overlay-caret--debug) {
+  opacity: 0.8;
+}
