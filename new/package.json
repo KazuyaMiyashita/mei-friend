@@ -6,12 +6,15 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "npm run lint && npm run build-only",
-    "build-only": "tsc --build",
-    "build-skiplint": "npm run build-only",
-    "lint": "biome check .",
+    "dev": "npm run dev --workspace=@mei-friend/web-app",
+    "build": "npm run lint && npm run build-only && npm run build --workspace=@mei-friend/web-app",
+    "build-only": "tsc -b",
+    "build-skiplint": "npm run build-only && npm run build --workspace=@mei-friend/web-app",
+    "clean": "tsc -b --clean",
+    "lint": "biome check . && npm run lint --workspace=@mei-friend/web-app",
+    "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "type-check": "tsc --build --dry",
+    "type-check": "tsc -b --dry",
     "test": "vitest run"
   },
   "devDependencies": {

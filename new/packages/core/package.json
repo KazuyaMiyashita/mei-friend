@@ -5,7 +5,8 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc -b",
+    "clean": "tsc -b --clean"
   },
   "dependencies": {
     "@xmldom/xmldom": "^0.9.9",

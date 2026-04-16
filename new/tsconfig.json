@@ -10,15 +10,14 @@
     "sourceMap": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "paths": {
-      "@mei-friend/core": ["./packages/core/src/index.ts"]
-    }
+    "forceConsistentCasingInFileNames": true
   },
   "files": [],
   "references": [
     { "path": "./packages/core" },
-    { "path": "./packages/plugin-codemirror" }
+    { "path": "./packages/plugin-codemirror" },
+    { "path": "./packages/cli-app" },
+    { "path": "./packages/web-app" }
   ],
   "exclude": ["node_modules", "**/dist"]
 }

@@ -1,15 +1,17 @@
 {
-  "name": "web-app",
+  "name": "@mei-friend/web-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "clean": "tsc -b --clean",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mei-friend/core": "*",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },

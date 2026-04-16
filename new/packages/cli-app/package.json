@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
     "start": "node dist/index.js"
   },
   "dependencies": {
