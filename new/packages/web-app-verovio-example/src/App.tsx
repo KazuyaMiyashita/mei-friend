@@ -1,12 +1,33 @@
 import { MeiFriend } from "@mei-friend/core";
+import {
+  type DebugFilters,
+  VerovioCanvas,
+  type VrvOptions,
+} from "@mei-friend/plugin-verovio-react";
 import { useCallback, useEffect, useState } from "react";
 import styles from "./App.module.css";
-import { VerovioCanvas } from "./components/VerovioCanvas";
+import { VerovioCanvasHeader } from "./components/VerovioCanvasHeader";
 
 export default function App() {
   const [meiFriend, setMeiFriend] = useState<MeiFriend | null>(null);
-  const [xmlContent, setXmlContent] = useState<string>("");
   const [draftTitle, setDraftTitle] = useState<string>("");
+  const [currentTitle, setCurrentTitle] = useState<string>("Untitled");
+
+  // Verovio Controls State
+  const [vrvOptions, setVrvOptions] = useState<VrvOptions>({
+    scale: 50,
+    breaks: "auto",
+  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [fitMode, setFitMode] = useState<"off" | "width" | "height">("off");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [debugFilters, setDebugFilters] = useState<DebugFilters>({
+    measure: false,
+    staff: false,
+    note: false,
+    caret: false,
+  });
 
   const handleFileChange = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -14,9 +35,12 @@ export default function App() {
       if (file) {
         const text = await file.text();
         const instance = MeiFriend.fromXmlString(text);
+        const title = instance.mei?.head.getTitle() || "Untitled";
         setMeiFriend(instance);
-        setXmlContent(instance.toXmlString());
-        setDraftTitle(instance.mei?.head.getTitle() || "");
+        setDraftTitle(title);
+        setCurrentTitle(title);
+        setCurrentPage(1);
+        setSelectedId(null);
       }
     },
     [],
@@ -26,8 +50,9 @@ export default function App() {
     if (!meiFriend) return;
 
     const unregister = meiFriend.onUpdate(() => {
-      setXmlContent(meiFriend.toXmlString());
-      setDraftTitle(meiFriend.mei?.head.getTitle() || "");
+      const title = meiFriend.mei?.head.getTitle() || "Untitled";
+      setDraftTitle(title);
+      setCurrentTitle(title);
     });
 
     return () => unregister();
@@ -51,7 +76,29 @@ export default function App() {
 
       <div className={styles.scoreContainer}>
         {meiFriend ? (
-          <VerovioCanvas xmlContent={xmlContent} />
+          <>
+            <VerovioCanvasHeader
+              fitMode={fitMode}
+              setFitMode={setFitMode}
+              vrvOptions={vrvOptions}
+              setVrvOptions={setVrvOptions}
+              currentPage={currentPage}
+              setCurrentPage={setCurrentPage}
+              totalPages={totalPages}
+              debugFilters={debugFilters}
+              setDebugFilters={setDebugFilters}
+            />
+            <VerovioCanvas
+              meiFriend={meiFriend}
+              options={vrvOptions}
+              currentPage={currentPage}
+              fitMode={fitMode}
+              selectedId={selectedId}
+              debugFilters={debugFilters}
+              onSelectionChange={setSelectedId}
+              onTotalPagesChange={setTotalPages}
+            />
+          </>
         ) : (
           <div className={styles.placeholder}>
             Please select an MEI file to view the score
@@ -70,7 +117,7 @@ export default function App() {
         <h2>MEI Information</h2>
         <div className={styles.infoRow}>
           <span className={styles.infoLabel}>Current Title:</span>
-          <span>{meiFriend?.mei?.head.getTitle() || "Untitled"}</span>
+          <span>{currentTitle}</span>
         </div>
         <div className={styles.infoField}>
           <label htmlFor="title-input">New Title:</label>
@@ -99,59 +146,75 @@ export default function App() {
         <h2>Getting Started</h2>
         <p style={{ marginBottom: "1rem", opacity: 0.9 }}>
           Integrating MeiFriend with Verovio is simple. Initialize a model
-          instance, subscribe to structural updates, and pass the XML to the
-          canvas component.
+          instance and pass it to the canvas component.
         </p>
         <div className={styles.codeBlock}>
           <pre>
-            {`import { useEffect, useState } from "react";
+            {`import { useState } from "react";
 import { MeiFriend } from "@mei-friend/core";
-import { VerovioCanvas } from "./components/VerovioCanvas";
+import { VerovioCanvas } from "@mei-friend/plugin-verovio-react";
 
-export function InteractiveScoreViewer({ initialXml }) {
-  const [xmlContent, setXmlContent] = useState("");
+export function ScoreViewer({ initialXml }) {
+  const [meiFriend] = useState(() => MeiFriend.fromXmlString(initialXml));
 
-  useEffect(() => {
-    if (!initialXml) return;
-
-    // 1. Create a MeiFriend instance from your MEI XML string
-    const meiFriend = MeiFriend.fromXmlString(initialXml);
-    setXmlContent(meiFriend.toXmlString());
-
-    // 2. Subscribe to document updates for two-way synchronization
-    const unsubscribe = meiFriend.onUpdate(() => {
-      setXmlContent(meiFriend.toXmlString());
-    });
-
-    // Cleanup on unmount
-    return () => unsubscribe();
-  }, [initialXml]);
-
-  // 3. Render the interactive Verovio canvas
-  return <VerovioCanvas xmlContent={xmlContent} />;
+  // The component handles WASM initialization and document updates automatically
+  return <VerovioCanvas meiFriend={meiFriend} />;
 }`}
           </pre>
         </div>
 
         <h3>Querying and Updating the Score</h3>
         <p style={{ marginBottom: "1rem", opacity: 0.9 }}>
-          MeiFriend provides an intuitive wrapper for inspecting and modifying
-          musical structures.
+          By using the MeiFriend API to query or update musical information, the
+          content of a VerovioCanvas sharing the same MeiFriend instance can be
+          automatically synchronized and updated.
         </p>
         <div className={styles.codeBlock}>
           <pre>
             {`// Get the title
 const title = meiFriend.mei.head.getTitle();
 
-// Update the title (changes trigger the onUpdate listener)
+// Update the title
 meiFriend.mei.head.setTitle("My New Masterpiece");
 
-// You can also directly replace or modify any XML element by its xml:id
+// Directly update XML information
 meiFriend.update({
   type: "replaceElement",
-  targetId: "m-123",
-  xml: '<note xml:id="m-123" pname="c" oct="4" dur="4"/>'
+  targetId: "note-123",
+  xml: '<note xml:id="note-123" pname="c" oct="4" dur="4"/>'
 });`}
+          </pre>
+        </div>
+
+        <h3>Advanced Usage: Accessing Verovio Toolkit</h3>
+        <p style={{ marginBottom: "1rem", opacity: 0.9 }}>
+          You can directly access the internal `VerovioToolkit` instance through
+          the `ref` of `VerovioCanvas`. This allows you to utilize advanced
+          Verovio-specific features, such as rendering MIDI.
+        </p>
+        <div className={styles.codeBlock}>
+          <pre>
+            {`import { useRef } from "react";
+import { VerovioCanvas, type VerovioCanvasHandle } from "@mei-friend/plugin-verovio-react";
+
+export function AdvancedScoreViewer({ meiFriend }) {
+  const canvasRef = useRef<VerovioCanvasHandle>(null);
+
+  const handleExportMidi = () => {
+    const tk = canvasRef.current?.getToolkit();
+    if (tk) {
+      const midiBase64 = tk.renderToMIDI();
+      console.log("MIDI generated:", midiBase64);
+    }
+  };
+
+  return (
+    <>
+      <button onClick={handleExportMidi}>Export MIDI</button>
+      <VerovioCanvas ref={canvasRef} meiFriend={meiFriend} />
+    </>
+  );
+}`}
           </pre>
         </div>
       </div>

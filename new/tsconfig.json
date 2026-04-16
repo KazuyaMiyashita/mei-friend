@@ -16,6 +16,7 @@
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/plugin-codemirror" },
+    { "path": "./packages/plugin-verovio-react" },
     { "path": "./packages/cli-app" },
     { "path": "./packages/web-app" },
     { "path": "./packages/web-app-verovio-example" }

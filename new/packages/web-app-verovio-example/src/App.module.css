@@ -32,6 +32,8 @@
   margin-bottom: 1rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
   background-color: #fff;
+  display: flex;
+  flex-direction: column;
 }
 
 .placeholder {
