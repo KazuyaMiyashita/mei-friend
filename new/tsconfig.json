@@ -12,8 +12,13 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@mei-friend/core": ["./packages/core/dist/index.d.ts"]
+      "@mei-friend/core": ["./packages/core/src/index.ts"]
     }
   },
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/plugin-codemirror" }
+  ],
   "exclude": ["node_modules", "**/dist"]
 }
