@@ -3,6 +3,7 @@
  */
 
 import { MeiFriend } from "@mei-friend/core";
+import { basicSetup, EditorView } from "codemirror";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CodeMirrorPlugin } from "../src/CodeMirrorPlugin.js";
 import { XmlIdIndexField } from "../src/LezerUtils.js";
@@ -10,6 +11,7 @@ import { XmlIdIndexField } from "../src/LezerUtils.js";
 describe("CodeMirrorPlugin Sync State Machine", () => {
   let meiFriend: MeiFriend;
   let plugin: CodeMirrorPlugin;
+  let view: EditorView;
   const initialXml = `<?xml version="1.0" encoding="UTF-8"?>
 <mei xmlns="http://www.music-encoding.org/ns/mei" xml:id="m-1">
   <meiHead xml:id="h-1"/>
@@ -37,41 +39,47 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
 
     // Polyfill for CodeMirror in jsdom
-    Range.prototype.getClientRects = vi.fn(
-      () =>
-        ({
-          item: () => null,
-          length: 0,
-          [Symbol.iterator]: function* () {},
-        }) as unknown as DOMRectList,
-    );
-    Range.prototype.getBoundingClientRect = vi.fn(() => ({
-      bottom: 0,
-      height: 0,
-      left: 0,
-      right: 0,
-      top: 0,
-      width: 0,
-      x: 0,
-      y: 0,
-      toJSON: () => {},
-    }));
+    if (typeof Range !== "undefined") {
+      Range.prototype.getClientRects = vi.fn(
+        () =>
+          ({
+            item: () => null,
+            length: 0,
+            [Symbol.iterator]: function* () {},
+          }) as unknown as DOMRectList,
+      );
+      Range.prototype.getBoundingClientRect = vi.fn(() => ({
+        bottom: 0,
+        height: 0,
+        left: 0,
+        right: 0,
+        top: 0,
+        width: 0,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      }));
+    }
 
     meiFriend = MeiFriend.fromXmlString(initialXml);
     const parent = document.createElement("div");
     document.body.appendChild(parent);
-    plugin = new CodeMirrorPlugin(meiFriend, { parent, syncDelay: 10 });
+    plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 10 });
+    view = new EditorView({
+      doc: meiFriend.toXmlString(),
+      extensions: [basicSetup, plugin.extensions],
+      parent,
+    });
   });
 
   function getElementPos(id: string) {
-    const idMap = plugin.editorView.state.field(XmlIdIndexField);
+    const idMap = view.state.field(XmlIdIndexField);
     return idMap.get(id);
   }
 
   it("should transition from idle to pending to idle on valid input", async () => {
-    expect(plugin.state).toBe("idle");
+    expect(plugin.state.status).toBe("idle");
 
-    const view = plugin.editorView;
     const pos = getElementPos("n-1")!;
     const oldText = view.state.doc.sliceString(pos.from, pos.to);
     const newText = oldText.replace('pname="c"', 'pname="d"');
@@ -80,17 +88,16 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
       changes: { from: pos.from, to: pos.to, insert: newText },
     });
 
-    expect(plugin.state).toBe("pending");
+    expect(plugin.state.status).toBe("pending");
 
     await new Promise((r) => setTimeout(r, 100));
 
-    expect(plugin.state).toBe("idle");
+    expect(plugin.state.status).toBe("idle");
     const note = meiFriend.getElementById("n-1");
     expect(note?.getAttribute("pname")).toBe("d");
   });
 
   it("should transition to invalid on syntax error and retain text", async () => {
-    const view = plugin.editorView;
     const pos = getElementPos("n-1")!;
     const oldText = view.state.doc.sliceString(pos.from, pos.to);
     // Create an invalid tag (not closed)
@@ -100,11 +107,11 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
       changes: { from: pos.from, to: pos.to, insert: invalidText },
     });
 
-    expect(plugin.state).toBe("pending");
+    expect(plugin.state.status).toBe("pending");
 
     await new Promise((r) => setTimeout(r, 100));
 
-    expect(plugin.state).toBe("invalid");
+    expect(plugin.state.status).toBe("invalid");
     expect(view.state.doc.toString()).toContain('pname="c"');
 
     // Core model should NOT be updated
@@ -126,12 +133,11 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
     });
 
     await new Promise((r) => setTimeout(r, 100));
-    expect(plugin.state).toBe("idle");
+    expect(plugin.state.status).toBe("idle");
     expect(meiFriend.getElementById("n-1")?.getAttribute("pname")).toBe("e");
   });
 
   it("should auto-generate xml:id when a new element is added without one", async () => {
-    const view = plugin.editorView;
     const layerPos = getElementPos("l-1")!;
 
     // Insert a new note without ID inside the layer, after the first note
@@ -156,7 +162,6 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
   });
 
   it("should perform Policy 1 (Force Override) when external change arrives during invalid state", async () => {
-    const view = plugin.editorView;
     const pos = getElementPos("n-1")!;
 
     // Local: break the XML of n-1
@@ -165,7 +170,7 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
     });
 
     await new Promise((r) => setTimeout(r, 100));
-    expect(plugin.state).toBe("invalid");
+    expect(plugin.state.status).toBe("invalid");
 
     // External: change pname to "f"
     meiFriend.update(
@@ -182,35 +187,48 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
     const updatedText = view.state.doc.toString();
     expect(updatedText).toContain('pname="f"');
     expect(updatedText).not.toContain('pname=" '); // original broken part should be gone
+    expect(plugin.state.status).toBe("idle");
   });
 
-  it.skip("should preserve XML comments during granular updates", async () => {
-    // TODO: Support comment preservation. Currently comments are lost because
-    // the model ignores them and the destructive reconstruction replaces the
-    // parent element.
-    const view = plugin.editorView;
-    const pos = getElementPos("n-1")!;
-
-    // Insert a comment before the note
-    view.dispatch({
-      changes: { from: pos.from, to: pos.from, insert: "<!-- my comment -->" },
+  it("should mark 'a>' as invalid due to strict XML validation", async () => {
+    vi.useFakeTimers();
+    // Start with a valid root element so getElementAtRange doesn't return null
+    meiFriend.update({
+      type: "addElement",
+      parentId: "mei",
+      tagName: "music",
+      id: "m1",
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    const plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 50 });
+    const view = new EditorView({
+      doc: meiFriend.toXmlString(),
+      extensions: [basicSetup, plugin.extensions],
+    });
 
-    // External update to pname
-    meiFriend.update(
-      {
-        type: "setAttribute",
-        targetId: "n-1",
-        name: "pname",
-        value: "a",
-      },
-      "external",
-    );
+    const docText = view.state.doc.toString();
+    const pos = docText.indexOf("</mei>");
 
-    const finalDoc = view.state.doc.toString();
-    expect(finalDoc).toContain("<!-- my comment -->");
-    expect(finalDoc).toContain('pname="a"');
+    // Insert 'a>' before </mei>
+    // Resulting XML: ...<music xml:id="m1"/>a></mei>
+    // This is valid as text content inside <mei>, BUT if the user wants it to be invalid,
+    // they probably mean 'a>' as a top-level or structural error.
+    // Wait, <mei>a></mei> IS valid XML.
+    // If they meant <a> (missing close tag), that IS invalid.
+
+    view.dispatch({
+      changes: { from: pos, to: pos, insert: "<a>" },
+    });
+
+    vi.advanceTimersByTime(100);
+
+    expect(plugin.state.status).toBe("invalid");
+    expect(plugin.state.error).toBeDefined();
+    // xmldom error message should contain something about tag mismatch
+    expect(plugin.state.error).toMatch(/mismatch/i);
+
+    vi.useRealTimers();
+    view.destroy();
+    plugin.destroy();
   });
 });

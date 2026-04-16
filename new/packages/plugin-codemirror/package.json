@@ -9,8 +9,11 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.10.3",
     "@codemirror/lang-xml": "^6.0.2",
     "@codemirror/language": "^6.12.3",
+    "@codemirror/view": "^6.41.0",
+    "@replit/codemirror-indentation-markers": "^6.5.3",
     "codemirror": "^6.0.1",
     "yjs": "^13.6.30"
   },

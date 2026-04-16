@@ -115,7 +115,12 @@ export function getElementAtRange(
 export function hasSyntaxError(node: SyntaxNode): boolean {
   let hasError = false;
   node.cursor().iterate((n) => {
-    if (n.name === "Error") {
+    if (
+      n.name === "Error" ||
+      n.name === "⚠" ||
+      n.type.isError ||
+      n.name === "MismatchedCloseTag"
+    ) {
       hasError = true;
       return false; // Stop iteration
     }

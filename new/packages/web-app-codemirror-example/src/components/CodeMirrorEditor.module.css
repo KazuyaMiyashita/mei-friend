@@ -1,0 +1,12 @@
+.editorContainer {
+  height: 100%;
+  width: 100%;
+  border: 1px solid #ccc;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.editorContainer :global(.cm-editor) {
+  height: 100%;
+}

@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  */
 import { MeiFriend } from "@mei-friend/core";
+import { basicSetup, EditorView } from "codemirror";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { CodeMirrorPlugin } from "../src/CodeMirrorPlugin.js";
 
@@ -55,14 +56,22 @@ describe("CodeMirrorPlugin", () => {
 
   it("should initialize and destroy", () => {
     const plugin = new CodeMirrorPlugin(meiFriend);
-    expect(plugin.editorView).toBeDefined();
+    const view = new EditorView({
+      doc: meiFriend.toXmlString(),
+      extensions: [basicSetup, plugin.extensions],
+    });
+    expect(plugin.editorView).toBe(view);
+    view.destroy();
     plugin.destroy();
   });
 
   describe("MeiFriend -> CodeMirror sync (Model to Editor)", () => {
     it("should sync attribute changes from model to editor", () => {
       const plugin = new CodeMirrorPlugin(meiFriend);
-      const view = plugin.editorView;
+      const view = new EditorView({
+        doc: meiFriend.toXmlString(),
+        extensions: [basicSetup, plugin.extensions],
+      });
 
       meiFriend.update({
         type: "setAttribute",
@@ -75,12 +84,16 @@ describe("CodeMirrorPlugin", () => {
       expect(docText).toContain('pname="e"');
       expect(docText).toContain('xml:id="n1"');
       expect(docText.trim()).toBe(meiFriend.toXmlString().trim());
+      view.destroy();
       plugin.destroy();
     });
 
     it("should sync element additions from model to editor", () => {
       const plugin = new CodeMirrorPlugin(meiFriend);
-      const view = plugin.editorView;
+      const view = new EditorView({
+        doc: meiFriend.toXmlString(),
+        extensions: [basicSetup, plugin.extensions],
+      });
 
       meiFriend.update({
         type: "addElement",
@@ -93,12 +106,16 @@ describe("CodeMirrorPlugin", () => {
       const docText = view.state.doc.toString();
       expect(docText).toContain('xml:id="n3"');
       expect(docText.trim()).toBe(meiFriend.toXmlString().trim());
+      view.destroy();
       plugin.destroy();
     });
 
     it("should sync element removals from model to editor", () => {
       const plugin = new CodeMirrorPlugin(meiFriend);
-      const view = plugin.editorView;
+      const view = new EditorView({
+        doc: meiFriend.toXmlString(),
+        extensions: [basicSetup, plugin.extensions],
+      });
 
       meiFriend.update({
         type: "removeElement",
@@ -109,12 +126,16 @@ describe("CodeMirrorPlugin", () => {
       expect(docText).not.toContain('xml:id="n1"');
       expect(docText).toContain('xml:id="n2"');
       expect(docText.trim()).toBe(meiFriend.toXmlString().trim());
+      view.destroy();
       plugin.destroy();
     });
 
     it("should maintain cursor position in unrelated parts", () => {
       const plugin = new CodeMirrorPlugin(meiFriend);
-      const view = plugin.editorView;
+      const view = new EditorView({
+        doc: meiFriend.toXmlString(),
+        extensions: [basicSetup, plugin.extensions],
+      });
 
       const lastPos = view.state.doc.length;
       view.dispatch({ selection: { anchor: lastPos } });
@@ -128,6 +149,7 @@ describe("CodeMirrorPlugin", () => {
 
       // Cursor should stay near the end
       expect(view.state.selection.main.anchor).toBeGreaterThan(lastPos - 10);
+      view.destroy();
       plugin.destroy();
     });
   });
@@ -136,7 +158,10 @@ describe("CodeMirrorPlugin", () => {
     it("should sync text changes to the model after a delay", async () => {
       vi.useFakeTimers();
       const plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 50 });
-      const view = plugin.editorView;
+      const view = new EditorView({
+        doc: meiFriend.toXmlString(),
+        extensions: [basicSetup, plugin.extensions],
+      });
 
       const docText = view.state.doc.toString();
       const pos = docText.indexOf('pname="c"') + 7;
@@ -154,13 +179,17 @@ describe("CodeMirrorPlugin", () => {
       expect(meiFriend.getElementById("n1")?.getAttribute("pname")).toBe("b");
 
       vi.useRealTimers();
+      view.destroy();
       plugin.destroy();
     });
 
     it("should sync element structural changes from text", async () => {
       vi.useFakeTimers();
       const plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 0 });
-      const view = plugin.editorView;
+      const view = new EditorView({
+        doc: meiFriend.toXmlString(),
+        extensions: [basicSetup, plugin.extensions],
+      });
 
       const docText = view.state.doc.toString();
       const n2Pos = docText.indexOf('<note xml:id="n2"');
@@ -181,13 +210,78 @@ describe("CodeMirrorPlugin", () => {
       expect(n3?.getAttribute("pname")).toBe("a");
 
       vi.useRealTimers();
+      view.destroy();
+      plugin.destroy();
+    });
+
+    it("should skip update if only formatting/whitespace changes", async () => {
+      vi.useFakeTimers();
+      const plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 0 });
+      const view = new EditorView({
+        doc: meiFriend.toXmlString(),
+        extensions: [basicSetup, plugin.extensions],
+      });
+
+      const onUpdateSpy = vi.fn();
+      meiFriend.onUpdate(onUpdateSpy);
+
+      const docText = view.state.doc.toString();
+      const n1Pos = docText.indexOf('<note xml:id="n1"');
+
+      // Add a space inside the tag (formatting change)
+      view.dispatch({
+        changes: { from: n1Pos + 5, to: n1Pos + 5, insert: " " },
+      });
+
+      vi.advanceTimersByTime(10);
+
+      // Should have been processed but no Yjs update triggered
+      expect(plugin.state.status).toBe("idle");
+      expect(onUpdateSpy).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
+      view.destroy();
+      plugin.destroy();
+    });
+
+    it("should auto-inject xml:id when a new element is typed", async () => {
+      vi.useFakeTimers();
+      const plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 0 });
+      const view = new EditorView({
+        doc: meiFriend.toXmlString(),
+        extensions: [basicSetup, plugin.extensions],
+      });
+
+      const docText = view.state.doc.toString();
+      const n1Pos = docText.indexOf('<note xml:id="n1"');
+
+      // Type a new note without ID
+      view.dispatch({
+        changes: {
+          from: n1Pos,
+          to: n1Pos,
+          insert: '<note pname="e"/>\n          ',
+        },
+      });
+
+      vi.advanceTimersByTime(10);
+
+      // The plugin should have injected an xml:id into the editor
+      const updatedText = view.state.doc.toString();
+      expect(updatedText).toMatch(/<note xml:id="[a-zA-Z0-9-]+" pname="e"\/>/);
+
+      vi.useRealTimers();
+      view.destroy();
       plugin.destroy();
     });
 
     it("should not trigger a feedback loop", async () => {
       vi.useFakeTimers();
       const plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 0 });
-      const view = plugin.editorView;
+      const view = new EditorView({
+        doc: meiFriend.toXmlString(),
+        extensions: [basicSetup, plugin.extensions],
+      });
       const dispatchSpy = vi.spyOn(view, "dispatch");
 
       // Change from model
@@ -203,15 +297,8 @@ describe("CodeMirrorPlugin", () => {
 
       vi.advanceTimersByTime(100);
 
-      // If a loop existed, MeiFriend.update might have been called again with "codemirror" origin
-      // We can't easily spy on meiFriend.update here without more setup,
-      // but we can check if handleDocChange was called.
-      // (Actually handleDocChange is private, so we check if model is dirty)
-
-      // Verification: The origin of the last model change should NOT be "codemirror"
-      // because the change came FROM the model.
-
       vi.useRealTimers();
+      view.destroy();
       plugin.destroy();
     });
   });
@@ -219,7 +306,10 @@ describe("CodeMirrorPlugin", () => {
   describe("Utilities", () => {
     it("should jump to and highlight an element", () => {
       const plugin = new CodeMirrorPlugin(meiFriend);
-      const view = plugin.editorView;
+      const view = new EditorView({
+        doc: meiFriend.toXmlString(),
+        extensions: [basicSetup, plugin.extensions],
+      });
 
       const result = plugin.jumpToElement("n2");
       expect(result).toBe(true);
@@ -230,11 +320,16 @@ describe("CodeMirrorPlugin", () => {
         selection.to,
       );
       expect(selectedText).toContain('xml:id="n2"');
+      view.destroy();
       plugin.destroy();
     });
 
     it("should return false when jumping to non-existent ID", () => {
       const plugin = new CodeMirrorPlugin(meiFriend);
+      const _view = new EditorView({
+        doc: meiFriend.toXmlString(),
+        extensions: [basicSetup, plugin.extensions],
+      });
       const result = plugin.jumpToElement("ghost");
       expect(result).toBe(false);
       plugin.destroy();

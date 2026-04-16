@@ -1,0 +1,30 @@
+{
+  "name": "@mei-friend/web-app-codemirror-example",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "clean": "tsc -b --clean",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@mei-friend/core": "*",
+    "@mei-friend/plugin-codemirror": "*",
+    "codemirror": "^6.0.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-resizable-panels": "^4.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.0.4"
+  }
+}

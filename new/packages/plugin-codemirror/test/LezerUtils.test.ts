@@ -92,21 +92,26 @@ describe("LezerUtils", () => {
       extensions: [xml()],
     });
 
-    // Check if any error exists in the document at all
     const tree = syntaxTree(brokenState);
-    let errorFound = false;
-    tree.cursor().iterate((n) => {
-      if (n.name === "Error") {
-        errorFound = true;
-        return false;
-      }
-      return true;
-    });
+    const hasErr = hasSyntaxError(tree.topNode);
+    expect(hasErr).toBe(true);
 
     const dirty = getElementAtRange(brokenState, 10, 10);
-    expect(dirty).not.toBeNull();
-    const hasErr = hasSyntaxError(dirty!.node);
-    expect(hasErr).toBe(errorFound);
+    expect(dirty).toBeNull();
+  });
+
+  it("should detect MismatchedCloseTag as a syntax error", () => {
+    // </a> without <a>
+    const mismatchedXml = "</a>";
+    const mismatchedState = EditorState.create({
+      doc: mismatchedXml,
+      extensions: [xml()],
+    });
+
+    const tree = syntaxTree(mismatchedState);
+    // console.log("Tree structure:", tree.topNode.toString());
+    const hasErr = hasSyntaxError(tree.topNode);
+    expect(hasErr).toBe(true);
   });
 
   it("should return null when offset is outside any element (if possible)", () => {

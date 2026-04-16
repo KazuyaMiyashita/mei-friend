@@ -202,13 +202,19 @@ export class MeiElement {
    * Replaces this element's attributes and children with the content of the provided MEI XML string.
    * This is a destructive operation that maintains the Yjs identity of this element but
    * recreates all its descendants.
+   * @param xml The new MEI XML string.
+   * @param origin The origin of the update (optional).
    */
-  replaceWith(xml: string): void {
+  replaceWith(
+    xml: string,
+    // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
+    origin?: any,
+  ): void {
     const myId = this.id;
     if (!myId) {
       console.warn("Cannot replace elements without IDs.");
       return;
     }
-    this.doc.update(replaceElement(myId, xml));
+    this.doc.update(replaceElement(myId, xml), origin);
   }
 }

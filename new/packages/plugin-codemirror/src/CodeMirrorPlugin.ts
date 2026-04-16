@@ -1,9 +1,18 @@
+import { indentWithTab } from "@codemirror/commands";
 import { xml } from "@codemirror/lang-xml";
-import { Transaction } from "@codemirror/state";
+import { ensureSyntaxTree, indentUnit, syntaxTree } from "@codemirror/language";
+import { type Extension, type Range, Transaction } from "@codemirror/state";
+import {
+  Decoration,
+  EditorView,
+  keymap,
+  ViewPlugin,
+  type ViewUpdate,
+} from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { MeiFriend, type MeiUpdateEvent } from "@mei-friend/core";
-import { DOMParser, XMLSerializer } from "@xmldom/xmldom";
-import { basicSetup, EditorView } from "codemirror";
+import { indentationMarkers } from "@replit/codemirror-indentation-markers";
+import { DOMParser } from "@xmldom/xmldom";
 import {
   getElementAtRange,
   hasSyntaxError,
@@ -14,76 +23,225 @@ import {
  * Options for CodeMirrorPlugin.
  */
 export interface CodeMirrorPluginOptions {
-  /** The element to attach the CodeMirror editor to. */
-  parent?: HTMLElement;
   /** Whether to sync changes automatically. Defaults to true. */
   autoSync?: boolean;
   /** Debounce interval for syncing from CodeMirror to MeiFriend (ms). Defaults to 300. */
   syncDelay?: number;
+  /** The origin identifier for updates from this plugin. Defaults to "codemirror". */
+  origin?: string;
+  /** Callback triggered when the synchronization state changes. */
+  onStateChange?: (state: SyncState) => void;
 }
 
 /**
- * Current state of the synchronization between CodeMirror and MeiFriend.
+ * Current status of the synchronization between CodeMirror and MeiFriend.
  */
-export type SyncState = "idle" | "pending" | "invalid" | "applying_external";
+export type SyncStatus = "idle" | "pending" | "invalid" | "applying_external";
+
+/**
+ * Current state of the synchronization, including optional error information.
+ */
+export interface SyncState {
+  status: SyncStatus;
+  error?: string;
+}
+
+/**
+ * Decoration for syntax errors.
+ */
+const errorMark = Decoration.mark({
+  class: "cm-mei-syntax-error",
+  attributes: { title: "Syntax Error" },
+});
+
+/**
+ * CodeMirror extension to highlight syntax error nodes.
+ */
+const errorHighlighter = EditorView.decorations.of((view) => {
+  const decorations: Range<Decoration>[] = [];
+  for (const { from, to } of view.visibleRanges) {
+    syntaxTree(view.state).iterate({
+      from,
+      to,
+      enter: (node) => {
+        if (
+          node.name === "Error" ||
+          node.name === "⚠" ||
+          node.type.isError ||
+          node.name === "MismatchedCloseTag"
+        ) {
+          if (node.from < node.to) {
+            decorations.push(errorMark.range(node.from, node.to));
+          }
+        }
+      },
+    });
+  }
+  return Decoration.set(decorations);
+});
+
+/**
+ * Default CSS for error highlighting and custom tweaks.
+ */
+const customTheme = EditorView.theme({
+  // Syntax error - just wavy underline, no background color
+  ".cm-mei-syntax-error": {
+    textDecoration: "underline wavy red",
+  },
+  // Disable highlightSelectionMatches background
+  ".cm-selectionMatch": {
+    backgroundColor: "transparent !important",
+  },
+});
 
 /**
  * CodeMirrorPlugin provides a bridge between MeiFriend's Yjs-based model
  * and the CodeMirror text editor.
  */
 export class CodeMirrorPlugin {
-  private view: EditorView;
+  private view: EditorView | null = null;
   private meiFriend: MeiFriend;
   private options: Required<CodeMirrorPluginOptions>;
   private syncTimeout: ReturnType<typeof setTimeout> | null = null;
-  private unregisterUpdate: () => void;
-  private syncState: SyncState = "idle";
+  private unregisterUpdate: (() => void) | null = null;
+  private _syncState: SyncState = { status: "idle" };
 
   constructor(meiFriend: MeiFriend, options: CodeMirrorPluginOptions = {}) {
     this.meiFriend = meiFriend;
     this.options = {
-      parent: options.parent ?? document.createElement("div"),
       autoSync: options.autoSync ?? true,
       syncDelay: options.syncDelay ?? 300,
+      origin: options.origin ?? "codemirror",
+      onStateChange: options.onStateChange ?? (() => {}),
     };
+  }
 
-    this.view = new EditorView({
-      doc: this.meiFriend.toXmlString(),
-      extensions: [
-        basicSetup,
-        xml(),
-        XmlIdIndexField,
-        EditorView.updateListener.of((update) => {
-          if (
-            update.docChanged &&
-            this.options.autoSync &&
-            this.syncState !== "applying_external"
-          ) {
-            this.scheduleSync(update);
-          }
-        }),
-      ],
-      parent: this.options.parent,
-    });
-
-    this.unregisterUpdate = this.meiFriend.onUpdate((events) => {
-      this.handleModelUpdate(events);
-    });
+  /**
+   * Returns CodeMirror extensions to enable MEI editing and synchronization.
+   */
+  public get extensions(): Extension {
+    return [
+      xml({ autoCloseTags: false }),
+      XmlIdIndexField,
+      errorHighlighter,
+      customTheme,
+      indentUnit.of("  "),
+      indentationMarkers(),
+      keymap.of([indentWithTab]),
+      ViewPlugin.define((view) => {
+        this.view = view;
+        this.unregisterUpdate = this.meiFriend.onUpdate((events) => {
+          this.handleModelUpdate(events);
+        });
+        return {
+          update: (update: ViewUpdate) => {
+            if (
+              update.docChanged &&
+              this.options.autoSync &&
+              this.syncStatus !== "applying_external"
+            ) {
+              this.scheduleSync(update);
+            }
+          },
+          destroy: () => {
+            this.unregisterUpdate?.();
+            this.unregisterUpdate = null;
+            this.view = null;
+          },
+        };
+      }),
+    ];
   }
 
   public get state(): SyncState {
-    return this.syncState;
+    return this._syncState;
+  }
+
+  private get syncStatus(): SyncStatus {
+    return this._syncState.status;
+  }
+
+  private set syncStatus(status: SyncStatus) {
+    this.setSyncState(status);
+  }
+
+  private setSyncState(status: SyncStatus, error?: string) {
+    if (this._syncState.status !== status || this._syncState.error !== error) {
+      this._syncState = { status, error };
+      this.options.onStateChange(this._syncState);
+    }
+  }
+
+  /**
+   * Parses an XML string and returns the DOM and any error messages.
+   */
+  private parseXml(xml: string): {
+    dom: ReturnType<DOMParser["parseFromString"]>;
+    error?: string;
+  } {
+    let parserErrorMsg = "";
+    const parser = new DOMParser({
+      onError: (level, msg) => {
+        if (level === "error" || level === "fatalError") {
+          if (!parserErrorMsg) parserErrorMsg = msg;
+        }
+      },
+    });
+
+    const dom = parser.parseFromString(xml, "application/xml");
+    const parserErrorElements = dom.getElementsByTagName("parsererror");
+    if (parserErrorMsg || parserErrorElements.length > 0) {
+      const errorText =
+        parserErrorMsg ||
+        (parserErrorElements.length > 0
+          ? parserErrorElements[0].textContent
+          : "Unknown XML error");
+      return { dom, error: errorText || "Unknown XML error" };
+    }
+    return { dom };
+  }
+
+  /**
+   * Checks for syntax errors in the full document and updates the sync state.
+   */
+  private checkFullSyntaxError(): void {
+    if (!this.view) return;
+    const hasError = hasSyntaxError(
+      (
+        ensureSyntaxTree(this.view.state, this.view.state.doc.length, 100) ||
+        syntaxTree(this.view.state)
+      ).topNode,
+    );
+    if (hasError) {
+      this.setSyncState("invalid", "Lezer syntax error");
+    } else {
+      this.syncStatus = "idle";
+    }
   }
 
   private handleModelUpdate(events: MeiUpdateEvent[]): void {
-    // Avoid feedback loops
-    if (events.some((e) => e.origin === "codemirror")) return;
+    if (!this.view) return;
+
+    // Avoid feedback loops from this specific plugin instance
+    if (events.some((e) => e.origin === this.options.origin)) return;
 
     // Policy 1: Always apply external changes even if we are in an invalid/pending state.
-    const prevState = this.syncState;
-    this.syncState = "applying_external";
+    const prevStatus = this.syncStatus;
+    this.syncStatus = "applying_external";
 
     try {
+      // If the document is currently invalid, Lezer tree positions are unreliable.
+      // A granular update might accidentally replace large valid portions of the document.
+      // Therefore, if the state is invalid, perform a full document refresh.
+      if (prevStatus === "invalid") {
+        const xml = this.meiFriend.toXmlString();
+        this.view.dispatch({
+          changes: { from: 0, to: this.view.state.doc.length, insert: xml },
+          annotations: [Transaction.userEvent.of("model-sync")],
+        });
+        return;
+      }
+
       const idMap = this.view.state.field(XmlIdIndexField);
       const changes: { from: number; to: number; insert: string }[] = [];
 
@@ -135,10 +293,13 @@ export class CodeMirrorPlugin {
         });
       }
     } finally {
-      // Return to Idle if we were not pending/invalid, otherwise keep the previous state
-      // unless the external change completely overrode the dirty region.
-      this.syncState =
-        prevState === "pending" || prevState === "invalid" ? prevState : "idle";
+      // Return to Idle if we were not pending, and there are no syntax errors.
+      // If we were pending, keep pending until the timeout fires.
+      if (prevStatus === "pending") {
+        this.syncStatus = "pending";
+      } else {
+        this.checkFullSyntaxError();
+      }
     }
   }
 
@@ -149,7 +310,7 @@ export class CodeMirrorPlugin {
       ) => void;
     };
   }): void {
-    this.syncState = "pending";
+    this.syncStatus = "pending";
     if (this.syncTimeout) {
       clearTimeout(this.syncTimeout);
     }
@@ -159,7 +320,10 @@ export class CodeMirrorPlugin {
         this.handleDocChange(update);
       } catch (e) {
         console.error("Error in handleDocChange:", e);
-        this.syncState = "invalid";
+        this.setSyncState(
+          "invalid",
+          e instanceof Error ? e.message : String(e),
+        );
       }
     }, this.options.syncDelay);
   }
@@ -171,13 +335,23 @@ export class CodeMirrorPlugin {
       ) => void;
     };
   }): void {
+    if (!this.view) return;
+
+    // Strict validation of the full document
+    const fullXml = this.view.state.doc.toString();
+    const { error: fullXmlError } = this.parseXml(fullXml);
+    if (fullXmlError) {
+      this.setSyncState("invalid", `Full XML error: ${fullXmlError}`);
+      return;
+    }
+
     const cmChanges: { fromB: number; toB: number }[] = [];
     update.changes.iterChanges((_fromA, _toA, fromB, toB) => {
       cmChanges.push({ fromB, toB });
     });
 
     if (cmChanges.length === 0) {
-      this.syncState = "idle";
+      this.checkFullSyntaxError();
       return;
     }
 
@@ -187,78 +361,81 @@ export class CodeMirrorPlugin {
 
     const dirty = getElementAtRange(this.view.state, from, to);
     if (!dirty) {
-      this.syncState = "idle"; // Consider it synced or irrelevant
+      this.checkFullSyntaxError();
       return;
     }
 
     // Check for syntax errors via Lezer
     if (hasSyntaxError(dirty.node)) {
-      this.syncState = "invalid";
+      this.setSyncState("invalid", "Lezer syntax error in changed element");
       return;
     }
 
-    // Try to parse the dirty element text
-    let hasParserError = false;
-    const parser = new DOMParser({
-      onError: (level, _msg) => {
-        if (level === "error" || level === "fatalError") {
-          hasParserError = true;
-        }
-      },
-    });
-    const dom = parser.parseFromString(dirty.text, "application/xml");
-    const parserErrorElements = dom.getElementsByTagName("parsererror");
-    if (hasParserError || parserErrorElements.length > 0) {
-      this.syncState = "invalid";
+    // We can't easily use the full 'dom' here because it's a different document structure
+    // than what was previously parsed from a fragment.
+    // However, since we've already confirmed the full document is valid,
+    // we can proceed with confidence using dirty.text for fragment-based updates
+    // as long as we re-verify the fragment itself if needed, or just trust it.
+    // To be safe and meet the "strict" requirement, we parse the fragment too.
+    const { dom: fragmentDom, error: fragmentError } = this.parseXml(
+      dirty.text,
+    );
+    if (fragmentError) {
+      this.setSyncState("invalid", `XML fragment error: ${fragmentError}`);
       return;
     }
+    const newElement = fragmentDom.documentElement;
 
-    const newElement = dom.documentElement;
     if (!newElement) {
-      this.syncState = "invalid";
+      this.setSyncState("invalid", "No root element in XML fragment");
       return;
     }
 
     // ------------------------------------------------------------------------
     // ID Auto-Generation & Insertion
     // ------------------------------------------------------------------------
-    // biome-ignore lint/suspicious/noExplicitAny: xmldom Element lacks some browser DOM properties but is structurally compatible for our needs.
-    const ensureIdsInDom = (el: any): boolean => {
-      let changed = false;
-      if (!el.getAttribute("xml:id") && !el.getAttribute("id")) {
-        el.setAttribute(
-          "xml:id",
-          MeiFriend.generateId(el.tagName.toLowerCase()),
-        );
-        changed = true;
+    const idChanges: { from: number; insert: string }[] = [];
+    dirty.node.cursor().iterate((node) => {
+      if (node.name === "Element") {
+        const id = this.getElementIdFromNode(node.node);
+        if (!id) {
+          const tag = node.node.firstChild;
+          if (
+            tag &&
+            (tag.name === "OpenTag" || tag.name === "SelfClosingTag")
+          ) {
+            const tagNameNode = tag.getChild("TagName");
+            if (tagNameNode) {
+              const tagName = this.view?.state.doc.sliceString(
+                tagNameNode.from,
+                tagNameNode.to,
+              );
+              if (tagName) {
+                const generatedId = MeiFriend.generateId(tagName.toLowerCase());
+                idChanges.push({
+                  from: tagNameNode.to,
+                  insert: ` xml:id="${generatedId}"`,
+                });
+              }
+            }
+          }
+        }
       }
-      for (let i = 0; i < el.children.length; i++) {
-        if (ensureIdsInDom(el.children[i])) changed = true;
-      }
-      return changed;
-    };
+      return true;
+    });
 
-    if (ensureIdsInDom(newElement)) {
-      // If IDs were missing, we update the CodeMirror text FIRST.
-      // This will trigger another docChange, but we want to sync the state with IDs.
-      const updatedText = new XMLSerializer().serializeToString(
-        // biome-ignore lint/suspicious/noExplicitAny: xmldom Node lacks some browser DOM properties but is structurally compatible for our needs.
-        newElement as any,
-      );
-      // We use a simplified serialization for auto-id insertion.
-      // In a real app, we'd use a more sophisticated way to inject just the attribute.
-      this.view.dispatch({
-        changes: { from: dirty.from, to: dirty.to, insert: updatedText },
+    if (idChanges.length > 0) {
+      this.view?.dispatch({
+        changes: idChanges,
         annotations: [Transaction.userEvent.of("id-injection")],
       });
-      // The subsequent docChange will trigger another handleDocChange which will then sync to Yjs.
       return;
     }
 
     const id =
       newElement.getAttribute("xml:id") || newElement.getAttribute("id");
     if (!id) {
-      this.syncState = "invalid";
+      this.setSyncState("invalid", "Missing xml:id in changed element");
       return;
     }
 
@@ -274,27 +451,64 @@ export class CodeMirrorPlugin {
             ? this.meiFriend.getElementById(parentId)
             : null;
           if (parentMei) {
-            const parentText = this.view.state.doc.sliceString(
+            const parentText = this.view?.state.doc.sliceString(
               curr.from,
               curr.to,
             );
-            parentMei.replaceWith(parentText);
-            this.syncState = "idle";
+
+            if (parentText) {
+              // Check if normalized XML matches before replacing
+              try {
+                const tempMei = MeiFriend.fromXmlString(parentText);
+                const tempStr = tempMei.toXmlString(false).trim();
+                const currentStr = this.meiFriend
+                  .serializeElement(parentMei.yNode, 0)
+                  .trim();
+                if (tempStr === currentStr) {
+                  this.syncStatus = "idle";
+                  return;
+                }
+              } catch (_e) {
+                // Ignore and proceed with replacement if temp parsing fails
+              }
+
+              parentMei.replaceWith(parentText, this.options.origin);
+            }
+            this.checkFullSyntaxError();
             return;
           }
         }
         curr = curr.parent;
       }
-      this.syncState = "invalid";
+      this.setSyncState(
+        "invalid",
+        "Could not find a valid parent element with xml:id for sync",
+      );
       return;
     }
 
+    // Check if normalized XML matches before replacing
+    try {
+      const tempMei = MeiFriend.fromXmlString(dirty.text);
+      const tempStr = tempMei.toXmlString(false).trim();
+      const currentStr = this.meiFriend
+        .serializeElement(targetMeiElement.yNode, 0)
+        .trim();
+      if (tempStr === currentStr) {
+        this.syncStatus = "idle";
+        return;
+      }
+    } catch (_e) {
+      // Ignore and proceed with replacement if temp parsing fails
+    }
+
     // Use destructive reconstruction for simple and robust synchronization
-    targetMeiElement.replaceWith(dirty.text);
-    this.syncState = "idle";
+    targetMeiElement.replaceWith(dirty.text, this.options.origin);
+    this.checkFullSyntaxError();
   }
 
   private getElementIdFromNode(node: SyntaxNode): string | null {
+    if (!this.view) return null;
     const state = this.view.state;
     // Lezer XML parser structure:
     // Element -> (OpenTag | SelfClosingTag) -> Attribute -> AttributeName, AttributeValue
@@ -335,8 +549,10 @@ export class CodeMirrorPlugin {
     if (this.syncTimeout) {
       clearTimeout(this.syncTimeout);
     }
-    this.unregisterUpdate();
-    this.view.destroy();
+    this.unregisterUpdate?.();
+    this.unregisterUpdate = null;
+    // We don't destroy the view here because we don't own it anymore.
+    this.view = null;
   }
 
   /**
@@ -345,6 +561,7 @@ export class CodeMirrorPlugin {
    * @returns True if the element was found and jumped to.
    */
   public jumpToElement(xmlId: string): boolean {
+    if (!this.view) return false;
     const idMap = this.view.state.field(XmlIdIndexField);
     const pos = idMap.get(xmlId);
     if (pos) {
@@ -361,6 +578,29 @@ export class CodeMirrorPlugin {
    * Returns the underlying CodeMirror EditorView instance.
    */
   public get editorView(): EditorView {
+    if (!this.view) {
+      throw new Error(
+        "EditorView not initialized. Make sure to include plugin.extensions in your CodeMirror configuration.",
+      );
+    }
     return this.view;
+  }
+
+  /**
+   * Refreshes the editor content with the current state of the MeiFriend model.
+   * This overrides any local unsynced changes.
+   */
+  public refresh(): void {
+    if (!this.view) return;
+    const _prevState = this.state;
+    this.syncStatus = "applying_external";
+    try {
+      const xml = this.meiFriend.toXmlString();
+      this.view.dispatch({
+        changes: { from: 0, to: this.view.state.doc.length, insert: xml },
+      });
+    } finally {
+      this.syncStatus = "idle";
+    }
   }
 }
