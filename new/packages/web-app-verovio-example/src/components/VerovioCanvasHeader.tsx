@@ -12,6 +12,7 @@ interface Props {
   totalPages: number;
   debugFilters: DebugFilters;
   setDebugFilters: React.Dispatch<React.SetStateAction<DebugFilters>>;
+  enabled: boolean;
 }
 
 export function VerovioCanvasHeader({
@@ -24,6 +25,7 @@ export function VerovioCanvasHeader({
   totalPages,
   debugFilters,
   setDebugFilters,
+  enabled,
 }: Props) {
   return (
     <div className={styles.toolbar}>
@@ -31,6 +33,7 @@ export function VerovioCanvasHeader({
         <span className={styles.ctrlLabelText}>Fit</span>
         <select
           value={fitMode}
+          disabled={!enabled}
           onChange={(e) =>
             setFitMode(e.target.value as "off" | "width" | "height")
           }
@@ -49,6 +52,7 @@ export function VerovioCanvasHeader({
           max={200}
           step={5}
           value={vrvOptions.scale}
+          disabled={!enabled}
           onChange={(e) =>
             setVrvOptions((prev) => ({
               ...prev,
@@ -56,13 +60,16 @@ export function VerovioCanvasHeader({
             }))
           }
         />
-        <span>{vrvOptions.scale}%</span>
+        <span style={{ minWidth: "4ch", display: "inline-block" }}>
+          {vrvOptions.scale}%
+        </span>
       </label>
 
       <label className={styles.ctrlLabel}>
         <span className={styles.ctrlLabelText}>Breaks</span>
         <select
           value={vrvOptions.breaks}
+          disabled={!enabled}
           onChange={(e) =>
             setVrvOptions((prev) => ({
               ...prev,
@@ -82,18 +89,18 @@ export function VerovioCanvasHeader({
           type="button"
           className={styles.ctrlBtn}
           onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-          disabled={currentPage <= 1}
+          disabled={!enabled || currentPage <= 1}
         >
           &lt;
         </button>
         <span style={{ fontSize: "11px" }}>
-          {currentPage} / {totalPages}
+          {enabled ? `${currentPage} / ${totalPages}` : "- / -"}
         </span>
         <button
           type="button"
           className={styles.ctrlBtn}
           onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-          disabled={currentPage >= totalPages}
+          disabled={!enabled || currentPage >= totalPages}
         >
           &gt;
         </button>
@@ -108,6 +115,7 @@ export function VerovioCanvasHeader({
             type="button"
             key={key}
             className={styles.ctrlBtn}
+            disabled={!enabled}
             onClick={() =>
               setDebugFilters((prev) => ({
                 ...prev,

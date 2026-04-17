@@ -1,4 +1,4 @@
-import { MeiFriend } from "@mei-friend/core";
+import { Cursor, MeiFriend } from "@mei-friend/core";
 import {
   type DebugFilters,
   VerovioCanvas,
@@ -6,6 +6,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import type { VerovioOptions } from "verovio";
 import styles from "./App.module.css";
+import { VerovioCanvasFooter } from "./components/VerovioCanvasFooter";
 import { VerovioCanvasHeader } from "./components/VerovioCanvasHeader";
 
 export default function App() {
@@ -22,12 +23,27 @@ export default function App() {
   const [totalPages, setTotalPages] = useState(1);
   const [fitMode, setFitMode] = useState<"off" | "width" | "height">("off");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<Cursor | null>(null);
+
   const [debugFilters, setDebugFilters] = useState<DebugFilters>({
     measure: false,
     staff: false,
     note: false,
     caret: false,
   });
+
+  const handleSelectionChange = useCallback(
+    (id: string | null) => {
+      setSelectedId(id);
+      if (meiFriend && id) {
+        const newCursor = Cursor.fromId(meiFriend, id);
+        if (newCursor) {
+          setCursor(newCursor);
+        }
+      }
+    },
+    [meiFriend],
+  );
 
   const handleFileChange = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,6 +57,7 @@ export default function App() {
         setCurrentTitle(title);
         setCurrentPage(1);
         setSelectedId(null);
+        setCursor(null);
       }
     },
     [],
@@ -58,6 +75,52 @@ export default function App() {
     return () => unregister();
   }, [meiFriend]);
 
+  // Keyboard navigation logic
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      if (!cursor) return;
+
+      let nextCursor: Cursor | undefined;
+      switch (e.key) {
+        case "ArrowRight":
+          e.preventDefault();
+          nextCursor = cursor.nextEvent();
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          nextCursor = cursor.prevEvent();
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          nextCursor = cursor.staffUp();
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          nextCursor = cursor.staffDown();
+          break;
+      }
+
+      if (nextCursor && nextCursor !== cursor) {
+        const nextId = nextCursor.getElementId();
+        if (nextId) {
+          setCursor(nextCursor);
+          setSelectedId(nextId);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [cursor]);
+
   const handleTitleSubmit = useCallback(() => {
     if (meiFriend?.mei) {
       meiFriend.mei.head.setTitle(draftTitle);
@@ -72,38 +135,45 @@ export default function App() {
           A proof of concept for embedding Verovio in a React application with
           interactive overlays.
         </p>
+        <p style={{ fontSize: "0.9rem", color: "#66d9ef" }}>
+          Tip: Click a note and use Arrow Keys to navigate!
+        </p>
       </header>
 
       <div className={styles.scoreContainer}>
+        <VerovioCanvasHeader
+          fitMode={fitMode}
+          setFitMode={setFitMode}
+          vrvOptions={vrvOptions}
+          setVrvOptions={setVrvOptions}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          totalPages={totalPages}
+          debugFilters={debugFilters}
+          setDebugFilters={setDebugFilters}
+          enabled={!!meiFriend}
+        />
         {meiFriend ? (
-          <>
-            <VerovioCanvasHeader
-              fitMode={fitMode}
-              setFitMode={setFitMode}
-              vrvOptions={vrvOptions}
-              setVrvOptions={setVrvOptions}
-              currentPage={currentPage}
-              setCurrentPage={setCurrentPage}
-              totalPages={totalPages}
-              debugFilters={debugFilters}
-              setDebugFilters={setDebugFilters}
-            />
-            <VerovioCanvas
-              meiFriend={meiFriend}
-              options={vrvOptions}
-              currentPage={currentPage}
-              fitMode={fitMode}
-              selectedId={selectedId}
-              debugFilters={debugFilters}
-              onSelectionChange={setSelectedId}
-              onTotalPagesChange={setTotalPages}
-            />
-          </>
+          <VerovioCanvas
+            meiFriend={meiFriend}
+            options={vrvOptions}
+            currentPage={currentPage}
+            fitMode={fitMode}
+            selectedId={selectedId}
+            debugFilters={debugFilters}
+            onSelectionChange={handleSelectionChange}
+            onTotalPagesChange={setTotalPages}
+          />
         ) : (
           <div className={styles.placeholder}>
             Please select an MEI file to view the score
           </div>
         )}
+        <VerovioCanvasFooter
+          position={cursor?.position ?? null}
+          selectedId={selectedId}
+          enabled={!!meiFriend}
+        />
       </div>
 
       <div className={styles.controls}>
@@ -188,9 +258,9 @@ meiFriend.update({
 
         <h3>Advanced Usage: Accessing Verovio Toolkit</h3>
         <p style={{ marginBottom: "1rem", opacity: 0.9 }}>
-          You can directly access the internal `VerovioToolkit` instance through
-          the `ref` of `VerovioCanvas`. Since the toolkit runs in a Web Worker,
-          all methods are asynchronous and return Promises.
+          You can directly access the internal \`VerovioToolkit\` instance
+          through the \`ref\` of \`VerovioCanvas\`. Since the toolkit runs in a
+          Web Worker, all methods are asynchronous and return Promises.
         </p>
         <div className={styles.codeBlock}>
           <pre>
@@ -227,9 +297,9 @@ export function AdvancedScoreViewer({ meiFriend }) {
             fontStyle: "italic",
           }}
         >
-          Note: While reading data (like `renderToMIDI`) is safe, avoid mutating
-          the toolkit state (like `loadData`) directly, as it may cause
-          inconsistencies with the React component's internal state.
+          Note: While reading data (like \`renderToMIDI\`) is safe, avoid
+          mutating the toolkit state (like \`loadData\`) directly, as it may
+          cause inconsistencies with the React component's internal state.
         </p>
       </div>
     </div>

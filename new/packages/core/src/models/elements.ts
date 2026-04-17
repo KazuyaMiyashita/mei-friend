@@ -948,7 +948,7 @@ export class Offset {
   }
 
   public toString(): string {
-    return `Offset(${this.value.toMixedNumberString()})`;
+    return `${this.value.toMixedNumberString()}`;
   }
 
   /**
