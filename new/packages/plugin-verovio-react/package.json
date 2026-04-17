@@ -9,6 +9,7 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
+    "comlink": "^4.4.2",
     "verovio": "^6.1.0"
   },
   "peerDependencies": {

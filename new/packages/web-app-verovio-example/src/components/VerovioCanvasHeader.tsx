@@ -1,14 +1,12 @@
-import type {
-  DebugFilters,
-  VrvOptions,
-} from "@mei-friend/plugin-verovio-react";
+import type { DebugFilters } from "@mei-friend/plugin-verovio-react";
+import type { VerovioOptions } from "verovio";
 import styles from "./VerovioCanvasHeader.module.css";
 
 interface Props {
   fitMode: "off" | "width" | "height";
   setFitMode: (mode: "off" | "width" | "height") => void;
-  vrvOptions: VrvOptions;
-  setVrvOptions: React.Dispatch<React.SetStateAction<VrvOptions>>;
+  vrvOptions: VerovioOptions;
+  setVrvOptions: React.Dispatch<React.SetStateAction<VerovioOptions>>;
   currentPage: number;
   setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
   totalPages: number;
@@ -68,7 +66,7 @@ export function VerovioCanvasHeader({
           onChange={(e) =>
             setVrvOptions((prev) => ({
               ...prev,
-              breaks: e.target.value as VrvOptions["breaks"],
+              breaks: e.target.value as VerovioOptions["breaks"],
             }))
           }
         >

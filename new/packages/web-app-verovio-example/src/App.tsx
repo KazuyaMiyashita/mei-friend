@@ -2,9 +2,9 @@ import { MeiFriend } from "@mei-friend/core";
 import {
   type DebugFilters,
   VerovioCanvas,
-  type VrvOptions,
 } from "@mei-friend/plugin-verovio-react";
 import { useCallback, useEffect, useState } from "react";
+import type { VerovioOptions } from "verovio";
 import styles from "./App.module.css";
 import { VerovioCanvasHeader } from "./components/VerovioCanvasHeader";
 
@@ -14,7 +14,7 @@ export default function App() {
   const [currentTitle, setCurrentTitle] = useState<string>("Untitled");
 
   // Verovio Controls State
-  const [vrvOptions, setVrvOptions] = useState<VrvOptions>({
+  const [vrvOptions, setVrvOptions] = useState<VerovioOptions>({
     scale: 50,
     breaks: "auto",
   });
@@ -189,8 +189,8 @@ meiFriend.update({
         <h3>Advanced Usage: Accessing Verovio Toolkit</h3>
         <p style={{ marginBottom: "1rem", opacity: 0.9 }}>
           You can directly access the internal `VerovioToolkit` instance through
-          the `ref` of `VerovioCanvas`. This allows you to utilize advanced
-          Verovio-specific features, such as rendering MIDI.
+          the `ref` of `VerovioCanvas`. Since the toolkit runs in a Web Worker,
+          all methods are asynchronous and return Promises.
         </p>
         <div className={styles.codeBlock}>
           <pre>
@@ -200,10 +200,12 @@ import { VerovioCanvas, type VerovioCanvasHandle } from "@mei-friend/plugin-vero
 export function AdvancedScoreViewer({ meiFriend }) {
   const canvasRef = useRef<VerovioCanvasHandle>(null);
 
-  const handleExportMidi = () => {
-    const tk = canvasRef.current?.getToolkit();
+  const handleExportMidi = async () => {
+    // Get the proxied toolkit instance (async)
+    const tk = await canvasRef.current?.getToolkit();
     if (tk) {
-      const midiBase64 = tk.renderToMIDI();
+      // All toolkit methods return Promises
+      const midiBase64 = await tk.renderToMIDI();
       console.log("MIDI generated:", midiBase64);
     }
   };
@@ -217,6 +219,18 @@ export function AdvancedScoreViewer({ meiFriend }) {
 }`}
           </pre>
         </div>
+        <p
+          style={{
+            marginTop: "1rem",
+            fontSize: "0.85rem",
+            color: "#ffcb6b",
+            fontStyle: "italic",
+          }}
+        >
+          Note: While reading data (like `renderToMIDI`) is safe, avoid mutating
+          the toolkit state (like `loadData`) directly, as it may cause
+          inconsistencies with the React component's internal state.
+        </p>
       </div>
     </div>
   );

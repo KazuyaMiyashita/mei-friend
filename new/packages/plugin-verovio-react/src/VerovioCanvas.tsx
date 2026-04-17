@@ -3,6 +3,8 @@ import {
   type MeiFriend,
   type ScoreModel,
 } from "@mei-friend/core";
+import type { Remote } from "comlink";
+import * as Comlink from "comlink";
 import {
   forwardRef,
   useEffect,
@@ -12,15 +14,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { VerovioToolkit } from "verovio/esm";
-import createModule from "verovio/wasm";
-
-export interface VrvOptions {
-  scale?: number;
-  breaks?: "auto" | "line" | "encoded" | "none";
-  // biome-ignore lint/suspicious/noExplicitAny: Verovio toolkit has many optional parameters
-  [key: string]: any;
-}
+import type { VerovioOptions } from "verovio";
+import type { VerovioToolkit } from "verovio/esm";
+import type { VerovioWorkerAPI } from "./verovio-worker.js";
 
 export interface DebugFilters {
   measure?: boolean;
@@ -38,7 +34,7 @@ export interface VerovioCanvasColors {
 
 export interface VerovioCanvasProps {
   meiFriend: MeiFriend;
-  options?: VrvOptions;
+  options?: VerovioOptions;
   currentPage?: number;
   fitMode?: "off" | "width" | "height";
   selectedId?: string | null;
@@ -50,7 +46,7 @@ export interface VerovioCanvasProps {
 }
 
 export interface VerovioCanvasHandle {
-  getToolkit: () => VerovioToolkit | null;
+  getToolkit: () => Promise<Remote<VerovioToolkit> | null>;
 }
 
 function createOverlayRect(
@@ -112,76 +108,114 @@ export const VerovioCanvas = forwardRef<
     onRenderCompleted,
   } = props;
 
-  const [tk, setTk] = useState<VerovioToolkit | null>(null);
+  // Storing the Remote proxy in useState caused runtime errors in React 19 (e.g. 'tk.setOptions is not a function'), likely due to React misidentifying the proxy as a Thenable; wrapping it in an object avoids this.
+  const [tkContainer, setTkContainer] = useState<{
+    instance: Remote<VerovioToolkit> | null;
+  }>({ instance: null });
+  const tk = tkContainer.instance;
+
   const [currentSvg, setCurrentSvg] = useState<string>("");
   const [scoreModel, setScoreModel] = useState<ScoreModel | null>(null);
-  const [isRendering, setIsRendering] = useState(false);
+  const [renderTrigger, setRenderTrigger] = useState(0);
 
   const svgContainerRef = useRef<HTMLDivElement>(null);
   const bboxCacheRef = useRef<
     Map<string, { x: number; y: number; width: number; height: number }>
   >(new Map());
 
+  // Track whether the underlying MEI data or layout options have changed
+  // requiring a full tk.loadData()
+  const isDataDirtyRef = useRef(true);
+  const lastOptionsStrRef = useRef("");
+
   useImperativeHandle(ref, () => ({
-    getToolkit: () => tk,
+    getToolkit: async () => tk,
   }));
 
-  // Initialize Verovio
+  // Initialize Verovio Worker
   useEffect(() => {
-    let active = true;
-    // biome-ignore lint/suspicious/noExplicitAny: Required for VerovioToolkit initialization
-    createModule().then((VerovioModule: any) => {
-      if (active) {
-        setTk(new VerovioToolkit(VerovioModule));
-      }
+    // Vite-specific worker import
+    const vrvWorker = new Worker(new URL("./verovio-worker", import.meta.url), {
+      type: "module",
     });
+
+    const api = Comlink.wrap<VerovioWorkerAPI>(vrvWorker);
+
+    api.init().then((proxiedTk: Remote<VerovioToolkit>) => {
+      setTkContainer({ instance: proxiedTk });
+    });
+
     return () => {
-      active = false;
+      vrvWorker.terminate();
     };
   }, []);
 
-  // Render score when MeiFriend or options change
+  // Subscribe to updates to mark data as dirty
+  useEffect(() => {
+    if (!meiFriend) return;
+
+    // Initially data is dirty when a new meiFriend instance is provided
+    isDataDirtyRef.current = true;
+
+    const unsubscribe = meiFriend.onUpdate(() => {
+      isDataDirtyRef.current = true;
+      setRenderTrigger((prev) => prev + 1);
+    });
+
+    return () => unsubscribe();
+  }, [meiFriend]);
+
+  // Render score when MeiFriend, options, or page changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: renderTrigger is used to force re-render when MeiFriend data updates
   useEffect(() => {
     if (!tk || !meiFriend) return;
 
-    const render = () => {
-      setIsRendering(true);
+    const render = async () => {
       try {
-        const xmlContent = meiFriend.toXmlString();
-        tk.setOptions({
-          ...options,
-          adjustPageHeight: true,
-          adjustPageWidth: true,
-        });
-        tk.loadData(xmlContent);
-        const pages = tk.getPageCount();
-        onTotalPagesChange?.(pages);
+        const currentOptionsStr = JSON.stringify(options);
+        const optionsChanged = currentOptionsStr !== lastOptionsStrRef.current;
 
-        const svg = tk.renderToSVG(currentPage);
+        if (optionsChanged) {
+          isDataDirtyRef.current = true;
+          lastOptionsStrRef.current = currentOptionsStr;
+        }
+
+        if (isDataDirtyRef.current) {
+          const xmlContent = meiFriend.toXmlString();
+
+          await tk.setOptions({
+            ...options,
+            adjustPageHeight: true,
+            adjustPageWidth: true,
+          });
+
+          await tk.loadData(xmlContent);
+
+          const pages = await tk.getPageCount();
+          onTotalPagesChange?.(pages);
+
+          setScoreModel(buildScoreModel(meiFriend));
+
+          isDataDirtyRef.current = false;
+        }
+
+        // SVG rendering is fast, do it every time page or layout changes
+        const svg = await tk.renderToSVG(currentPage, false);
+
         setCurrentSvg(svg);
-
-        setScoreModel(buildScoreModel(meiFriend));
         onRenderCompleted?.();
       } catch (e) {
         console.error("Verovio rendering error:", e);
-      } finally {
-        setIsRendering(false);
       }
     };
 
     render();
-
-    // Subscribe to updates
-    const unsubscribe = meiFriend.onUpdate(() => {
-      render();
-    });
-
-    return () => unsubscribe();
   }, [
     tk,
     meiFriend,
     options,
     currentPage,
+    renderTrigger,
     onTotalPagesChange,
     onRenderCompleted,
   ]);
@@ -437,23 +471,6 @@ export const VerovioCanvas = forwardRef<
     textAlign: "center", // Center score horizontally when Fit is Off
   };
 
-  const loadingStyle: React.CSSProperties = {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.7)",
-    zIndex: 100,
-    fontSize: "1.2rem",
-    fontWeight: "bold",
-    color: colors.score || "#333",
-    pointerEvents: "none",
-  };
-
   return (
     <div style={containerStyle}>
       {/* biome-ignore lint/a11y/noStaticElementInteractions: Interactive score canvas */}
@@ -465,11 +482,7 @@ export const VerovioCanvas = forwardRef<
         // biome-ignore lint/security/noDangerouslySetInnerHtml: Verovio generated SVG
         dangerouslySetInnerHTML={svgHtml}
       />
-      {(!tk || isRendering) && (
-        <div style={loadingStyle}>
-          {!tk ? "Loading Verovio..." : "Rendering…"}
-        </div>
-      )}
+      {/* While it's possible to display loading and rendering information, it's generally less stressful to display nothing unless the processing speed is extremely slow. Currently, this process is omitted. */}
     </div>
   );
 });
