@@ -18,5 +18,9 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
-  "references": [{ "path": "../core" }]
+  "references": [
+    { "path": "../core" },
+    { "path": "../plugin-codemirror" },
+    { "path": "../plugin-verovio-react" }
+  ]
 }

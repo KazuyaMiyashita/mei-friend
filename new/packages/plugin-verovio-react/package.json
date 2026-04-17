@@ -6,20 +6,19 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -b",
-    "clean": "tsc -b --clean"
+    "typecheck": "tsc -b --dry",
+    "clean": "tsc -b --clean",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write ."
   },
   "dependencies": {
+    "@mei-friend/core": "*",
     "comlink": "^4.4.2",
     "verovio": "^6.1.0"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0"
-  },
-  "devDependencies": {
-    "@mei-friend/core": "0.1.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "typescript": "^6.0.2"
   }
 }

@@ -11,6 +11,10 @@ export default defineConfig({
         __dirname,
         "../plugin-codemirror/src/index.ts",
       ),
+      "@mei-friend/plugin-verovio-react": path.resolve(
+        __dirname,
+        "../plugin-verovio-react/src/index.ts",
+      ),
     },
   },
 });

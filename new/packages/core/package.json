@@ -6,7 +6,12 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -b",
-    "clean": "tsc -b --clean"
+    "typecheck": "tsc -b --dry",
+    "clean": "tsc -b --clean",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "test": "vitest run"
   },
   "dependencies": {
     "@xmldom/xmldom": "^0.9.9",
