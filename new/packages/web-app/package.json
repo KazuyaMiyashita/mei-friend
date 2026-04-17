@@ -16,7 +16,7 @@
   "dependencies": {
     "@dnd-kit/react": "^0.3.2",
     "@mei-friend/core": "*",
-    "@mei-friend/plugin-codemirror": "*",
+    "@mei-friend/lib-codemirror": "*",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-dropzone": "^15.0.0",

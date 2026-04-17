@@ -10,7 +10,7 @@
     "dev:codemirror": "npm run dev --workspace=@mei-friend/example-web-app-codemirror",
     "dev:verovio": "npm run dev --workspace=@mei-friend/example-web-app-verovio",
     "build": "npm run lint && npm run build:libs && npm run build:apps",
-    "build:libs": "tsc -b packages/core packages/plugin-codemirror packages/plugin-verovio-react packages/example-cli",
+    "build:libs": "tsc -b packages/core packages/lib-codemirror packages/lib-verovio-react packages/example-cli",
     "build:apps": "npm run build --workspace=@mei-friend/web-app --workspace=@mei-friend/example-web-app-codemirror --workspace=@mei-friend/example-web-app-verovio",
     "build-skiplint": "npm run build:libs && npm run build:apps",
     "typecheck": "tsc -b --dry",

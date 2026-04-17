@@ -2,7 +2,7 @@ import { Cursor, MeiFriend } from "@mei-friend/core";
 import {
   type DebugFilters,
   VerovioCanvas,
-} from "@mei-friend/plugin-verovio-react";
+} from "@mei-friend/lib-verovio-react";
 import { useCallback, useEffect, useState } from "react";
 import type { VerovioOptions } from "verovio";
 import styles from "./App.module.css";
@@ -222,7 +222,7 @@ export default function App() {
           <pre>
             {`import { useState } from "react";
 import { MeiFriend } from "@mei-friend/core";
-import { VerovioCanvas } from "@mei-friend/plugin-verovio-react";
+import { VerovioCanvas } from "@mei-friend/lib-verovio-react";
 
 export function ScoreViewer({ initialXml }) {
   const [meiFriend] = useState(() => MeiFriend.fromXmlString(initialXml));
@@ -265,7 +265,7 @@ meiFriend.update({
         <div className={styles.codeBlock}>
           <pre>
             {`import { useRef } from "react";
-import { VerovioCanvas, type VerovioCanvasHandle } from "@mei-friend/plugin-verovio-react";
+import { VerovioCanvas, type VerovioCanvasHandle } from "@mei-friend/lib-verovio-react";
 
 export function AdvancedScoreViewer({ meiFriend }) {
   const canvasRef = useRef<VerovioCanvasHandle>(null);

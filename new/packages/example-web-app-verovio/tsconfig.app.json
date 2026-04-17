@@ -20,7 +20,7 @@
   "include": ["src"],
   "references": [
     { "path": "../core" },
-    { "path": "../plugin-codemirror" },
-    { "path": "../plugin-verovio-react" }
+    { "path": "../lib-codemirror" },
+    { "path": "../lib-verovio-react" }
   ]
 }

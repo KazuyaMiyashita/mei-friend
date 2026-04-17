@@ -1,8 +1,5 @@
 import type { MeiFriend } from "@mei-friend/core";
-import {
-  CodeMirrorPlugin,
-  type SyncState,
-} from "@mei-friend/plugin-codemirror";
+import { CodeMirrorPlugin, type SyncState } from "@mei-friend/lib-codemirror";
 import { basicSetup, EditorView } from "codemirror";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import styles from "./CodeMirrorEditor.module.css";

@@ -1,5 +1,5 @@
 {
-  "name": "@mei-friend/plugin-verovio-react",
+  "name": "@mei-friend/lib-verovio-react",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",

@@ -1,5 +1,5 @@
 import { MeiFriend } from "@mei-friend/core";
-import type { SyncState } from "@mei-friend/plugin-codemirror";
+import type { SyncState } from "@mei-friend/lib-codemirror";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Panel,

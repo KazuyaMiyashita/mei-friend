@@ -1,4 +1,4 @@
-import type { DebugFilters } from "@mei-friend/plugin-verovio-react";
+import type { DebugFilters } from "@mei-friend/lib-verovio-react";
 import type { VerovioOptions } from "verovio";
 import styles from "./VerovioCanvasHeader.module.css";
 

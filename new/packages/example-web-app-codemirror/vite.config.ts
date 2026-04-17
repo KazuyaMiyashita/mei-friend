@@ -7,9 +7,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@mei-friend/core": path.resolve(__dirname, "../core/src/index.ts"),
-      "@mei-friend/plugin-codemirror": path.resolve(
+      "@mei-friend/lib-codemirror": path.resolve(
         __dirname,
-        "../plugin-codemirror/src/index.ts",
+        "../lib-codemirror/src/index.ts",
       ),
     },
   },

@@ -16,8 +16,8 @@
   "dependencies": {
     "@dnd-kit/react": "^0.3.2",
     "@mei-friend/core": "*",
-    "@mei-friend/plugin-codemirror": "*",
-    "@mei-friend/plugin-verovio-react": "*",
+    "@mei-friend/lib-codemirror": "*",
+    "@mei-friend/lib-verovio-react": "*",
     "comlink": "^4.4.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

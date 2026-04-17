@@ -1,5 +1,5 @@
 {
-  "name": "@mei-friend/plugin-codemirror",
+  "name": "@mei-friend/lib-codemirror",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
