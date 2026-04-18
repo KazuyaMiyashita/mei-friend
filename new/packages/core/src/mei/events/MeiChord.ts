@@ -1,7 +1,7 @@
 import type { MeiElement } from "../../MeiElement.js";
 import type { Duration } from "../../models/elements.js";
 import { MeiNote } from "./MeiNote.js";
-import { getDurationFromAttributes } from "./utils.js";
+import { getDuration } from "./utils.js";
 
 /**
  * Wrapper for <chord> element.
@@ -16,7 +16,7 @@ export class MeiChord {
 
   /** Returns the musical duration. */
   get duration(): Duration | undefined {
-    return getDurationFromAttributes(this.element.getAttributes());
+    return getDuration(this.element);
   }
 
   /** Returns the notes within the chord. */

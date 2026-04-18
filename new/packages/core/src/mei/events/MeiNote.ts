@@ -7,7 +7,7 @@ import {
   InternationalPitchStep,
   type Pitch,
 } from "../../models/elements.js";
-import { getDurationFromAttributes } from "./utils.js";
+import { getDuration } from "./utils.js";
 
 /**
  * Wrapper for <note> element.
@@ -22,7 +22,7 @@ export class MeiNote {
 
   /** Returns the musical duration. */
   get duration(): Duration | undefined {
-    return getDurationFromAttributes(this.element.getAttributes());
+    return getDuration(this.element);
   }
 
   /** Returns the Pitch of the note. */

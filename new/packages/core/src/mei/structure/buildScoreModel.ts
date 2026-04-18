@@ -8,7 +8,7 @@ import {
   ScoreModel,
   type StaffModel,
 } from "../../models/score.js";
-import { getDurationFromAttributes } from "../events/utils.js";
+import { getDuration } from "../events/utils.js";
 
 const EVENT_TAGS = new Set(["note", "rest", "chord", "space", "mRest"]);
 const CONTAINER_TAGS = new Set(["beam", "tuplet", "ftrem", "btrem"]);
@@ -47,8 +47,7 @@ function collectEvents(
     const id = child.id ?? "";
 
     if (EVENT_TAGS.has(tag)) {
-      const dur =
-        getDurationFromAttributes(child.getAttributes()) ?? Duration.of(0);
+      const dur = getDuration(child) ?? Duration.of(0);
       events.push({ id, offset, duration: dur, isNavigable: navigable });
 
       if (tag === "chord") {
