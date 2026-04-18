@@ -5,6 +5,7 @@ import type { MeiUpdate, MeiUpdateEvent } from "./MeiUpdate.js";
 import { Mei } from "./mei/Mei.js";
 import { buildScoreModel } from "./mei/structure/buildScoreModel.js";
 import type { ScoreModel } from "./models/score.js";
+import { generateId } from "./utils/id.js";
 
 /**
  * MeiFriend represents a single Music Encoding Initiative (MEI) score.
@@ -84,10 +85,7 @@ export class MeiFriend {
     // biome-ignore lint/suspicious/noExplicitAny: xmldom Element lacks some browser DOM properties but is structurally compatible for our needs.
     const ensureIds = (el: any) => {
       if (!el.getAttribute("xml:id") && !el.getAttribute("id")) {
-        el.setAttribute(
-          "xml:id",
-          MeiFriend.generateId(el.tagName.toLowerCase()),
-        );
+        el.setAttribute("xml:id", generateId(el.tagName.toLowerCase()));
       }
       for (let i = 0; i < el.children.length; i++) {
         ensureIds(el.children[i]);
@@ -397,15 +395,6 @@ export class MeiFriend {
   // --------------------------------------------------------------------------
   // Utilities
   // --------------------------------------------------------------------------
-
-  /**
-   * Generates a unique ID for an MEI element.
-   * Uses a prefix based on the tag name and a random string.
-   */
-  public static generateId(prefix = "m"): string {
-    const randomPart = Math.random().toString(36).substring(2, 9);
-    return `${prefix}-${randomPart}`;
-  }
 
   /**
    * Serializes a Yjs XML element back to an MEI XML string.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MeiFriend } from "../../../src/index.js";
+import { MeiFriend, MeiHead } from "../../../src/index.js";
 
 describe("MeiHead API", () => {
   it("should get the title from a complete MEI document", () => {
@@ -14,14 +14,14 @@ describe("MeiHead API", () => {
    </meiHead>
 </mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
-    const head = meiFriend.mei!.head;
+    const head = meiFriend.mei!.head!;
     expect(head.getTitle()).toBe("My Work");
   });
 
   it("should return undefined if title is missing", () => {
     const xml = `<mei xmlns="http://www.music-encoding.org/ns/mei"><meiHead/></mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
-    const head = meiFriend.mei!.head;
+    const head = meiFriend.mei!.head!;
     expect(head.getTitle()).toBeUndefined();
   });
 
@@ -29,11 +29,10 @@ describe("MeiHead API", () => {
     // Create initial structure
     const xml = `<mei xmlns="http://www.music-encoding.org/ns/mei" xml:id="m1"></mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
-    const head = meiFriend.mei!.head;
 
-    head.setTitle("New Title");
+    MeiHead.setTitleAtRoot(meiFriend.getRootElement()!, "New Title");
 
-    expect(head.getTitle()).toBe("New Title");
+    expect(meiFriend.mei!.head!.getTitle()).toBe("New Title");
     const serialized = meiFriend.toXmlString(false);
     expect(serialized).toContain("New Title</title>");
     expect(serialized).toContain("<titleStmt");
@@ -53,7 +52,7 @@ describe("MeiHead API", () => {
    </meiHead>
 </mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
-    const head = meiFriend.mei!.head;
+    const head = meiFriend.mei!.head!;
     head.setTitle("Updated Title");
     expect(head.getTitle()).toBe("Updated Title");
   });
@@ -61,16 +60,15 @@ describe("MeiHead API", () => {
   it("should work and be undoable", () => {
     const xml = `<mei xmlns="http://www.music-encoding.org/ns/mei" xml:id="m1"></mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
-    const head = meiFriend.mei!.head;
 
-    head.setTitle("Transacted Title");
-    expect(head.getTitle()).toBe("Transacted Title");
+    MeiHead.setTitleAtRoot(meiFriend.getRootElement()!, "Transacted Title");
+    expect(meiFriend.mei!.head!.getTitle()).toBe("Transacted Title");
 
     // Verify it's completely undoable in a single step
     meiFriend.undo();
 
-    // The title should be gone
-    expect(head.getTitle()).toBeUndefined();
+    // The header should be gone
+    expect(meiFriend.mei!.head).toBeUndefined();
     // And the dynamically created <meiHead> structure should also be completely removed
     const rootChildren = meiFriend.getRootElement()!.children;
     expect(rootChildren.length).toBe(0);

@@ -9,21 +9,10 @@ import {
   type StaffModel,
 } from "../../models/score.js";
 import { getDuration } from "../events/utils.js";
+import { MeiScoreDef } from "../metadata/MeiScoreDef.js";
 
 const EVENT_TAGS = new Set(["note", "rest", "chord", "space", "mRest"]);
 const CONTAINER_TAGS = new Set(["beam", "tuplet", "ftrem", "btrem"]);
-
-/**
- * Extracts meter information from a scoreDef element.
- */
-function getMeterFromScoreDef(scoreDef: MeiElement): Partial<Meter> {
-  const count = scoreDef.getAttribute("meter.count");
-  const unit = scoreDef.getAttribute("meter.unit");
-  const meter: { beats?: number; beatType?: Duration } = {};
-  if (count) meter.beats = Number.parseInt(count, 10);
-  if (unit) meter.beatType = Duration.of(4, Number.parseInt(unit, 10));
-  return meter;
-}
 
 /**
  * Recursively collects musical events from a layer element,
@@ -72,8 +61,10 @@ export function buildScoreModel(root: MeiElement): ScoreModel {
   // Initial meter from global scoreDef
   const globalScoreDef = root.getElementsByTagName("scoreDef")[0];
   if (globalScoreDef) {
-    const m = getMeterFromScoreDef(globalScoreDef);
-    currentMeter = { ...currentMeter, ...m };
+    const m = MeiScoreDef.create(globalScoreDef)?.meter;
+    if (m) {
+      currentMeter = { ...currentMeter, ...m };
+    }
   }
 
   const measures = root.getElementsByTagName("measure");
@@ -85,8 +76,10 @@ export function buildScoreModel(root: MeiElement): ScoreModel {
     // Update meter if measure has a scoreDef
     const measureScoreDef = mEl.getElementsByTagName("scoreDef")[0];
     if (measureScoreDef && measureScoreDef.parentElement?.id === mEl.id) {
-      const m = getMeterFromScoreDef(measureScoreDef);
-      currentMeter = { ...currentMeter, ...m };
+      const m = MeiScoreDef.create(measureScoreDef)?.meter;
+      if (m) {
+        currentMeter = { ...currentMeter, ...m };
+      }
     }
 
     const measureN = Number.parseInt(mEl.getAttribute("n") ?? "1", 10);

@@ -1,4 +1,4 @@
-import type { MeiElement } from "../../MeiElement.js";
+import { MeiElement } from "../../MeiElement.js";
 import type { Duration } from "../../models/elements.js";
 import { MeiNote } from "./MeiNote.js";
 import { getDuration } from "./utils.js";
@@ -6,23 +6,23 @@ import { getDuration } from "./utils.js";
 /**
  * Wrapper for <chord> element.
  */
-export class MeiChord {
-  constructor(public readonly element: MeiElement) {}
-
-  /** Returns the xml:id or id. */
-  get id(): string | undefined {
-    return this.element.id;
+export class MeiChord extends MeiElement {
+  static create(element: MeiElement): MeiChord | undefined {
+    if (element.tagName === "chord") {
+      return new MeiChord(element.yNode, element.doc);
+    }
+    return undefined;
   }
 
   /** Returns the musical duration. */
   get duration(): Duration | undefined {
-    return getDuration(this.element);
+    return getDuration(this);
   }
 
   /** Returns the notes within the chord. */
   get notes(): MeiNote[] {
-    return this.element.children
-      .filter((c) => c.tagName === "note")
-      .map((c) => new MeiNote(c));
+    return this.children
+      .map((c) => MeiNote.create(c))
+      .filter((n): n is MeiNote => !!n);
   }
 }

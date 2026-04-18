@@ -32,7 +32,8 @@ function staffsToNotes(
     for (const child of element.children) {
       switch (child.tagName) {
         case "layer": {
-          const l = new MeiLayer(child);
+          const l = MeiLayer.create(child);
+          if (!l) break;
           const subPart =
             l.n === "1" || !l.n ? currentPart : currentPart.spawn(l.n);
           const notes = parseSafe(child, subPart);
@@ -55,7 +56,8 @@ function staffsToNotes(
           break;
         }
         case "chord": {
-          const c = new MeiChord(child);
+          const c = MeiChord.create(child);
+          if (!c) break;
           const duration = c.duration ?? measureDur;
           const notes = c.notes.flatMap((n, i) => {
             const pitch = n.pitch;
@@ -96,7 +98,8 @@ function staffsToNotes(
           break;
         }
         case "note": {
-          const n = new MeiNote(child);
+          const n = MeiNote.create(child);
+          if (!n) break;
           const pitch = n.pitch;
           const duration = n.duration ?? measureDur;
           if (pitch) {
@@ -133,7 +136,8 @@ function staffsToNotes(
         case "rest":
         case "mRest":
         case "mSpace": {
-          const r = new MeiRest(child, getMeasureDuration(root));
+          const r = MeiRest.create(child, getMeasureDuration(root));
+          if (!r) break;
           const duration = r.duration ?? measureDur;
           results.push(
             new Note<NoteInfo>(
@@ -164,13 +168,13 @@ function staffsToNotes(
 
   const scores: Score<NoteInfo>[] = [];
   for (const staff of staffs) {
-    const elems = parseSafe(staff.element, part);
+    const elems = parseSafe(staff, part);
     if (elems.length === 0) {
       scores.push(
         new Note<NoteInfo>(
           {
             value: Rest,
-            id: staff.element.id ?? generateId(),
+            id: staff.id ?? generateId(),
             isTieStarted: false,
             isTieEnded: false,
           },
@@ -179,8 +183,8 @@ function staffsToNotes(
         ),
       );
     } else {
-      const layers = staff.element.children.filter(
-        (c) => c.tagName === "layer",
+      const layers = staff.children.filter(
+        (c: MeiElement) => c.tagName === "layer",
       );
       if (layers.length > 1) {
         scores.push(new Chord<NoteInfo>(new Set(elems)));
@@ -198,11 +202,16 @@ function staffsToNotes(
 export function buildScore(root: MeiElement): Score<NoteInfo> {
   const staffDefs = root
     .getElementsByTagName("staffDef")
-    .map((s) => new MeiStaffDef(s));
-  const ties = root.getElementsByTagName("tie").map((t) => new MeiTie(t));
+    .map((s) => MeiStaffDef.create(s))
+    .filter((s): s is MeiStaffDef => !!s);
+  const ties = root
+    .getElementsByTagName("tie")
+    .map((t) => MeiTie.create(t))
+    .filter((t): t is MeiTie => !!t);
   const measures = root
     .getElementsByTagName("measure")
-    .map((m) => new MeiMeasure(m));
+    .map((m) => MeiMeasure.create(m))
+    .filter((m): m is MeiMeasure => !!m);
 
   const partMap = new Map<string, Part>();
   for (const sd of staffDefs) {

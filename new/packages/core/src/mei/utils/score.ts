@@ -13,9 +13,9 @@ export function getMeterCount(el: MeiElement): number | undefined {
   const staffDef = el.getElementsByTagName("staffDef")[0];
 
   return (
-    (scoreDef ? new MeiScoreDef(scoreDef).meterCount : undefined) ??
-    (meterSig ? new MeiMeterSig(meterSig).count : undefined) ??
-    (staffDef ? new MeiStaffDef(staffDef).meterCount : undefined)
+    (scoreDef ? MeiScoreDef.create(scoreDef)?.meterCount : undefined) ??
+    (meterSig ? MeiMeterSig.create(meterSig)?.count : undefined) ??
+    (staffDef ? MeiStaffDef.create(staffDef)?.meterCount : undefined)
   );
 }
 
@@ -28,9 +28,9 @@ export function getMeterUnit(el: MeiElement): number | undefined {
   const staffDef = el.getElementsByTagName("staffDef")[0];
 
   return (
-    (scoreDef ? new MeiScoreDef(scoreDef).meterUnit : undefined) ??
-    (meterSig ? new MeiMeterSig(meterSig).unit : undefined) ??
-    (staffDef ? new MeiStaffDef(staffDef).meterCount : undefined)
+    (scoreDef ? MeiScoreDef.create(scoreDef)?.meterUnit : undefined) ??
+    (meterSig ? MeiMeterSig.create(meterSig)?.unit : undefined) ??
+    (staffDef ? MeiStaffDef.create(staffDef)?.meterCount : undefined)
   );
 }
 

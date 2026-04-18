@@ -34,7 +34,7 @@ describe("MeiNote and MeiRest duration with tuplets", () => {
     const noteElement = meiFriend.getElementById("n1");
     expect(noteElement).toBeDefined();
 
-    const meiNote = new MeiNote(noteElement!);
+    const meiNote = MeiNote.create(noteElement!)!;
     // 1 quarter note * 2 / 3 = 2/3
     expect(meiNote.duration).toBeDefined();
     expect(meiNote.duration!.value.n).toBe(2);
@@ -70,7 +70,7 @@ describe("MeiNote and MeiRest duration with tuplets", () => {
     `;
     const meiFriend = MeiFriend.fromXmlString(xml);
     const noteElement = meiFriend.getElementById("n_nested");
-    const meiNote = new MeiNote(noteElement!);
+    const meiNote = MeiNote.create(noteElement!)!;
 
     // Base dur 8 -> 1/2 quarter note
     // Outer tuplet 3:2 -> * 2/3
@@ -108,7 +108,7 @@ describe("MeiNote and MeiRest duration with tuplets", () => {
     `;
     const meiFriend = MeiFriend.fromXmlString(xml);
     const restElement = meiFriend.getElementById("r1");
-    const meiRest = new MeiRest(restElement!);
+    const meiRest = MeiRest.create(restElement!)!;
 
     expect(meiRest.duration!.value.n).toBe(2);
     expect(meiRest.duration!.value.d).toBe(3);

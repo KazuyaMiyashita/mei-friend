@@ -1,11 +1,12 @@
 import type { MeiElement } from "../../MeiElement.js";
 import { Duration } from "../../models/elements.js";
 import { Rational } from "../../models/math.js";
+import { MeiTuplet } from "./MeiTuplet.js";
 
 /**
  * Utility to calculate duration from MEI attributes.
  */
-export function getDurationFromAttributes(
+function getDurationFromAttributes(
   attributes: Record<string, string>,
 ): Duration | undefined {
   if (!attributes.dur) return undefined;
@@ -40,16 +41,9 @@ export function getDuration(element: MeiElement): Duration | undefined {
 
   let current = element.parentElement;
   while (current) {
-    if (current.tagName === "tuplet") {
-      const num = current.getAttribute("num");
-      const numbase = current.getAttribute("numbase");
-      if (num && numbase) {
-        const n = parseInt(num, 10);
-        const nb = parseInt(numbase, 10);
-        if (!Number.isNaN(n) && !Number.isNaN(nb) && n !== 0) {
-          duration = duration.mul(new Rational(nb, n));
-        }
-      }
+    const tupletMultiplier = MeiTuplet.create(current)?.multiplier;
+    if (tupletMultiplier) {
+      duration = duration.mul(tupletMultiplier);
     }
     current = current.parentElement;
   }

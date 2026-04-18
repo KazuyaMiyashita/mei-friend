@@ -1,17 +1,22 @@
-import type { MeiElement } from "../../MeiElement.js";
+import { MeiElement } from "../../MeiElement.js";
 import { Duration } from "../../models/elements.js";
 
 /**
  * Wrapper for <meterSig> element.
  */
-export class MeiMeterSig {
-  constructor(public readonly element: MeiElement) {}
+export class MeiMeterSig extends MeiElement {
+  static create(element: MeiElement): MeiMeterSig | undefined {
+    if (element.tagName === "meterSig") {
+      return new MeiMeterSig(element.yNode, element.doc);
+    }
+    return undefined;
+  }
 
   /**
    * Returns the meter count from @count.
    */
   get count(): number | undefined {
-    const count = this.element.getAttribute("count");
+    const count = this.getAttribute("count");
     return count ? parseInt(count, 10) : undefined;
   }
 
@@ -19,7 +24,7 @@ export class MeiMeterSig {
    * Returns the meter unit from @unit.
    */
   get unit(): number | undefined {
-    const unit = this.element.getAttribute("unit");
+    const unit = this.getAttribute("unit");
     return unit ? parseInt(unit, 10) : undefined;
   }
 

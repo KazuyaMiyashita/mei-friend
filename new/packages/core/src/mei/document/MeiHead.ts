@@ -1,23 +1,35 @@
-import type { MeiElement } from "../../MeiElement.js";
+import { MeiElement } from "../../MeiElement.js";
 import { setTextContent } from "../../MeiUpdate.js";
 
 /**
- * Adapter for MEI header operations.
- * Provides high-level access to metadata stored in <meiHead>.
+ * Wrapper for <meiHead> element.
+ * Provides high-level access to metadata stored in the header.
  */
-export class MeiHead {
+export class MeiHead extends MeiElement {
+  static create(element: MeiElement): MeiHead | undefined {
+    if (element.tagName === "meiHead") {
+      return new MeiHead(element.yNode, element.doc);
+    }
+    return undefined;
+  }
+
   /**
-   * @param rootMeiElement The root <mei> element.
+   * Ensures structure for <meiHead> exists and sets the title.
+   * This handles the creation of the header if it doesn't already exist.
    */
-  constructor(private readonly rootMeiElement: MeiElement) {}
+  public static setTitleAtRoot(root: MeiElement, text: string): void {
+    root.doc.transact(() => {
+      const head = root.mutation.getOrCreateChild("meiHead");
+      const headWrapper = new MeiHead(head.yNode, head.doc);
+      headWrapper.setTitle(text);
+    });
+  }
 
   /**
    * Returns the main title text of the score.
    */
   public getTitle(): string | undefined {
-    return this.rootMeiElement
-      .getChildElement("meiHead")
-      ?.getChildElement("fileDesc")
+    return this.getChildElement("fileDesc")
       ?.getChildElement("titleStmt")
       ?.getChildElement("title")?.textContent;
   }
@@ -26,16 +38,15 @@ export class MeiHead {
    * Sets the main title text of the score, creating the necessary structure if needed.
    */
   public setTitle(text: string): void {
-    this.rootMeiElement.doc.transact(() => {
-      const title = this.rootMeiElement
-        .getOrCreateChild("meiHead")
+    this.doc.transact(() => {
+      const title = this.mutation
         .getOrCreateChild("fileDesc")
-        .getOrCreateChild("titleStmt")
-        .getOrCreateChild("title");
+        .mutation.getOrCreateChild("titleStmt")
+        .mutation.getOrCreateChild("title");
 
       const targetId = title.id;
       if (targetId) {
-        this.rootMeiElement.doc.update(setTextContent(targetId, text));
+        this.doc.update(setTextContent(targetId, text));
       }
     });
   }

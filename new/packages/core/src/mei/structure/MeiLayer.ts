@@ -1,13 +1,18 @@
-import type { MeiElement } from "../../MeiElement.js";
+import { MeiElement } from "../../MeiElement.js";
 
 /**
  * Wrapper for <layer> element.
  */
-export class MeiLayer {
-  constructor(public readonly element: MeiElement) {}
+export class MeiLayer extends MeiElement {
+  static create(element: MeiElement): MeiLayer | undefined {
+    if (element.tagName === "layer") {
+      return new MeiLayer(element.yNode, element.doc);
+    }
+    return undefined;
+  }
 
   /** Returns the layer number. */
   get n(): string | undefined {
-    return this.element.getAttribute("n");
+    return this.getAttribute("n");
   }
 }

@@ -10,7 +10,7 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
-import { MeiFriend, type MeiUpdateEvent } from "@mei-friend/core";
+import { generateId, MeiFriend, type MeiUpdateEvent } from "@mei-friend/core";
 import { indentationMarkers } from "@replit/codemirror-indentation-markers";
 import { DOMParser } from "@xmldom/xmldom";
 import {
@@ -411,7 +411,7 @@ export class CodeMirrorPlugin {
                 tagNameNode.to,
               );
               if (tagName) {
-                const generatedId = MeiFriend.generateId(tagName.toLowerCase());
+                const generatedId = generateId(tagName.toLowerCase());
                 idChanges.push({
                   from: tagNameNode.to,
                   insert: ` xml:id="${generatedId}"`,
@@ -472,7 +472,7 @@ export class CodeMirrorPlugin {
                 // Ignore and proceed with replacement if temp parsing fails
               }
 
-              parentMei.replaceWith(parentText, this.options.origin);
+              parentMei.mutation.replaceWith(parentText, this.options.origin);
             }
             this.checkFullSyntaxError();
             return;
@@ -503,7 +503,7 @@ export class CodeMirrorPlugin {
     }
 
     // Use destructive reconstruction for simple and robust synchronization
-    targetMeiElement.replaceWith(dirty.text, this.options.origin);
+    targetMeiElement.mutation.replaceWith(dirty.text, this.options.origin);
     this.checkFullSyntaxError();
   }
 

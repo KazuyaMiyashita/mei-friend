@@ -1,6 +1,7 @@
 import * as Y from "yjs";
-import { MeiFriend } from "./MeiFriend.js";
+import type { MeiFriend } from "./MeiFriend.js";
 import { addElement, replaceElement } from "./MeiUpdate.js";
+import { generateId } from "./utils/id.js";
 
 /**
  * MeiElement wraps a Y.XmlElement and provides a clean API for DOM operations
@@ -166,30 +167,44 @@ export class MeiElement {
   }
 
   /**
+   * Access mutation operations for this element.
+   */
+  get mutation(): Mutation {
+    return new Mutation(this);
+  }
+}
+
+/**
+ * Mutation handles destructive operations on a MeiElement.
+ */
+export class Mutation {
+  constructor(private readonly element: MeiElement) {}
+
+  /**
    * Gets an existing child element by tag name, or creates it if it doesn't exist.
    * Requires the parent element to have an id.
    * @param tagName The tag name of the child.
    * @returns The existing or newly created child element.
    */
   getOrCreateChild(tagName: string): MeiElement {
-    const existing = this.getChildElement(tagName);
+    const existing = this.element.getChildElement(tagName);
     if (existing) {
       return existing;
     }
 
-    const parentId = this.id;
+    const parentId = this.element.id;
     if (!parentId) {
       throw new Error(
         `Cannot create child <${tagName}> on an element without an id.`,
       );
     }
 
-    const newId = MeiFriend.generateId(tagName.toLowerCase());
-    this.doc.update(addElement(parentId, tagName, newId));
+    const newId = generateId(tagName.toLowerCase());
+    this.element.doc.update(addElement(parentId, tagName, newId));
 
     // Retrieve via DOM traversal instead of getElementById because idMap index
     // might not be updated yet if this is called within a batch transaction.
-    const newElement = this.getChildElement(tagName);
+    const newElement = this.element.getChildElement(tagName);
     if (!newElement) {
       throw new Error(
         `Failed to create or retrieve new child <${tagName}> with id ${newId}.`,
@@ -210,11 +225,11 @@ export class MeiElement {
     // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
     origin?: any,
   ): void {
-    const myId = this.id;
+    const myId = this.element.id;
     if (!myId) {
       console.warn("Cannot replace elements without IDs.");
       return;
     }
-    this.doc.update(replaceElement(myId, xml), origin);
+    this.element.doc.update(replaceElement(myId, xml), origin);
   }
 }

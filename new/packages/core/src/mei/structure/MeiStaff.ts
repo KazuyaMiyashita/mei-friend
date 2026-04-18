@@ -1,21 +1,26 @@
-import type { MeiElement } from "../../MeiElement.js";
+import { MeiElement } from "../../MeiElement.js";
 import { MeiLayer } from "./MeiLayer.js";
 
 /**
  * Wrapper for <staff> element.
  */
-export class MeiStaff {
-  constructor(public readonly element: MeiElement) {}
+export class MeiStaff extends MeiElement {
+  static create(element: MeiElement): MeiStaff | undefined {
+    if (element.tagName === "staff") {
+      return new MeiStaff(element.yNode, element.doc);
+    }
+    return undefined;
+  }
 
   /** Returns the staff number. */
   get n(): string | undefined {
-    return this.element.getAttribute("n");
+    return this.getAttribute("n");
   }
 
-  /** Returns the layer elements within the staff. */
+  /** Returns all layers in this staff. */
   get layers(): MeiLayer[] {
-    return this.element.children
-      .filter((c) => c.tagName === "layer")
-      .map((c) => new MeiLayer(c));
+    return this.children
+      .map((c) => MeiLayer.create(c))
+      .filter((l): l is MeiLayer => !!l);
   }
 }

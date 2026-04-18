@@ -1,4 +1,4 @@
-import type { MeiElement } from "../../MeiElement.js";
+import { MeiElement } from "../../MeiElement.js";
 import {
   type Duration,
   InternationalPitch,
@@ -12,22 +12,22 @@ import { getDuration } from "./utils.js";
 /**
  * Wrapper for <note> element.
  */
-export class MeiNote {
-  constructor(public readonly element: MeiElement) {}
-
-  /** Returns the xml:id or id. */
-  get id(): string | undefined {
-    return this.element.id;
+export class MeiNote extends MeiElement {
+  static create(element: MeiElement): MeiNote | undefined {
+    if (element.tagName === "note") {
+      return new MeiNote(element.yNode, element.doc);
+    }
+    return undefined;
   }
 
   /** Returns the musical duration. */
   get duration(): Duration | undefined {
-    return getDuration(this.element);
+    return getDuration(this);
   }
 
   /** Returns the Pitch of the note. */
   get pitch(): Pitch | undefined {
-    const attrs = this.element.getAttributes();
+    const attrs = this.getAttributes();
     const pname = attrs.pname?.toLowerCase();
     if (!pname) return undefined;
 
@@ -48,7 +48,7 @@ export class MeiNote {
     // Accid handling: accid.ges or <accid> child
     let alterVal = 0;
     const accidGes = attrs["accid.ges"];
-    const accidChild = this.element.children.find((c) => c.tagName === "accid");
+    const accidChild = this.children.find((c) => c.tagName === "accid");
     const accid = accidGes || accidChild?.getAttribute("accid");
 
     if (accid) {

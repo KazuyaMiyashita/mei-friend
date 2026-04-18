@@ -51,7 +51,7 @@ export default function App() {
       if (file) {
         const text = await file.text();
         const instance = MeiFriend.fromXmlString(text);
-        const title = instance.mei?.head.getTitle() || "Untitled";
+        const title = instance.mei?.head?.getTitle() || "Untitled";
         setMeiFriend(instance);
         setDraftTitle(title);
         setCurrentTitle(title);
@@ -67,7 +67,7 @@ export default function App() {
     if (!meiFriend) return;
 
     const unregister = meiFriend.onUpdate(() => {
-      const title = meiFriend.mei?.head.getTitle() || "Untitled";
+      const title = meiFriend.mei?.head?.getTitle() || "Untitled";
       setDraftTitle(title);
       setCurrentTitle(title);
     });
@@ -121,7 +121,7 @@ export default function App() {
   }, [cursor, meiFriend]);
 
   const handleTitleSubmit = useCallback(() => {
-    if (meiFriend?.mei) {
+    if (meiFriend?.mei?.head) {
       meiFriend.mei.head.setTitle(draftTitle);
     }
   }, [meiFriend, draftTitle]);
@@ -241,10 +241,10 @@ export function ScoreViewer({ initialXml }) {
         <div className={styles.codeBlock}>
           <pre>
             {`// Get the title
-const title = meiFriend.mei.head.getTitle();
+const title = meiFriend.mei?.head?.getTitle();
 
 // Update the title
-meiFriend.mei.head.setTitle("My New Masterpiece");
+meiFriend.mei?.head?.setTitle("My New Masterpiece");
 
 // Directly update XML information
 meiFriend.update({

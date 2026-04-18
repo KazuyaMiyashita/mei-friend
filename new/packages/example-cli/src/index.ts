@@ -14,7 +14,7 @@ function main() {
     const meiContent = readFileSync(filePath, "utf-8");
     const meiFriend = MeiFriend.fromXmlString(meiContent);
     const root = meiFriend.getRootElement();
-    const title = meiFriend.mei?.head.getTitle() || "Unknown Title";
+    const title = meiFriend.mei?.head?.getTitle() || "Unknown Title";
 
     console.log(`Successfully parsed MEI file: ${filePath}`);
     console.log(`MEI Element Name: ${root?.tagName}`);

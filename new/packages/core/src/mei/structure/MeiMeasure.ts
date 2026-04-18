@@ -1,21 +1,26 @@
-import type { MeiElement } from "../../MeiElement.js";
+import { MeiElement } from "../../MeiElement.js";
 import { MeiStaff } from "./MeiStaff.js";
 
 /**
  * Wrapper for <measure> element.
  */
-export class MeiMeasure {
-  constructor(public readonly element: MeiElement) {}
+export class MeiMeasure extends MeiElement {
+  static create(element: MeiElement): MeiMeasure | undefined {
+    if (element.tagName === "measure") {
+      return new MeiMeasure(element.yNode, element.doc);
+    }
+    return undefined;
+  }
 
   /** Returns the measure number. */
   get n(): string | undefined {
-    return this.element.getAttribute("n");
+    return this.getAttribute("n");
   }
 
   /** Returns the staff elements within the measure. */
   get staffs(): MeiStaff[] {
-    return this.element.children
-      .filter((c) => c.tagName === "staff")
-      .map((c) => new MeiStaff(c));
+    return this.children
+      .map((c) => MeiStaff.create(c))
+      .filter((s): s is MeiStaff => !!s);
   }
 }

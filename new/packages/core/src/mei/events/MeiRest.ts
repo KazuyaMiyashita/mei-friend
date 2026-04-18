@@ -1,26 +1,36 @@
-import type { MeiElement } from "../../MeiElement.js";
+import type * as Y from "yjs";
+import { MeiElement } from "../../MeiElement.js";
+import type { MeiFriend } from "../../MeiFriend.js";
 import type { Duration } from "../../models/elements.js";
 import { getDuration } from "./utils.js";
 
 /**
  * Wrapper for <rest>, <mRest>, or <mSpace> element.
  */
-export class MeiRest {
-  constructor(
-    public readonly element: MeiElement,
-    private readonly measureDuration?: Duration,
-  ) {}
+export class MeiRest extends MeiElement {
+  static create(
+    element: MeiElement,
+    measureDuration?: Duration,
+  ): MeiRest | undefined {
+    if (["rest", "mRest", "mSpace"].includes(element.tagName)) {
+      return new MeiRest(element.yNode, element.doc, measureDuration);
+    }
+    return undefined;
+  }
 
-  /** Returns the xml:id or id. */
-  get id(): string | undefined {
-    return this.element.id;
+  constructor(
+    yNode: Y.XmlElement,
+    doc: MeiFriend,
+    public readonly measureDuration?: Duration,
+  ) {
+    super(yNode, doc);
   }
 
   /** Returns the musical duration. */
   get duration(): Duration | undefined {
-    if (this.element.tagName === "mRest" || this.element.tagName === "mSpace") {
+    if (this.tagName === "mRest" || this.tagName === "mSpace") {
       return this.measureDuration;
     }
-    return getDuration(this.element);
+    return getDuration(this);
   }
 }
