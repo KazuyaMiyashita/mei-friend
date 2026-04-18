@@ -36,7 +36,7 @@ export default function App() {
     (id: string | null) => {
       setSelectedId(id);
       if (meiFriend && id) {
-        const newCursor = Cursor.fromId(meiFriend, id);
+        const newCursor = Cursor.fromId(meiFriend.getScoreModel(), id);
         if (newCursor) {
           setCursor(newCursor);
         }
@@ -86,17 +86,17 @@ export default function App() {
         return;
       }
 
-      if (!cursor) return;
+      if (!cursor || !meiFriend) return;
 
       let nextCursor: Cursor | undefined;
       switch (e.key) {
         case "ArrowRight":
           e.preventDefault();
-          nextCursor = cursor.nextEvent();
+          nextCursor = e.shiftKey ? cursor.nextBeat() : cursor.nextEvent();
           break;
         case "ArrowLeft":
           e.preventDefault();
-          nextCursor = cursor.prevEvent();
+          nextCursor = e.shiftKey ? cursor.prevBeat() : cursor.prevEvent();
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -109,17 +109,16 @@ export default function App() {
       }
 
       if (nextCursor && nextCursor !== cursor) {
-        const nextId = nextCursor.getElementId();
-        if (nextId) {
-          setCursor(nextCursor);
-          setSelectedId(nextId);
-        }
+        setCursor(nextCursor);
+        // Highlight the event at the new position (may be null for virtual beat positions)
+        const nextEvent = nextCursor.getEvent();
+        setSelectedId(nextEvent?.id ?? null);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [cursor]);
+  }, [cursor, meiFriend]);
 
   const handleTitleSubmit = useCallback(() => {
     if (meiFriend?.mei) {
@@ -170,7 +169,7 @@ export default function App() {
           </div>
         )}
         <VerovioCanvasFooter
-          position={cursor?.position ?? null}
+          cursor={cursor}
           selectedId={selectedId}
           enabled={!!meiFriend}
         />

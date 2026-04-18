@@ -1,8 +1,4 @@
-import {
-  buildScoreModel,
-  type MeiFriend,
-  type ScoreModel,
-} from "@mei-friend/core";
+import type { MeiFriend, ScoreModel } from "@mei-friend/core";
 import type { Remote } from "comlink";
 import * as Comlink from "comlink";
 import {
@@ -194,7 +190,7 @@ export const VerovioCanvas = forwardRef<
           const pages = await tk.getPageCount();
           onTotalPagesChange?.(pages);
 
-          setScoreModel(buildScoreModel(meiFriend));
+          setScoreModel(meiFriend.getScoreModel());
 
           isDataDirtyRef.current = false;
         }
@@ -340,14 +336,14 @@ export const VerovioCanvas = forwardRef<
     const overlayColor = colors.overlay || "rgba(255, 0, 0, 0.2)";
     const caretColor = colors.caret || "#ff6b6b";
 
-    for (const [_measureN, measureModel] of scoreModel) {
-      const mBbox = currentBboxMap.get(measureModel.xmlId);
+    for (const measureModel of scoreModel.measures) {
+      const mBbox = currentBboxMap.get(measureModel.id);
       if (mBbox && debugFilters.measure) {
         overlayLayer.appendChild(
           createOverlayRect(
             mBbox,
             "mf-overlay-measure",
-            measureModel.xmlId,
+            measureModel.id,
             false,
             overlayColor,
           ),
@@ -355,14 +351,14 @@ export const VerovioCanvas = forwardRef<
       }
 
       for (const [_staffN, staff] of measureModel.staves) {
-        const sBbox = currentBboxMap.get(staff.xmlId);
+        const sBbox = currentBboxMap.get(staff.id);
         if (sBbox) {
           if (debugFilters.staff) {
             overlayLayer.appendChild(
               createOverlayRect(
                 sBbox,
                 "mf-overlay-staff",
-                staff.xmlId,
+                staff.id,
                 true,
                 overlayColor,
               ),
@@ -373,7 +369,7 @@ export const VerovioCanvas = forwardRef<
               createOverlayRect(
                 sBbox,
                 "mf-overlay-staff-hitbox",
-                staff.xmlId,
+                staff.id,
                 true,
                 "transparent",
               ),
@@ -382,7 +378,7 @@ export const VerovioCanvas = forwardRef<
         }
 
         for (const [_lN, layer] of staff.layers) {
-          for (const note of layer.notes) {
+          for (const note of layer.events) {
             const nBbox = currentBboxMap.get(note.id);
             if (!nBbox) continue;
 

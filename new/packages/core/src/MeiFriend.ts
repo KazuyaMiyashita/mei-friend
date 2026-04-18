@@ -3,6 +3,8 @@ import * as Y from "yjs";
 import { MeiElement } from "./MeiElement.js";
 import type { MeiUpdate, MeiUpdateEvent } from "./MeiUpdate.js";
 import { Mei } from "./mei/Mei.js";
+import { buildScoreModel } from "./mei/structure/buildScoreModel.js";
+import type { ScoreModel } from "./models/score.js";
 
 /**
  * MeiFriend represents a single Music Encoding Initiative (MEI) score.
@@ -41,6 +43,8 @@ export class MeiFriend {
   private readonly tagMap = new Map<string, Set<Y.XmlElement>>();
   /** Reverse index to track which ID belongs to which element, for efficient updates. */
   private readonly elementToIdMap = new Map<Y.XmlElement, string>();
+  /** Cached ScoreModel; invalidated on every document update. */
+  private _scoreModelCache: ScoreModel | null = null;
 
   constructor(doc?: Y.Doc) {
     this.doc = doc ?? new Y.Doc();
@@ -126,6 +130,19 @@ export class MeiFriend {
   public get mei(): Mei | undefined {
     const root = this.getRootElement();
     return root ? new Mei(root) : undefined;
+  }
+
+  /**
+   * Returns a cached ScoreModel built from the current document state.
+   * The cache is invalidated on every document update.
+   */
+  public getScoreModel(): ScoreModel {
+    if (!this._scoreModelCache) {
+      const root = this.getRootElement();
+      if (!root) throw new Error("Document has no root element");
+      this._scoreModelCache = buildScoreModel(root);
+    }
+    return this._scoreModelCache;
   }
 
   /**
@@ -593,6 +610,7 @@ export class MeiFriend {
     this.buildIndex(this.xmlRoot);
 
     this.xmlRoot.observeDeep((events) => {
+      this._scoreModelCache = null;
       for (const event of events) {
         if (event instanceof Y.YXmlEvent) {
           // Attribute changes (only affects ID map)

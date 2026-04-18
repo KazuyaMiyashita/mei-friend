@@ -1,40 +1,41 @@
-import type { Position } from "@mei-friend/core";
+import type { Cursor } from "@mei-friend/core";
 import styles from "./VerovioCanvasFooter.module.css";
 
 interface Props {
-  position: Position | null;
+  cursor: Cursor | null;
   selectedId: string | null;
   enabled: boolean;
 }
 
-export function VerovioCanvasFooter({ position, selectedId, enabled }: Props) {
+export function VerovioCanvasFooter({ cursor, selectedId, enabled }: Props) {
+  const pos = cursor?.position ?? null;
   return (
     <div className={styles.footerToolbar}>
       <div className={styles.statusItem}>
         <span className={styles.statusLabel}>Measure</span>
         <span className={styles.statusValue}>
-          {enabled && position ? position.measureIndex + 1 : "-"}
+          {enabled && pos ? pos.measureIndex + 1 : "-"}
         </span>
       </div>
 
       <div className={styles.statusItem}>
         <span className={styles.statusLabel}>Staff</span>
         <span className={styles.statusValue}>
-          {enabled && position ? position.staff : "-"}
+          {enabled && pos ? pos.staffN : "-"}
         </span>
       </div>
 
       <div className={styles.statusItem}>
         <span className={styles.statusLabel}>Layer</span>
         <span className={styles.statusValue}>
-          {enabled && position ? position.layer : "-"}
+          {enabled && pos ? pos.layerN : "-"}
         </span>
       </div>
 
       <div className={styles.statusItem}>
         <span className={styles.statusLabel}>Offset</span>
         <span className={styles.statusValue} style={{ minWidth: "40px" }}>
-          {enabled && position ? position.offset.toString() : "-"}
+          {enabled && pos ? pos.offset.toString() : "-"}
         </span>
       </div>
 

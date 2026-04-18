@@ -8,6 +8,7 @@ export * from "./metadata/MeiMeterSig.js";
 export * from "./metadata/MeiScoreDef.js";
 export * from "./metadata/MeiStaffDef.js";
 export * from "./metadata/MeiTempo.js";
+export * from "./structure/buildScoreModel.js";
 export * from "./structure/MeiLayer.js";
 export * from "./structure/MeiMeasure.js";
 export * from "./structure/MeiStaff.js";
