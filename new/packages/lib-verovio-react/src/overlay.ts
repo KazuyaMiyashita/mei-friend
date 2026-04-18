@@ -38,11 +38,98 @@ export function applySvgFitStyles(
   }
 }
 
+export function getAdjustedStaffBBox(
+  staffElement: SVGGElement | null,
+  originalBBox: BBox | undefined,
+  bboxMap: Map<string, BBox>,
+): BBox | null {
+  if (!staffElement || !originalBBox) return originalBBox ?? null;
+
+  // 1. Get the 5 paths directly under staff
+  const paths = Array.from(staffElement.children).filter(
+    (el) => el.tagName.toLowerCase() === "path",
+  ) as SVGPathElement[];
+
+  if (paths.length === 0) return originalBBox;
+
+  let highestY = Number.POSITIVE_INFINITY;
+  let lowestY = Number.NEGATIVE_INFINITY;
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+
+  for (const path of paths) {
+    const pathBBox = path.getBBox();
+    if (pathBBox.y < highestY) highestY = pathBBox.y;
+    if (pathBBox.y + pathBBox.height > lowestY)
+      lowestY = pathBBox.y + pathBBox.height;
+    if (pathBBox.x < minX) minX = pathBBox.x;
+    if (pathBBox.x + pathBBox.width > maxX) maxX = pathBBox.x + pathBBox.width;
+  }
+
+  if (highestY === Number.POSITIVE_INFINITY) return originalBBox;
+
+  // Height and vertical margins
+  const staffHeight = lowestY - highestY;
+  const margin = (staffHeight / 5) * 1.5;
+  const adjustedTop = highestY - margin;
+  const adjustedHeight = staffHeight + margin * 2;
+
+  // Left and Right bounds
+  // Find first event X
+  let firstEventX = Number.POSITIVE_INFINITY;
+  const layers = Array.from(staffElement.children).filter((el) =>
+    el.classList.contains("layer"),
+  );
+
+  for (const layer of layers) {
+    const events = Array.from(layer.children).filter(
+      (el) =>
+        el.classList.contains("note") ||
+        el.classList.contains("rest") ||
+        el.classList.contains("mRest") ||
+        el.classList.contains("chord"),
+    );
+    for (const event of events) {
+      const bbox = bboxMap.get(event.id);
+      if (bbox && bbox.x < firstEventX) {
+        firstEventX = bbox.x;
+      }
+    }
+  }
+
+  let leftEdge = minX;
+  const signatures = Array.from(staffElement.children).filter(
+    (el) =>
+      el.classList.contains("clef") ||
+      el.classList.contains("keySig") ||
+      el.classList.contains("meterSig"),
+  );
+
+  for (const sig of signatures) {
+    const sigBBox = bboxMap.get(sig.id);
+    if (sigBBox) {
+      if (sigBBox.x < firstEventX) {
+        const sigRight = sigBBox.x + sigBBox.width;
+        if (sigRight > leftEdge) {
+          leftEdge = sigRight;
+        }
+      }
+    }
+  }
+
+  return {
+    x: leftEdge,
+    y: adjustedTop,
+    width: maxX - leftEdge,
+    height: adjustedHeight,
+  };
+}
+
 export function createOverlayRect(
   bbox: BBox,
   className: string,
   targetId: string,
-  interactive = false,
+  cursorType: "pointer" | "default" | "none" = "none",
   color = "rgba(255, 0, 0, 0.2)",
 ): SVGRectElement {
   const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -52,9 +139,17 @@ export function createOverlayRect(
   rect.setAttribute("height", String(bbox.height));
   rect.setAttribute("class", `mf-overlay ${className}`);
   rect.setAttribute("data-target-id", targetId);
+
+  let pointerEventsStyle = "";
+  if (cursorType === "none") {
+    pointerEventsStyle = "pointer-events: none;";
+  } else {
+    pointerEventsStyle = `cursor: ${cursorType}; pointer-events: auto;`;
+  }
+
   rect.setAttribute(
     "style",
-    `fill: ${color}; stroke: none; ${interactive ? "cursor: pointer;" : "pointer-events: none;"}`,
+    `fill: ${color}; stroke: none; ${pointerEventsStyle}`,
   );
   return rect;
 }
@@ -139,39 +234,23 @@ export function renderOverlays(
   }
 
   const overlayColor = colors.overlay || "rgba(255, 0, 0, 0.2)";
-  const measureColor = colors.measureOverlay || overlayColor;
   const staffColor = colors.staffOverlay || overlayColor;
   const noteColor = colors.noteOverlay || overlayColor;
   const caretColor = colors.caret || "#ff6b6b";
 
   for (const measureModel of scoreModel.measures) {
-    const mBbox = bboxMap.get(measureModel.id);
-    if (mBbox) {
-      if (debugFilters.measure) {
-        overlayLayer.appendChild(
-          createOverlayRect(
-            mBbox,
-            "mf-overlay-measure",
-            measureModel.id,
-            true, // Make interactive so it can be clicked
-            measureColor,
-          ),
-        );
-      } else {
-        overlayLayer.appendChild(
-          createOverlayRect(
-            mBbox,
-            "mf-overlay-measure-hitbox",
-            measureModel.id,
-            true,
-            "transparent",
-          ),
-        );
-      }
-    }
-
     for (const [_staffN, staff] of measureModel.staves) {
-      const sBbox = bboxMap.get(staff.id);
+      const rawSBbox = bboxMap.get(staff.id);
+      let sBbox = rawSBbox;
+
+      const staffElement = container.querySelector(
+        `g#${CSS.escape(staff.id)}`,
+      ) as SVGGElement | null;
+      if (staffElement && rawSBbox) {
+        sBbox =
+          getAdjustedStaffBBox(staffElement, rawSBbox, bboxMap) || rawSBbox;
+      }
+
       if (sBbox) {
         if (debugFilters.staff) {
           overlayLayer.appendChild(
@@ -179,7 +258,7 @@ export function renderOverlays(
               sBbox,
               "mf-overlay-staff",
               staff.id,
-              true,
+              "default",
               staffColor,
             ),
           );
@@ -190,7 +269,7 @@ export function renderOverlays(
               sBbox,
               "mf-overlay-staff-hitbox",
               staff.id,
-              true,
+              "default",
               "transparent",
             ),
           );
@@ -208,7 +287,7 @@ export function renderOverlays(
                 nBbox,
                 "mf-overlay-note",
                 note.id,
-                true,
+                "pointer",
                 noteColor,
               ),
             );
@@ -218,7 +297,7 @@ export function renderOverlays(
                 nBbox,
                 "mf-overlay-note-hitbox",
                 note.id,
-                true,
+                "pointer",
                 "transparent",
               ),
             );
@@ -243,7 +322,10 @@ export function renderOverlays(
         .querySelector(`g#${CSS.escape(selectedId)}`)
         ?.closest("g.staff");
       if (staffEl) {
-        const sBbox = bboxMap.get(staffEl.id);
+        const rawSBbox = bboxMap.get(staffEl.id);
+        const sBbox =
+          getAdjustedStaffBBox(staffEl as SVGGElement, rawSBbox, bboxMap) ||
+          rawSBbox;
         if (sBbox) {
           overlayLayer.appendChild(
             createCaret(elBbox.x, sBbox.y, sBbox.height, false, caretColor),

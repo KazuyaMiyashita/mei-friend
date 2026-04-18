@@ -110,7 +110,7 @@ export function VerovioCanvasHeader({
         <span className={styles.ctrlLabelText} style={{ marginRight: "4px" }}>
           Debug:
         </span>
-        {(["measure", "staff", "note", "caret"] as const).map((key) => (
+        {(["staff", "note", "caret"] as const).map((key) => (
           <button
             type="button"
             key={key}

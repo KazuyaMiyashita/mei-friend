@@ -13,13 +13,12 @@ const App = () => {
     const debug = params.get("debug");
 
     if (debug === "none" || debug === "false") {
-      return { measure: false, staff: false, note: false, caret: false };
+      return { staff: false, note: false, caret: false };
     }
 
     if (debug) {
       const parts = debug.split(",");
       return {
-        measure: parts.includes("measure"),
         staff: parts.includes("staff"),
         note: parts.includes("note"),
         caret: parts.includes("caret"),
@@ -28,7 +27,6 @@ const App = () => {
 
     // Default to all true if no param is provided (for general UI exploration)
     return {
-      measure: true,
       staff: true,
       note: true,
       caret: true,
@@ -37,7 +35,6 @@ const App = () => {
 
   const colors = useMemo(
     () => ({
-      measureOverlay: "rgba(0, 0, 255, 0.1)", // Blue for measure
       staffOverlay: "rgba(0, 255, 0, 0.2)", // Green for staff
       noteOverlay: "rgba(255, 0, 0, 0.3)", // Red for note
       caret: "#ff00ff", // Magenta for caret

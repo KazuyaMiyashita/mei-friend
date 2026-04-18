@@ -1,22 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("VerovioCanvas Overlays (Debug Mode)", () => {
-  test("(1) should render measure overlay", async ({ page }) => {
-    await page.goto("/?debug=measure");
-    await page.waitForSelector("svg .definition-scale");
-
-    // Verify the overlay for the first measure (m-1)
-    const measureOverlay = page.locator(
-      '.mf-overlay-measure[data-target-id="m-1"]',
-    );
-    await expect(measureOverlay).toBeVisible();
-
-    // Verify the applied style (Sandbox blue color: rgba(0, 0, 255, 0.1))
-    const style = await measureOverlay.getAttribute("style");
-    expect(style).toContain("rgba(0, 0, 255, 0.1)");
-  });
-
-  test("(2) should render staff overlay", async ({ page }) => {
+  test("(1) should render staff overlay", async ({ page }) => {
     await page.goto("/?debug=staff");
     await page.waitForSelector("svg .definition-scale");
 
@@ -31,7 +16,7 @@ test.describe("VerovioCanvas Overlays (Debug Mode)", () => {
     expect(style).toContain("rgba(0, 255, 0, 0.2)");
   });
 
-  test("(3) should render note overlay", async ({ page }) => {
+  test("(2) should render note overlay", async ({ page }) => {
     await page.goto("/?debug=note");
     await page.waitForSelector("svg .definition-scale");
 
@@ -46,7 +31,7 @@ test.describe("VerovioCanvas Overlays (Debug Mode)", () => {
     expect(style).toContain("rgba(255, 0, 0, 0.3)");
   });
 
-  test("(4) should render caret", async ({ page }) => {
+  test("(3) should render caret", async ({ page }) => {
     await page.goto("/?debug=caret");
     await page.waitForSelector("svg .definition-scale");
 
@@ -68,7 +53,7 @@ test.describe("VerovioCanvas Interactions", () => {
     await page.waitForSelector("svg .definition-scale");
   });
 
-  test("(5) should select note on click", async ({ page }) => {
+  test("(4) should select note on click", async ({ page }) => {
     // Click the second note of m-1, s-1-1 (n-1-1-2)
     const noteOverlay = page.locator(
       '.mf-overlay-note-hitbox[data-target-id="n-1-1-2"]',
@@ -84,25 +69,7 @@ test.describe("VerovioCanvas Interactions", () => {
     await expect(selectedGroup).toHaveClass(/selected/);
   });
 
-  test("(6) should select measure on click", async ({ page }) => {
-    // Click the second measure (m-2)
-    // Note: Since staff/note hitboxes overlap the measure, we use force: true to ensure
-    // the measure itself receives the click event at the center of its bounding box.
-    const measureOverlay = page.locator(
-      '.mf-overlay-measure-hitbox[data-target-id="m-2"]',
-    );
-    await measureOverlay.click({ force: true });
-
-    // Verify the selection status is updated
-    const status = page.locator("#selection-status");
-    await expect(status).toHaveText("Selected: m-2");
-
-    // Verify the 'selected' class is added to the actual SVG group (<g> tag)
-    const selectedGroup = page.locator("g#m-2");
-    await expect(selectedGroup).toHaveClass(/selected/);
-  });
-
-  test("(7) should display active caret on note click", async ({ page }) => {
+  test("(5) should display active caret on note click", async ({ page }) => {
     // Click the third note of m-1, s-1-1 (n-1-1-3)
     await page
       .locator('.mf-overlay-note-hitbox[data-target-id="n-1-1-3"]')

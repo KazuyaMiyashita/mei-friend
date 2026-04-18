@@ -91,12 +91,16 @@ To run the E2E tests in headless mode:
 
 ```bash
 npm run test:e2e
+# Or from the workspace root:
+# npm run test:e2e -w @mei-friend/lib-verovio-react
 ```
 
 To run E2E tests with the Playwright UI (useful for visually inspecting the rendered SVG and interactive overlays):
 
 ```bash
 npm run test:e2e:ui
+# Or from the workspace root:
+# npm run test:e2e:ui -w @mei-friend/lib-verovio-react
 ```
 
 The E2E tests launch a simple sandbox application. You can also start this sandbox application directly in your browser to manually inspect the overlays and interact with the score:

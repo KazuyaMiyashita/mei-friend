@@ -21,6 +21,6 @@
   "references": [
     { "path": "../core" },
     { "path": "../lib-codemirror" },
-    { "path": "../lib-verovio-react" }
+    { "path": "../lib-verovio-react/tsconfig.lib.json" }
   ]
 }

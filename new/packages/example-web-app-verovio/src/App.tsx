@@ -26,7 +26,6 @@ export default function App() {
   const [cursor, setCursor] = useState<Cursor | null>(null);
 
   const [debugFilters, setDebugFilters] = useState<DebugFilters>({
-    measure: false,
     staff: false,
     note: false,
     caret: false,

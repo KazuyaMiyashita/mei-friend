@@ -1,5 +1,4 @@
 export interface DebugFilters {
-  measure?: boolean;
   staff?: boolean;
   note?: boolean;
   caret?: boolean;
@@ -10,7 +9,6 @@ export interface VerovioCanvasColors {
   score?: string;
   caret?: string;
   overlay?: string;
-  measureOverlay?: string;
   staffOverlay?: string;
   noteOverlay?: string;
 }
