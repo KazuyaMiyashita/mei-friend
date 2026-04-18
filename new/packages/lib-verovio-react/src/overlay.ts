@@ -1,4 +1,4 @@
-import type { ScoreModel } from "@mei-friend/core";
+import type { Cursor, ScoreModel } from "@mei-friend/core";
 import type { BBox, DebugFilters, VerovioCanvasColors } from "./types.js";
 
 export function applySvgFitStyles(
@@ -181,6 +181,7 @@ export function renderOverlays(
   bboxMap: Map<string, BBox>,
   debugFilters: DebugFilters,
   selectedId: string | null,
+  cursor: Cursor | null,
   colors: VerovioCanvasColors,
 ) {
   const rootSvg = container.querySelector("svg") as SVGSVGElement | null;
@@ -313,22 +314,98 @@ export function renderOverlays(
     }
   }
 
-  // Caret for selection
-  if (selectedId) {
-    const elBbox = bboxMap.get(selectedId);
-    if (elBbox) {
-      // Find staff height
-      const staffEl = container
-        .querySelector(`g#${CSS.escape(selectedId)}`)
-        ?.closest("g.staff");
-      if (staffEl) {
-        const rawSBbox = bboxMap.get(staffEl.id);
+  // Caret for cursor
+  if (cursor) {
+    const { measureIndex, staffN, offset } = cursor.position;
+    const measure = scoreModel.getMeasure(measureIndex);
+    if (measure) {
+      const staff = measure.staves.get(staffN);
+      if (staff) {
+        const staffEl = container.querySelector(
+          `g#${CSS.escape(staff.id)}`,
+        ) as SVGGElement | null;
+        const rawSBbox = bboxMap.get(staff.id);
         const sBbox =
-          getAdjustedStaffBBox(staffEl as SVGGElement, rawSBbox, bboxMap) ||
-          rawSBbox;
+          staffEl && rawSBbox
+            ? getAdjustedStaffBBox(staffEl, rawSBbox, bboxMap) || rawSBbox
+            : rawSBbox;
+
         if (sBbox) {
+          const points: { offset: number; x: number }[] = [];
+          const measureLength = measure.meter.beatType.value
+            .mul(measure.meter.beats)
+            .toDouble();
+
+          // Collect event points first
+          const eventPoints = new Map<number, number>();
+          for (const [_sN, mStaff] of measure.staves) {
+            for (const [_lN, mLayer] of mStaff.layers) {
+              for (const event of mLayer.events) {
+                if (!event.isNavigable) continue;
+                const eBbox = bboxMap.get(event.id);
+                if (eBbox) {
+                  const off = event.offset.value.toDouble();
+                  // For the same offset, we can just use the first one we find
+                  if (!eventPoints.has(off)) {
+                    eventPoints.set(off, eBbox.x);
+                  }
+                }
+              }
+            }
+          }
+
+          // Boundary: Offset 0
+          const offset0X = eventPoints.get(0);
+          if (offset0X !== undefined) {
+            points.push({ offset: 0, x: offset0X });
+          } else {
+            points.push({ offset: 0, x: sBbox.x });
+          }
+
+          // Boundary: Measure End
+          // The user requested staff's right edge. createCaret(x) draws from x-width to x.
+          // So if we want the caret's right edge to be at staff right edge, we pass x = sBbox.x + sBbox.width.
+          points.push({ offset: measureLength, x: sBbox.x + sBbox.width });
+
+          // Add all other event points
+          for (const [off, x] of eventPoints.entries()) {
+            if (off > 0 && off < measureLength) {
+              points.push({ offset: off, x });
+            }
+          }
+
+          points.sort((a, b) => a.offset - b.offset);
+
+          const targetOffset = offset.value.toDouble();
+          const exactPoint = points.find(
+            (p) => Math.abs(p.offset - targetOffset) < 1e-6,
+          );
+
+          let caretX: number;
+          if (exactPoint) {
+            caretX = exactPoint.x;
+          } else {
+            let prevPoint = points[0];
+            for (const p of points) {
+              if (p.offset <= targetOffset) prevPoint = p;
+            }
+            let nextPoint = points[points.length - 1];
+            for (let i = points.length - 1; i >= 0; i--) {
+              if (points[i].offset >= targetOffset) nextPoint = points[i];
+            }
+
+            if (prevPoint.offset === nextPoint.offset) {
+              caretX = prevPoint.x;
+            } else {
+              const ratio =
+                (targetOffset - prevPoint.offset) /
+                (nextPoint.offset - prevPoint.offset);
+              caretX = prevPoint.x + ratio * (nextPoint.x - prevPoint.x);
+            }
+          }
+
           overlayLayer.appendChild(
-            createCaret(elBbox.x, sBbox.y, sBbox.height, false, caretColor),
+            createCaret(caretX, sBbox.y, sBbox.height, false, caretColor),
           );
         }
       }

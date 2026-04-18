@@ -297,7 +297,7 @@ export class Cursor {
   }
 
   /**
-   * Advances by one beat within the measure, or moves to the start of the next measure.
+   * Advances to the next beat boundary within the measure, or moves to the start of the next measure.
    */
   nextBeat(): Cursor {
     const { measureIndex, staffN, layerN } = this.position;
@@ -305,14 +305,18 @@ export class Cursor {
     if (!measure) return this;
     const beatDuration = measure.meter.beatType;
 
-    const nextOffset = this.position.offset.add(beatDuration);
+    const k =
+      Math.floor(
+        this.position.offset.value.div(beatDuration.value).toDouble() + 1e-9,
+      ) + 1;
+    const nextOffset = new Offset(beatDuration.value.mul(k));
 
     const layer = measure.staves.get(staffN)?.layers.get(layerN);
     const navigable = layer?.events.filter((e) => e.isNavigable) ?? [];
     const lastEvent = navigable[navigable.length - 1];
     const measureEnd = lastEvent
       ? lastEvent.offset.add(lastEvent.duration)
-      : nextOffset;
+      : new Offset(beatDuration.value.mul(measure.meter.beats));
 
     if (nextOffset.compareTo(measureEnd) < 0) {
       return new Cursor(this.scoreModel, {
@@ -335,7 +339,7 @@ export class Cursor {
   }
 
   /**
-   * Retreats by one beat, or moves to the last beat of the previous measure.
+   * Retreats to the previous beat boundary, or moves to the start of the previous measure.
    */
   prevBeat(): Cursor {
     const { measureIndex, staffN, layerN } = this.position;
@@ -343,12 +347,16 @@ export class Cursor {
     if (!measure) return this;
     const beatDuration = measure.meter.beatType;
 
-    const prevOffsetValue = this.position.offset.value.sub(beatDuration.value);
+    const k =
+      Math.ceil(
+        this.position.offset.value.div(beatDuration.value).toDouble() - 1e-9,
+      ) - 1;
+    const prevOffset = new Offset(beatDuration.value.mul(k));
 
-    if (prevOffsetValue.compareTo(new Rational(0)) >= 0) {
+    if (prevOffset.value.compareTo(new Rational(0)) >= 0) {
       return new Cursor(this.scoreModel, {
         ...this.position,
-        offset: new Offset(prevOffsetValue),
+        offset: prevOffset,
       });
     }
 
@@ -359,8 +367,57 @@ export class Cursor {
       measureIndex: measureIndex - 1,
       staffN,
       layerN,
-      offset: Offset.of(0), // Simple jump to start of previous measure for now
+      offset: Offset.of(0),
       measureId: prevMeasure.id,
+    });
+  }
+
+  /**
+   * Snaps the current position to the nearest preceding beat boundary strictly defined by beatType.
+   * Example: 4/4 (beatType 1), offset 1.5 -> 1.0. Offset 1.0 -> 1.0.
+   */
+  snapToBeat(): Cursor {
+    const { measureIndex, offset } = this.position;
+    const measure = this.scoreModel.getMeasure(measureIndex);
+    if (!measure) return this;
+    const beatDuration = measure.meter.beatType;
+
+    const k = Math.floor(
+      offset.value.div(beatDuration.value).toDouble() + 1e-9,
+    );
+    const snappedOffset = new Offset(beatDuration.value.mul(k));
+
+    if (snappedOffset.compareTo(offset) === 0) return this;
+    return new Cursor(this.scoreModel, {
+      ...this.position,
+      offset: snappedOffset,
+    });
+  }
+
+  /**
+   * Snaps the current position to the nearest preceding navigable event in the current staff/layer.
+   * If no such event exists, snaps to Offset 0.
+   */
+  snapToEvent(): Cursor {
+    const { measureIndex, staffN, layerN, offset } = this.position;
+    const measure = this.scoreModel.getMeasure(measureIndex);
+    if (!measure) return this;
+
+    const layer = measure.staves.get(staffN)?.layers.get(layerN);
+    const navigable = layer?.events.filter((e) => e.isNavigable) ?? [];
+    let snappedOffset = Offset.of(0);
+    for (const e of navigable) {
+      if (e.offset.compareTo(offset) <= 0) {
+        snappedOffset = e.offset;
+      } else {
+        break;
+      }
+    }
+
+    if (snappedOffset.compareTo(offset) === 0) return this;
+    return new Cursor(this.scoreModel, {
+      ...this.position,
+      offset: snappedOffset,
     });
   }
 }

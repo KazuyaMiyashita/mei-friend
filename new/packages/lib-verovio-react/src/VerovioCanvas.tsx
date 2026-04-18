@@ -1,4 +1,4 @@
-import type { MeiFriend, ScoreModel } from "@mei-friend/core";
+import type { Cursor, MeiFriend, ScoreModel } from "@mei-friend/core";
 import type { Remote } from "comlink";
 import * as Comlink from "comlink";
 import {
@@ -24,6 +24,7 @@ export interface VerovioCanvasProps {
   currentPage?: number;
   fitMode?: "off" | "width" | "height";
   selectedId?: string | null;
+  cursor?: Cursor | null;
   debugFilters?: DebugFilters;
   colors?: VerovioCanvasColors;
   onSelectionChange?: (id: string | null) => void;
@@ -47,6 +48,7 @@ export const VerovioCanvas = forwardRef<
     currentPage = 1,
     fitMode = "off",
     selectedId = null,
+    cursor = null,
     debugFilters = {},
     colors = {},
     onSelectionChange,
@@ -204,9 +206,10 @@ export const VerovioCanvas = forwardRef<
       bboxCacheRef.current,
       debugFilters,
       selectedId,
+      cursor,
       colors,
     );
-  }, [currentSvg, scoreModel, debugFilters, selectedId, colors]);
+  }, [currentSvg, scoreModel, debugFilters, selectedId, cursor, colors]);
 
   const handleClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;

@@ -1,4 +1,4 @@
-import { MeiFriend } from "@mei-friend/core";
+import { Cursor, MeiFriend } from "@mei-friend/core";
 import { VerovioCanvas } from "@src/VerovioCanvas";
 import { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -7,6 +7,17 @@ import sampleMei from "../../test/fixtures/sample.mei?raw";
 const App = () => {
   const [meiFriend, setMeiFriend] = useState<MeiFriend | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<Cursor | null>(null);
+
+  const handleSelectionChange = (id: string | null) => {
+    setSelectedId(id);
+    if (meiFriend && id) {
+      const newCursor = Cursor.fromId(meiFriend.getScoreModel(), id);
+      if (newCursor) {
+        setCursor(newCursor);
+      }
+    }
+  };
 
   const debugFilters = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -61,7 +72,8 @@ const App = () => {
       <VerovioCanvas
         meiFriend={meiFriend}
         selectedId={selectedId}
-        onSelectionChange={setSelectedId}
+        cursor={cursor}
+        onSelectionChange={handleSelectionChange}
         debugFilters={debugFilters}
         colors={colors}
         fitMode="width"

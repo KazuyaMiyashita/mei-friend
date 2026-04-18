@@ -9,8 +9,21 @@ interface Props {
 
 export function VerovioCanvasFooter({ cursor, selectedId, enabled }: Props) {
   const pos = cursor?.position ?? null;
+  const measure =
+    enabled && pos ? cursor?.scoreModel.getMeasure(pos.measureIndex) : null;
+  const meter = measure?.meter;
+
   return (
     <div className={styles.footerToolbar}>
+      <div className={styles.statusItem}>
+        <span className={styles.statusLabel}>Meter</span>
+        <span className={styles.statusValue}>
+          {meter
+            ? `${meter.beats}/${Math.round(4 / meter.beatType.value.toDouble())}`
+            : "-"}
+        </span>
+      </div>
+
       <div className={styles.statusItem}>
         <span className={styles.statusLabel}>Measure</span>
         <span className={styles.statusValue}>

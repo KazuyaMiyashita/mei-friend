@@ -99,11 +99,11 @@ export default function App() {
           break;
         case "ArrowUp":
           e.preventDefault();
-          nextCursor = cursor.staffUp();
+          nextCursor = cursor.staffUp().snapToEvent();
           break;
         case "ArrowDown":
           e.preventDefault();
-          nextCursor = cursor.staffDown();
+          nextCursor = cursor.staffDown().snapToEvent();
           break;
       }
 
@@ -158,6 +158,7 @@ export default function App() {
             currentPage={currentPage}
             fitMode={fitMode}
             selectedId={selectedId}
+            cursor={cursor}
             debugFilters={debugFilters}
             onSelectionChange={handleSelectionChange}
             onTotalPagesChange={setTotalPages}
