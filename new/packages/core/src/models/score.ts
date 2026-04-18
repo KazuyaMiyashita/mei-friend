@@ -364,11 +364,14 @@ export class Cursor {
     if (measureIndex <= 0) return this;
     const prevMeasure = this.scoreModel.getMeasure(measureIndex - 1);
     if (!prevMeasure) return this;
+    const lastBeatOffset = prevMeasure.totalDuration
+      .sub(prevMeasure.meter.beatType)
+      .asOffset();
     return new Cursor(this.scoreModel, {
       measureIndex: measureIndex - 1,
       staffN,
       layerN,
-      offset: Offset.of(0),
+      offset: lastBeatOffset,
       measureId: prevMeasure.id,
     });
   }

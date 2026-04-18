@@ -99,11 +99,15 @@ export default function App() {
           break;
         case "ArrowUp":
           e.preventDefault();
-          nextCursor = cursor.staffUp().snapToEvent();
+          nextCursor = e.shiftKey
+            ? cursor.staffUp().snapToBeat()
+            : cursor.staffUp().snapToEvent();
           break;
         case "ArrowDown":
           e.preventDefault();
-          nextCursor = cursor.staffDown().snapToEvent();
+          nextCursor = e.shiftKey
+            ? cursor.staffDown().snapToBeat()
+            : cursor.staffDown().snapToEvent();
           break;
       }
 
