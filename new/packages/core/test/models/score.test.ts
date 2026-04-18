@@ -43,8 +43,9 @@ describe("Cursor", () => {
     {
       id: "m1",
       measureIndex: 0,
-      measureN: 1,
+      measureN: "1",
       meter: { beats: 4, beatType: Duration.of(1) }, // 4/4
+      totalDuration: Duration.of(3),
       staves: new Map([
         [
           1,

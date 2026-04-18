@@ -75,8 +75,9 @@ export interface Meter {
 export interface MeasureModel {
   readonly id: string;
   readonly measureIndex: number;
-  readonly measureN: number;
+  readonly measureN: string | undefined;
   readonly meter: Meter;
+  readonly totalDuration: Duration;
   readonly staves: ReadonlyMap<number, StaffModel>;
 }
 

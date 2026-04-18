@@ -4,12 +4,13 @@ import {
   type EventModel,
   type LayerModel,
   type MeasureModel,
-  type Meter,
   ScoreModel,
   type StaffModel,
 } from "../../models/score.js";
 import { getDuration } from "../events/utils.js";
+import { MeiMeterSig } from "../metadata/MeiMeterSig.js";
 import { MeiScoreDef } from "../metadata/MeiScoreDef.js";
+import { getGlobalMeter } from "../metadata/meter.js";
 
 const EVENT_TAGS = new Set(["note", "rest", "chord", "space", "mRest"]);
 const CONTAINER_TAGS = new Set(["beam", "tuplet", "ftrem", "btrem"]);
@@ -17,12 +18,6 @@ const CONTAINER_TAGS = new Set(["beam", "tuplet", "ftrem", "btrem"]);
 /**
  * Recursively collects musical events from a layer element,
  * accumulating logical offsets. All MEI element-name knowledge lives here.
- *
- * @param el           - Element to traverse (layer or container)
- * @param baseOffset   - Offset at the start of this element
- * @param events       - Accumulator for collected EventModels
- * @param navigable    - Whether children are top-level navigable events
- * @returns The offset after the last event found
  */
 function collectEvents(
   el: MeiElement,
@@ -40,7 +35,6 @@ function collectEvents(
       events.push({ id, offset, duration: dur, isNavigable: navigable });
 
       if (tag === "chord") {
-        // Chord's internal notes are non-navigable (kept for click-target resolution)
         collectEvents(child, offset, events, false);
       }
 
@@ -56,16 +50,7 @@ function collectEvents(
  * Builds a ScoreModel from the root MEI element.
  */
 export function buildScoreModel(root: MeiElement): ScoreModel {
-  let currentMeter: Meter = { beats: 4, beatType: Duration.of(1) }; // Default 4/4
-
-  // Initial meter from global scoreDef
-  const globalScoreDef = root.getElementsByTagName("scoreDef")[0];
-  if (globalScoreDef) {
-    const m = MeiScoreDef.create(globalScoreDef)?.meter;
-    if (m) {
-      currentMeter = { ...currentMeter, ...m };
-    }
-  }
+  let currentMeter = getGlobalMeter(root);
 
   const measures = root.getElementsByTagName("measure");
   const measureModels: MeasureModel[] = [];
@@ -73,16 +58,28 @@ export function buildScoreModel(root: MeiElement): ScoreModel {
   for (let measureIndex = 0; measureIndex < measures.length; measureIndex++) {
     const mEl = measures[measureIndex];
 
-    // Update meter if measure has a scoreDef
-    const measureScoreDef = mEl.getElementsByTagName("scoreDef")[0];
-    if (measureScoreDef && measureScoreDef.parentElement?.id === mEl.id) {
-      const m = MeiScoreDef.create(measureScoreDef)?.meter;
-      if (m) {
-        currentMeter = { ...currentMeter, ...m };
+    // Update meter if measure has a scoreDef or meterSig
+    const meterSigEl = mEl.getElementsByTagName("meterSig")[0];
+    if (meterSigEl) {
+      const ms = MeiMeterSig.create(meterSigEl);
+      if (ms && ms.count !== undefined && ms.unit !== undefined) {
+        currentMeter = { beats: ms.count, beatType: Duration.of(4, ms.unit) };
+      }
+    } else {
+      const scoreDefEl = mEl.getElementsByTagName("scoreDef")[0];
+      if (scoreDefEl && scoreDefEl.parentElement?.id === mEl.id) {
+        const sd = MeiScoreDef.create(scoreDefEl);
+        if (sd) {
+          const count = sd.meterCount;
+          const unit = sd.meterUnit;
+          if (count !== undefined && unit !== undefined) {
+            currentMeter = { beats: count, beatType: Duration.of(4, unit) };
+          }
+        }
       }
     }
 
-    const measureN = Number.parseInt(mEl.getAttribute("n") ?? "1", 10);
+    const measureN = mEl.getAttribute("n");
     const staffModels = new Map<number, StaffModel>();
 
     const staves = mEl.getElementsByTagName("staff");
@@ -110,11 +107,33 @@ export function buildScoreModel(root: MeiElement): ScoreModel {
       });
     }
 
+    // Calculate total duration (max length among all layers)
+    let totalDuration = Duration.of(0);
+    for (const staff of staffModels.values()) {
+      for (const layer of staff.layers.values()) {
+        const navigable = layer.events.filter((e) => e.isNavigable);
+        if (navigable.length > 0) {
+          const last = navigable[navigable.length - 1];
+          const end = last.offset.add(last.duration).asDuration();
+          if (end.compareTo(totalDuration) > 0) {
+            totalDuration = end;
+          }
+        }
+      }
+    }
+
+    // Determine final meter for this measure
+    const measureMeter = currentMeter ?? {
+      beats: totalDuration.value.toDouble(),
+      beatType: Duration.of(1),
+    };
+
     measureModels.push({
       id: mEl.id ?? "",
       measureIndex,
       measureN,
-      meter: currentMeter,
+      meter: measureMeter,
+      totalDuration,
       staves: staffModels,
     });
   }

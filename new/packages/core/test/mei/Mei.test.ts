@@ -27,11 +27,6 @@ describe("MeiScore extraction", () => {
     const score = meiFriend.mei!;
 
     expect(score.tempos[0].bpm).toBe(120);
-    expect(score.meterCount).toBe(3);
-    expect(score.meterUnit).toBe(4);
-    // 3 * 4 / 4 = 3 (quarter notes)
-    expect(score.measureDuration!.value.n).toBe(3);
-    expect(score.measureDuration!.value.d).toBe(1);
   });
 
   it("should parse notes and convert to Score model", () => {

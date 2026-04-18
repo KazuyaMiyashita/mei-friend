@@ -1,5 +1,4 @@
 import { MeiElement } from "../../MeiElement.js";
-import { Duration } from "../../models/elements.js";
 
 /**
  * Wrapper for <meterSig> element.
@@ -26,15 +25,5 @@ export class MeiMeterSig extends MeiElement {
   get unit(): number | undefined {
     const unit = this.getAttribute("unit");
     return unit ? parseInt(unit, 10) : undefined;
-  }
-
-  /**
-   * Returns the duration of one beat (quarter note = Duration.of(1)).
-   * For 4/4 time, unit=4 → Duration.of(1).
-   */
-  get beatDuration(): Duration | undefined {
-    const unit = this.unit;
-    if (!unit) return undefined;
-    return Duration.of(4, unit);
   }
 }

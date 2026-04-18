@@ -1,6 +1,4 @@
 import { MeiElement } from "../../MeiElement.js";
-import { Duration } from "../../models/elements.js";
-import type { Meter } from "../../models/score.js";
 
 /**
  * Wrapper for <scoreDef> element.
@@ -27,17 +25,5 @@ export class MeiScoreDef extends MeiElement {
   get meterUnit(): number | undefined {
     const unit = this.getAttribute("meter.unit");
     return unit ? parseInt(unit, 10) : undefined;
-  }
-
-  /**
-   * Extracts meter information from the scoreDef attributes.
-   */
-  get meter(): Partial<Meter> {
-    const count = this.meterCount;
-    const unit = this.meterUnit;
-    const meter: { beats?: number; beatType?: Duration } = {};
-    if (count !== undefined) meter.beats = count;
-    if (unit !== undefined) meter.beatType = Duration.of(4, unit);
-    return meter;
   }
 }

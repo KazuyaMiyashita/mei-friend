@@ -1,19 +1,14 @@
 import type { MeiElement } from "../MeiElement.js";
 import type { Score } from "../models/containers.js";
-import type { Duration } from "../models/elements.js";
-import type { NoteInfo, ScoreModel } from "../models/score.js";
+import type { Meter, NoteInfo, ScoreModel } from "../models/score.js";
 import { MeiHead } from "./document/MeiHead.js";
 import { MeiTie } from "./events/MeiTie.js";
 import { MeiStaffDef } from "./metadata/MeiStaffDef.js";
 import { MeiTempo } from "./metadata/MeiTempo.js";
+import { getGlobalMeter } from "./metadata/meter.js";
 import { buildScore } from "./structure/buildScore.js";
 import { buildScoreModel } from "./structure/buildScoreModel.js";
 import { MeiMeasure } from "./structure/MeiMeasure.js";
-import {
-  getMeasureDuration,
-  getMeterCount,
-  getMeterUnit,
-} from "./utils/score.js";
 
 /**
  * High-level wrapper for an MEI score, providing extraction and conversion utilities.
@@ -59,19 +54,9 @@ export class Mei {
       .filter((t): t is MeiTie => !!t);
   }
 
-  /** Returns the meter count (beats per measure). */
-  get meterCount(): number | undefined {
-    return getMeterCount(this.root);
-  }
-
-  /** Returns the meter unit (beat duration). */
-  get meterUnit(): number | undefined {
-    return getMeterUnit(this.root);
-  }
-
-  /** Returns the duration of a full measure. */
-  get measureDuration(): Duration | undefined {
-    return getMeasureDuration(this.root);
+  /** Returns the global meter information. */
+  get meter(): Meter | undefined {
+    return getGlobalMeter(this.root);
   }
 
   /**

@@ -7,7 +7,7 @@ import { MeiNote } from "../events/MeiNote.js";
 import { MeiRest } from "../events/MeiRest.js";
 import { MeiTie } from "../events/MeiTie.js";
 import { MeiStaffDef } from "../metadata/MeiStaffDef.js";
-import { getMeasureDuration } from "../utils/score.js";
+import { getGlobalMeter } from "../metadata/meter.js";
 import { MeiLayer } from "./MeiLayer.js";
 import { MeiMeasure } from "./MeiMeasure.js";
 import type { MeiStaff } from "./MeiStaff.js";
@@ -22,7 +22,10 @@ function staffsToNotes(
   part: Part,
   ties: TiesIndex,
 ): Score<NoteInfo> {
-  const measureDur = getMeasureDuration(root) ?? Duration.of(4, 4);
+  const globalMeter = getGlobalMeter(root);
+  const measureDur = globalMeter
+    ? globalMeter.beatType.mul(globalMeter.beats)
+    : Duration.of(1); // Default to 4/4 if not found (1 duration = 4 quarters)
 
   const parseSafe = (
     element: MeiElement,
@@ -136,7 +139,7 @@ function staffsToNotes(
         case "rest":
         case "mRest":
         case "mSpace": {
-          const r = MeiRest.create(child, getMeasureDuration(root));
+          const r = MeiRest.create(child, measureDur);
           if (!r) break;
           const duration = r.duration ?? measureDur;
           results.push(
