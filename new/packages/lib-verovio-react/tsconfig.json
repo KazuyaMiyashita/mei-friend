@@ -1,11 +1,9 @@
 {
-  "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "composite": true,
-    "jsx": "react-jsx"
-  },
-  "include": ["src/**/*"],
-  "references": [{ "path": "../core" }]
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.lib.json" },
+    { "path": "./e2e" },
+    { "path": "./scripts" },
+    { "path": "./test" }
+  ]
 }

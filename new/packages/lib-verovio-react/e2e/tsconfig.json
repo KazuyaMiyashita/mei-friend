@@ -1,0 +1,18 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "types": ["node", "vite/client", "@playwright/test"],
+    "paths": {
+      "@src/*": ["../src/*"]
+    },
+    "noEmit": true,
+    "tsBuildInfoFile": "../node_modules/.tmp/tsconfig.e2e.tsbuildinfo"
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "references": [{ "path": "../tsconfig.lib.json" }, { "path": "../../core" }]
+}

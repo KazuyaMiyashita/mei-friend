@@ -18,7 +18,9 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "test": "vitest run",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspaces --if-present",
+    "test:e2e:ui": "npm run test:e2e:ui --workspaces --if-present",
     "preview": "npm run preview --workspace=@mei-friend/web-app"
   },
   "devDependencies": {
