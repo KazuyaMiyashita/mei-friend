@@ -18,5 +18,8 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
-  "references": [{ "path": "../core" }, { "path": "../lib-codemirror" }]
+  "references": [
+    { "path": "../core/tsconfig.lib.json" },
+    { "path": "../lib-codemirror" }
+  ]
 }
