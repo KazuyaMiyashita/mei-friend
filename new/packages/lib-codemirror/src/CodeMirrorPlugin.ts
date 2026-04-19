@@ -248,7 +248,7 @@ export class CodeMirrorPlugin {
       // Sort events by position in the document (descending) to avoid offset shifts
       const sortedEvents = events
         .map((event) => {
-          const id = event.target.id;
+          const id = event.xmlId;
           const pos = id ? idMap.get(id) : null;
           return { event, pos };
         })
@@ -267,8 +267,8 @@ export class CodeMirrorPlugin {
         // Instead of replacing the whole parent, we only replace the target element.
         // This preserves surrounding comments and indentation.
 
-        // Re-serialize the element from MeiFriend
-        const newText = this.meiFriend.serializeElement(event.target.yNode, 0);
+        // The event already contains the fully serialized XML string for the modified element
+        const newText = event.xmlString;
 
         // Try to match indentation of the original line
         const line = this.view.state.doc.lineAt(pos.from);
@@ -276,7 +276,7 @@ export class CodeMirrorPlugin {
         const indent = indentMatch ? indentMatch[1] : "";
         const indentedText = newText
           .split("\n")
-          .map((l, i) => (i === 0 ? l : indent + l))
+          .map((l: string, i: number) => (i === 0 ? l : indent + l))
           .join("\n");
 
         changes.push({
@@ -450,7 +450,7 @@ export class CodeMirrorPlugin {
           const parentMei = parentId
             ? this.meiFriend.getElementById(parentId)
             : null;
-          if (parentMei) {
+          if (parentId && parentMei) {
             const parentText = this.view?.state.doc.sliceString(
               curr.from,
               curr.to,
@@ -461,9 +461,7 @@ export class CodeMirrorPlugin {
               try {
                 const tempMei = MeiFriend.fromXmlString(parentText);
                 const tempStr = tempMei.toXmlString(false).trim();
-                const currentStr = this.meiFriend
-                  .serializeElement(parentMei.yNode, 0)
-                  .trim();
+                const currentStr = parentMei.toXmlString().trim();
                 if (tempStr === currentStr) {
                   this.syncStatus = "idle";
                   return;
@@ -472,7 +470,7 @@ export class CodeMirrorPlugin {
                 // Ignore and proceed with replacement if temp parsing fails
               }
 
-              parentMei.mutation.replaceWith(parentText, this.options.origin);
+              this.meiFriend.update(parentId, parentText, this.options.origin);
             }
             this.checkFullSyntaxError();
             return;
@@ -491,9 +489,7 @@ export class CodeMirrorPlugin {
     try {
       const tempMei = MeiFriend.fromXmlString(dirty.text);
       const tempStr = tempMei.toXmlString(false).trim();
-      const currentStr = this.meiFriend
-        .serializeElement(targetMeiElement.yNode, 0)
-        .trim();
+      const currentStr = targetMeiElement.toXmlString().trim();
       if (tempStr === currentStr) {
         this.syncStatus = "idle";
         return;
@@ -503,7 +499,7 @@ export class CodeMirrorPlugin {
     }
 
     // Use destructive reconstruction for simple and robust synchronization
-    targetMeiElement.mutation.replaceWith(dirty.text, this.options.origin);
+    this.meiFriend.update(id, dirty.text, this.options.origin);
     this.checkFullSyntaxError();
   }
 

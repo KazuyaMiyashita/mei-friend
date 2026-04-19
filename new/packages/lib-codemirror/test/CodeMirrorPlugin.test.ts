@@ -73,12 +73,7 @@ describe("CodeMirrorPlugin", () => {
         extensions: [basicSetup, plugin.extensions],
       });
 
-      meiFriend.update({
-        type: "setAttribute",
-        targetId: "n1",
-        name: "pname",
-        value: "e",
-      });
+      meiFriend.update("n1", '<note xml:id="n1" pname="e" oct="4" dur="4" />');
 
       const docText = view.state.doc.toString();
       expect(docText).toContain('pname="e"');
@@ -95,13 +90,10 @@ describe("CodeMirrorPlugin", () => {
         extensions: [basicSetup, plugin.extensions],
       });
 
-      meiFriend.update({
-        type: "addElement",
-        parentId: "l1",
-        tagName: "note",
-        id: "n3",
-        attributes: { pname: "g", oct: "4", dur: "4" },
-      });
+      meiFriend.update(
+        "l1",
+        '<layer xml:id="l1"><note xml:id="n1" pname="c" oct="4" dur="4" /><note xml:id="n2" pname="d" oct="4" dur="4" /><note xml:id="n3" pname="g" oct="4" dur="4" /></layer>',
+      );
 
       const docText = view.state.doc.toString();
       expect(docText).toContain('xml:id="n3"');
@@ -117,10 +109,10 @@ describe("CodeMirrorPlugin", () => {
         extensions: [basicSetup, plugin.extensions],
       });
 
-      meiFriend.update({
-        type: "removeElement",
-        targetId: "n1",
-      });
+      meiFriend.update(
+        "l1",
+        '<layer xml:id="l1"><note xml:id="n2" pname="d" oct="4" dur="4" /></layer>',
+      );
 
       const docText = view.state.doc.toString();
       expect(docText).not.toContain('xml:id="n1"');
@@ -140,12 +132,7 @@ describe("CodeMirrorPlugin", () => {
       const lastPos = view.state.doc.length;
       view.dispatch({ selection: { anchor: lastPos } });
 
-      meiFriend.update({
-        type: "setAttribute",
-        targetId: "n1",
-        name: "pname",
-        value: "f",
-      });
+      meiFriend.update("n1", '<note xml:id="n1" pname="f" oct="4" dur="4" />');
 
       // Cursor should stay near the end
       expect(view.state.selection.main.anchor).toBeGreaterThan(lastPos - 10);
@@ -285,12 +272,7 @@ describe("CodeMirrorPlugin", () => {
       const dispatchSpy = vi.spyOn(view, "dispatch");
 
       // Change from model
-      meiFriend.update({
-        type: "setAttribute",
-        targetId: "n1",
-        name: "pname",
-        value: "g",
-      });
+      meiFriend.update("n1", '<note xml:id="n1" pname="g" oct="4" dur="4" />');
 
       // The dispatch should have happened for model-sync
       expect(dispatchSpy).toHaveBeenCalled();

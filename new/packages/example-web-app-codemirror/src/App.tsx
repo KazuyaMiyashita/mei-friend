@@ -86,39 +86,19 @@ export default function App() {
         const newLogs = events.map((e) => {
           logIdRef.current += 1;
 
-          const changedAttrs = Array.from(e.attributesChanged.keys()).join(
-            ", ",
-          );
-          let details = "";
-          if (e.textChanged) details += "Text changed. ";
-          if (changedAttrs) details += `Attrs changed: [${changedAttrs}]. `;
-          if (e.addedElements.length)
-            details += `Added: ${e.addedElements.map((el) => el.tagName).join(", ")}. `;
-          if (e.removedElements.length)
-            details += `Removed: ${e.removedElements.map((el) => el.tagName).join(", ")}. `;
-
           const rawEvent = {
             origin: e.origin,
             isLocal: e.isLocal,
-            target: { tagName: e.target.tagName, id: e.target.id },
-            textChanged: e.textChanged,
-            attributesChanged: Object.fromEntries(e.attributesChanged),
-            addedElements: e.addedElements.map((el) => ({
-              tagName: el.tagName,
-              id: el.id,
-            })),
-            removedElements: e.removedElements.map((el) => ({
-              tagName: el.tagName,
-              id: el.id,
-            })),
+            xmlId: e.xmlId,
+            xmlString: e.xmlString,
           };
 
           return {
             id: logIdRef.current,
             timestamp: new Date(),
             origin: String(e.origin || "unknown"),
-            targetId: e.target.id || e.target.tagName,
-            details: details.trim() || "Structure updated.",
+            targetId: e.xmlId,
+            details: `Updated XML string: ${e.xmlString.substring(0, 50)}...`,
             rawEvent,
           };
         });

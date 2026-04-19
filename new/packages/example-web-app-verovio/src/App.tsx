@@ -1,4 +1,4 @@
-import { Cursor, MeiFriend } from "@mei-friend/core";
+import { Cursor, escapeXml, MeiFriend } from "@mei-friend/core";
 import {
   type DebugFilters,
   VerovioCanvas,
@@ -124,8 +124,16 @@ export default function App() {
   }, [cursor, meiFriend]);
 
   const handleTitleSubmit = useCallback(() => {
-    if (meiFriend?.mei?.head) {
-      meiFriend.mei.head.setTitle(draftTitle);
+    const titleEl = meiFriend?.mei?.head?.fileDesc?.titleStmt?.title;
+    if (meiFriend && titleEl) {
+      // Create a new XML string for the title element, preserving its ID
+      const safeTitle = escapeXml(draftTitle);
+      meiFriend.update(
+        titleEl.id,
+        `<title xml:id="${titleEl.id}">${safeTitle}</title>`,
+      );
+    } else if (meiFriend) {
+      console.warn("Could not find a <title> element to update.");
     }
   }, [meiFriend, draftTitle]);
 
@@ -247,15 +255,14 @@ export function ScoreViewer({ initialXml }) {
             {`// Get the title
 const title = meiFriend.mei?.head?.getTitle();
 
-// Update the title
-meiFriend.mei?.head?.setTitle("My New Masterpiece");
+// Update the title (assuming the <title> element exists and has an ID "title-1")
+meiFriend.update("title-1", '<title xml:id="title-1">My New Masterpiece</title>');
 
-// Directly update XML information
-meiFriend.update({
-  type: "replaceElement",
-  targetId: "note-123",
-  xml: '<note xml:id="note-123" pname="c" oct="4" dur="4"/>'
-});`}
+// Directly update other XML information
+meiFriend.update(
+  "note-123",
+  '<note xml:id="note-123" pname="c" oct="4" dur="4"/>'
+);`}
           </pre>
         </div>
 

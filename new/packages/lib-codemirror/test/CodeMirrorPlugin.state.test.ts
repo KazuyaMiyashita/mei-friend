@@ -174,13 +174,9 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
 
     // External: change pname to "f"
     meiFriend.update(
-      {
-        type: "setAttribute",
-        targetId: "n-1",
-        name: "pname",
-        value: "f",
-      },
-      "external-source",
+      "n-1",
+      '<note xml:id="n-1" pname="f" oct="4" dur="4" />',
+      "external",
     );
 
     // CodeMirror should be updated immediately and fix the syntax
@@ -193,12 +189,7 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
   it("should mark 'a>' as invalid due to strict XML validation", async () => {
     vi.useFakeTimers();
     // Start with a valid root element so getElementAtRange doesn't return null
-    meiFriend.update({
-      type: "addElement",
-      parentId: "mei",
-      tagName: "music",
-      id: "m1",
-    });
+    meiFriend.update("m-1", '<mei xml:id="m-1"><music xml:id="m1"/></mei>');
 
     const plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 50 });
     const view = new EditorView({
