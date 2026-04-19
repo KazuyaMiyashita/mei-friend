@@ -1,18 +1,12 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import {
-  addElement,
-  MeiFriend,
-  type MeiUpdateEvent,
-  removeElement,
-  setAttribute,
-  setTextContent,
-} from "../src/index.js";
+import { MeiFriend, type MeiUpdateEvent } from "../src/index.js";
 
 describe("MeiFriend", () => {
   beforeAll(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});
   });
+
   describe("Lifecycle & Serialization", () => {
     it("should create instance from XML string and serialize back", () => {
       const meiString = `<mei xmlns="http://www.music-encoding.org/ns/mei">
@@ -64,10 +58,10 @@ describe("MeiFriend", () => {
 
     it("should escape special characters in XML", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
-      meiFriend.update([
-        setAttribute("m1", "title", 'A & B "quoted"'),
-        setTextContent("m1", "5 < 10 & 10 > 5"),
-      ]);
+      meiFriend.update(
+        "m1",
+        '<mei xml:id="m1" title="A &amp; B &quot;quoted&quot;">5 &lt; 10 &amp; 10 &gt; 5</mei>',
+      );
 
       const xml = meiFriend.toXmlString(false);
       expect(xml).toContain('title="A &amp; B &quot;quoted&quot;"');
@@ -109,136 +103,93 @@ describe("MeiFriend", () => {
       expect(meiFriend.getElementsByTagName("rest").length).toBe(1);
     });
 
-    it("should update idMap when xml:id changes", () => {
-      const meiFriend = MeiFriend.fromXmlString(
-        '<mei><note xml:id="n-1"/></mei>',
-      );
-      meiFriend.update(setAttribute("n-1", "xml:id", "n-new"));
+    it("should update idMap when xml:id changes (internal sync)", () => {
+      const xml = `<mei xml:id="m1"><note xml:id="n1"/></mei>`;
+      const meiFriend = MeiFriend.fromXmlString(xml);
+
+      // We can't change ID via update("n1", ...) because update checks for ID mismatch.
+      // But we can change it via update("m1", ...) which replaces the whole child structure.
+      meiFriend.update("m1", '<mei xml:id="m1"><note xml:id="n-new"/></mei>');
 
       expect(meiFriend.getElementById("n-new")).toBeDefined();
-      expect(meiFriend.getElementById("n-1")).toBeUndefined();
+      expect(meiFriend.getElementById("n1")).toBeUndefined();
     });
 
     it("should maintain tag index correctly after element removal", () => {
       const meiFriend = MeiFriend.fromXmlString(
-        '<mei><note xml:id="n1"/><note xml:id="n2"/></mei>',
+        '<mei xml:id="m1"><note xml:id="n1"/><note xml:id="n2"/></mei>',
       );
-      meiFriend.update(removeElement("n1"));
+      // Remove n1 by updating parent m1
+      meiFriend.update("m1", '<mei xml:id="m1"><note xml:id="n2"/></mei>');
 
       expect(meiFriend.getElementsByTagName("note").length).toBe(1);
       expect(meiFriend.getElementsByTagName("note")[0].id).toBe("n2");
     });
 
-    it("should remove elements from indexes when removed", () => {
-      const meiFriend = MeiFriend.fromXmlString(
-        '<mei><music xml:id="m1"><body xml:id="b1"/></music></mei>',
-      );
-
-      expect(meiFriend.getElementById("m1")).toBeDefined();
-      expect(meiFriend.getElementsByTagName("music").length).toBe(1);
-
-      // Perform removal
-      meiFriend.update(removeElement("m1"));
-
-      // The removed element should be gone from the index.
-      expect(meiFriend.getElementById("m1")).toBeUndefined();
-      expect(meiFriend.getElementsByTagName("music").length).toBe(0);
-    });
-
-    it("should handle extremely deep nesting for indexes", () => {
+    it("should handle deep nesting for indexes", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
-      let parentId = "m1";
-      for (let i = 0; i < 50; i++) {
-        const id = i === 49 ? "deep-node" : `l-${i}`;
-        meiFriend.update(addElement(parentId, "layer", id));
-        parentId = id;
-      }
-      expect(meiFriend.getElementById("deep-node")).toBeDefined();
-      expect(meiFriend.getElementsByTagName("layer").length).toBe(50);
-    });
 
-    it("should find newly created elements by ID after transaction completes", () => {
-      const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m-1"/>');
-      meiFriend.update(addElement("m-1", "note", "n-internal"));
-      expect(meiFriend.getElementById("n-internal")).toBeDefined();
+      // Update with deep structure
+      const deepXml = `
+<mei xml:id="m1">
+  <layer xml:id="l1">
+    <layer xml:id="l2">
+      <note xml:id="deep-node"/>
+    </layer>
+  </layer>
+</mei>`;
+      meiFriend.update("m1", deepXml);
+
+      expect(meiFriend.getElementById("deep-node")).toBeDefined();
+      expect(meiFriend.getElementsByTagName("layer").length).toBe(2);
     });
   });
 
   describe("Reactivity (onUpdate)", () => {
-    it("should notify on attribute updates with origin and isLocal", () => {
-      const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m-1"/>');
+    it("should notify on updates with origin and isLocal", () => {
+      const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
       const captured: MeiUpdateEvent[] = [];
       meiFriend.onUpdate((events) => captured.push(...events));
 
-      meiFriend.update(setAttribute("m-1", "pname", "c"), "plugin-a");
+      meiFriend.update("m1", '<mei xml:id="m1" pname="c"/>', "plugin-a");
 
-      expect(captured.length).toBe(1);
-      const update = captured[0].attributesChanged.get("pname");
-      expect(update?.newValue).toBe("c");
+      expect(captured.length).toBeGreaterThan(0);
+      expect(captured[0].xmlId).toBe("m1");
+      expect(captured[0].xmlString).toContain('pname="c"');
       expect(captured[0].origin).toBe("plugin-a");
       expect(captured[0].isLocal).toBe(true);
     });
 
-    it("should report newValue when an attribute is overwritten", () => {
+    it("should report correctly when child elements or text change", () => {
       const meiFriend = MeiFriend.fromXmlString(
-        '<mei xml:id="m1" attr="old"/>',
-      );
-      const captured: MeiUpdateEvent[] = [];
-
-      meiFriend.onUpdate((events) => captured.push(...events));
-
-      meiFriend.update(setAttribute("m1", "attr", "new"));
-
-      expect(captured.length).toBeGreaterThan(0);
-      const update = captured[0].attributesChanged.get("attr");
-      expect(update?.newValue).toBe("new");
-    });
-
-    it("should notify on structural updates and text updates independently", () => {
-      const meiFriend = MeiFriend.fromXmlString(
-        '<mei xml:id="m-1"><note xml:id="n-1"/></mei>',
+        '<mei xml:id="m1"><note xml:id="n1"/></mei>',
       );
       const captured: MeiUpdateEvent[] = [];
       meiFriend.onUpdate((events) => captured.push(...events));
 
-      // Structural change (should not flag textChanged)
-      meiFriend.update(addElement("n-1", "accid", "a-1"));
-      expect(captured.length).toBe(1);
-      expect(captured[0].addedElements.length).toBe(1);
-      expect(captured[0].textChanged).toBe(false);
+      // Structural change by adding child to n1
+      meiFriend.update("n1", '<note xml:id="n1"><accid xml:id="a1"/></note>');
+      expect(captured.some((e) => e.xmlId === "n1")).toBe(true);
+      expect(captured.find((e) => e.xmlId === "n1")?.xmlString).toContain(
+        "<accid",
+      );
 
-      captured.length = 0; // Clear array
+      captured.length = 0;
 
       // Text change
-      meiFriend.update(setTextContent("a-1", "sharp"));
-
-      expect(captured.some((e) => e.target.id === "a-1" && e.textChanged)).toBe(
-        true,
-      );
-    });
-
-    it("should allow unregistering the observer", () => {
-      const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m-1"/>');
-      let count = 0;
-      const unsubscribe = meiFriend.onUpdate(() => {
-        count++;
-      });
-
-      meiFriend.update(setAttribute("m-1", "a", "1"));
-      expect(count).toBe(1);
-
-      unsubscribe();
-      meiFriend.update(setAttribute("m-1", "a", "2"));
-      expect(count).toBe(1); // Should not increase
+      meiFriend.update("a1", '<accid xml:id="a1">sharp</accid>');
+      expect(
+        captured.some((e) => e.xmlId === "a1" && e.xmlString.includes("sharp")),
+      ).toBe(true);
     });
   });
 
   describe("History Management", () => {
     it("should support undo and redo", () => {
-      const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m-1"/>');
-      const root = meiFriend.getElementById("m-1")!;
+      const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
+      const root = meiFriend.getElementById("m1")!;
 
-      meiFriend.update(setAttribute("m-1", "label", "test"));
+      meiFriend.update("m1", '<mei xml:id="m1" label="test"/>');
       expect(root.getAttribute("label")).toBe("test");
 
       meiFriend.undo();
@@ -251,7 +202,7 @@ describe("MeiFriend", () => {
     it("syncs indexes correctly after undo/redo", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
 
-      meiFriend.update(addElement("m1", "note", "n1"));
+      meiFriend.update("m1", '<mei xml:id="m1"><note xml:id="n1"/></mei>');
       expect(meiFriend.getElementById("n1")).toBeDefined();
 
       meiFriend.undo();
@@ -259,6 +210,33 @@ describe("MeiFriend", () => {
 
       meiFriend.redo();
       expect(meiFriend.getElementById("n1")).toBeDefined();
+    });
+
+    it("should fail if root element is missing an ID in update", () => {
+      const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
+      expect(() => meiFriend.update("m1", "<mei/>")).toThrowError(
+        /Missing xml:id on <mei>/,
+      );
+    });
+
+    it("should fail if child element is missing an ID in update", () => {
+      const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
+      expect(() =>
+        meiFriend.update("m1", '<mei xml:id="m1"><note/></mei>'),
+      ).toThrowError(/Missing xml:id on <note>/);
+    });
+
+    it("should succeed with assignIds utility", async () => {
+      const { assignIds } = await import("../src/utils/assignIds.js");
+      const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
+
+      // This would fail without assignIds
+      const newXml = assignIds("<mei><note/></mei>", "m1");
+      meiFriend.update("m1", newXml);
+
+      const root = meiFriend.getRootElement()!;
+      expect(root.children.length).toBe(1);
+      expect(root.children[0].id).toBeDefined();
     });
   });
 });

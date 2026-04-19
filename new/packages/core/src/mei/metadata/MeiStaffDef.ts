@@ -1,5 +1,6 @@
 import { MeiElement } from "../../MeiElement.js";
 import { Part } from "../../models/elements.js";
+import { MeiMeterSig } from "./MeiMeterSig.js";
 
 /**
  * Wrapper for <staffDef> element.
@@ -7,47 +8,32 @@ import { Part } from "../../models/elements.js";
 export class MeiStaffDef extends MeiElement {
   static create(element: MeiElement): MeiStaffDef | undefined {
     if (element.tagName === "staffDef") {
-      return new MeiStaffDef(element.yNode, element.doc);
+      return new MeiStaffDef(element.yNode);
     }
     return undefined;
   }
 
-  /**
-   * Returns the staff number from @n.
-   */
   get n(): string | undefined {
     return this.getAttribute("n");
   }
 
-  /**
-   * Returns the label text from <label> child.
-   */
-  get label(): string | undefined {
-    const labelElem = this.children.find((c) => c.tagName === "label");
-    return labelElem?.textContent;
+  get meterSig(): MeiMeterSig | undefined {
+    const el = this.getChildElement("meterSig");
+    return el ? new MeiMeterSig(el.yNode) : undefined;
   }
 
-  /**
-   * Returns the meter count from @meter.count.
-   */
   get meterCount(): number | undefined {
-    const count = this.getAttribute("meter.count");
-    return count ? parseInt(count, 10) : undefined;
+    const val = this.getAttribute("meter.count");
+    return val ? parseInt(val, 10) : this.meterSig?.count;
   }
 
-  /**
-   * Returns the meter unit from @meter.unit.
-   */
   get meterUnit(): number | undefined {
-    const unit = this.getAttribute("meter.unit");
-    return unit ? parseInt(unit, 10) : undefined;
+    const val = this.getAttribute("meter.unit");
+    return val ? parseInt(val, 10) : this.meterSig?.unit;
   }
 
-  /**
-   * Returns a logical Part based on label or @n.
-   */
-  getPart(): Part | undefined {
-    const name = this.label ?? this.n;
-    return name ? Part.of(name) : undefined;
+  public getPart(): Part {
+    const label = this.getAttribute("label") || `Staff ${this.n || "?"}`;
+    return Part.of(label);
   }
 }

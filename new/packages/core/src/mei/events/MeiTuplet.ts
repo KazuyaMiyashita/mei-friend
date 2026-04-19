@@ -7,24 +7,20 @@ import { Rational } from "../../models/math.js";
 export class MeiTuplet extends MeiElement {
   static create(element: MeiElement): MeiTuplet | undefined {
     if (element.tagName === "tuplet") {
-      return new MeiTuplet(element.yNode, element.doc);
+      return new MeiTuplet(element.yNode);
     }
     return undefined;
   }
 
   /**
-   * Returns the duration multiplier for the tuplet based on @num and @numbase.
+   * Returns the duration multiplier of the tuplet (num / numbase).
    */
-  get multiplier(): Rational | undefined {
+  get multiplier(): Rational {
     const num = this.getAttribute("num");
     const numbase = this.getAttribute("numbase");
     if (num && numbase) {
-      const n = parseInt(num, 10);
-      const nb = parseInt(numbase, 10);
-      if (!Number.isNaN(n) && !Number.isNaN(nb) && n !== 0) {
-        return new Rational(nb, n);
-      }
+      return new Rational(parseInt(numbase, 10), parseInt(num, 10));
     }
-    return undefined;
+    return new Rational(1, 1);
   }
 }

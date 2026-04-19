@@ -139,7 +139,7 @@ function staffsToNotes(
         case "rest":
         case "mRest":
         case "mSpace": {
-          const r = MeiRest.create(child, measureDur);
+          const r = MeiRest.create(child);
           if (!r) break;
           const duration = r.duration ?? measureDur;
           results.push(
@@ -225,7 +225,13 @@ export function buildScore(root: MeiElement): Score<NoteInfo> {
     }
   }
 
-  const tiesIndex = new TiesIndex(ties);
+  const tiesIndex = new TiesIndex(
+    ties.map((t) => ({
+      id: t.id,
+      startId: t.startid?.replace("#", ""),
+      endId: t.endid?.replace("#", ""),
+    })),
+  );
 
   // Collect all staffs and group by @n
   const staffsByPartN = new Map<string, MeiStaff[]>();

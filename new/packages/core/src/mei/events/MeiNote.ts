@@ -15,7 +15,7 @@ import { getDuration } from "./utils.js";
 export class MeiNote extends MeiElement {
   static create(element: MeiElement): MeiNote | undefined {
     if (element.tagName === "note") {
-      return new MeiNote(element.yNode, element.doc);
+      return new MeiNote(element.yNode);
     }
     return undefined;
   }

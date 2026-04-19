@@ -1,4 +1,6 @@
 import { MeiElement } from "../../MeiElement.js";
+import { MeiMeterSig } from "./MeiMeterSig.js";
+import { MeiStaffDef } from "./MeiStaffDef.js";
 
 /**
  * Wrapper for <scoreDef> element.
@@ -6,24 +8,29 @@ import { MeiElement } from "../../MeiElement.js";
 export class MeiScoreDef extends MeiElement {
   static create(element: MeiElement): MeiScoreDef | undefined {
     if (element.tagName === "scoreDef") {
-      return new MeiScoreDef(element.yNode, element.doc);
+      return new MeiScoreDef(element.yNode);
     }
     return undefined;
   }
 
-  /**
-   * Returns the meter count from @meter.count.
-   */
-  get meterCount(): number | undefined {
-    const count = this.getAttribute("meter.count");
-    return count ? parseInt(count, 10) : undefined;
+  get staffDefs(): MeiStaffDef[] {
+    return this.getElementsByTagName("staffDef").map(
+      (el) => new MeiStaffDef(el.yNode),
+    );
   }
 
-  /**
-   * Returns the meter unit from @meter.unit.
-   */
+  get meterSig(): MeiMeterSig | undefined {
+    const el = this.getChildElement("meterSig");
+    return el ? new MeiMeterSig(el.yNode) : undefined;
+  }
+
+  get meterCount(): number | undefined {
+    const val = this.getAttribute("meter.count");
+    return val ? parseInt(val, 10) : this.meterSig?.count;
+  }
+
   get meterUnit(): number | undefined {
-    const unit = this.getAttribute("meter.unit");
-    return unit ? parseInt(unit, 10) : undefined;
+    const val = this.getAttribute("meter.unit");
+    return val ? parseInt(val, 10) : this.meterSig?.unit;
   }
 }

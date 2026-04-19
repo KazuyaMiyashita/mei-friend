@@ -1,23 +1,30 @@
 import * as Y from "yjs";
-import type { MeiFriend } from "./MeiFriend.js";
-import { addElement, replaceElement } from "./MeiUpdate.js";
-import { generateId } from "./utils/id.js";
+import { serializeYNode } from "./utils/serialize.js";
 
 /**
  * MeiElement wraps a Y.XmlElement and provides a clean API for DOM operations
  * within a MeiFriend document.
+ *
+ * This class is a Read-only view of a Y.XmlElement. For all document modifications,
+ * use `MeiFriend.update(xmlId, xmlString)`.
+ *
+ * **Constraint**: Every MeiElement must have a valid `xml:id`. If the underlying
+ * Y.XmlElement is missing an ID, the constructor will throw an Error.
  */
 export class MeiElement {
-  constructor(
-    public readonly yNode: Y.XmlElement,
-    public readonly doc: MeiFriend,
-  ) {}
-
   /**
-   * The xml:id or id of the element.
+   * The xml:id or id of the element. Guaranteed to be present.
    */
-  get id(): string | undefined {
-    return this.getAttribute("xml:id") || this.getAttribute("id");
+  public readonly id: string;
+
+  constructor(public readonly yNode: Y.XmlElement) {
+    const id = yNode.getAttribute("xml:id") || yNode.getAttribute("id");
+    if (!id) {
+      throw new Error(
+        `MeiElement validation failed: Every element must have an xml:id. Tag: <${yNode.nodeName}>`,
+      );
+    }
+    this.id = id;
   }
 
   /**
@@ -34,7 +41,7 @@ export class MeiElement {
     return this.yNode
       .toArray()
       .filter((child): child is Y.XmlElement => child instanceof Y.XmlElement)
-      .map((child) => new MeiElement(child, this.doc));
+      .map((child) => new MeiElement(child));
   }
 
   /**
@@ -43,7 +50,8 @@ export class MeiElement {
   get parentElement(): MeiElement | undefined {
     const parent = this.yNode.parent;
     if (parent instanceof Y.XmlElement) {
-      return new MeiElement(parent, this.doc);
+      if (parent.nodeName === "__root__") return undefined;
+      return new MeiElement(parent);
     }
     return undefined;
   }
@@ -60,7 +68,7 @@ export class MeiElement {
         for (let i = index + 1; i < siblings.length; i++) {
           const sibling = siblings[i];
           if (sibling instanceof Y.XmlElement) {
-            return new MeiElement(sibling, this.doc);
+            return new MeiElement(sibling);
           }
         }
       }
@@ -80,7 +88,7 @@ export class MeiElement {
         for (let i = index - 1; i >= 0; i--) {
           const sibling = siblings[i];
           if (sibling instanceof Y.XmlElement) {
-            return new MeiElement(sibling, this.doc);
+            return new MeiElement(sibling);
           }
         }
       }
@@ -97,7 +105,6 @@ export class MeiElement {
 
   /**
    * Returns all attributes as a record.
-   * Only attributes with defined string values are included.
    */
   getAttributes(): Record<string, string> {
     const attrs = this.yNode.getAttributes();
@@ -122,7 +129,7 @@ export class MeiElement {
         const child = node.get(i);
         if (child instanceof Y.XmlElement) {
           if (child.nodeName === tagName) {
-            result.push(new MeiElement(child, this.doc));
+            result.push(new MeiElement(child));
           }
           traverse(child);
         }
@@ -134,7 +141,6 @@ export class MeiElement {
 
   /**
    * Returns the concatenated text content of the element.
-   * Traverses all descendant nodes recursively.
    */
   get textContent(): string {
     const texts: string[] = [];
@@ -163,73 +169,44 @@ export class MeiElement {
         (child): child is Y.XmlElement =>
           child instanceof Y.XmlElement && child.nodeName === tagName,
       );
-    return yChild ? new MeiElement(yChild, this.doc) : undefined;
+    return yChild ? new MeiElement(yChild) : undefined;
   }
 
-  /**
-   * Access mutation operations for this element.
-   */
-  get mutation(): Mutation {
-    return new Mutation(this);
-  }
-}
-
-/**
- * Mutation handles destructive operations on a MeiElement.
- */
-export class Mutation {
-  constructor(private readonly element: MeiElement) {}
+  // --------------------------------------------------------------------------
+  // Immutable Mutation API
+  // --------------------------------------------------------------------------
 
   /**
-   * Gets an existing child element by tag name, or creates it if it doesn't exist.
-   * Requires the parent element to have an id.
-   * @param tagName The tag name of the child.
-   * @returns The existing or newly created child element.
+   * Creates a clone of this element, applies the given recipe to the clone,
+   * and returns a new MeiElement wrapping the modified clone.
+   *
+   * The returned element is detached from the document and can be used to
+   * update the original via `MeiFriend.update(id, newElement.toXmlString())`.
+   *
+   * **Note**: If the recipe removes the `xml:id` or the resulting element structure
+   * is invalid according to MeiElement constraints, this method will throw an Error.
+   *
+   * @param recipe A function that modifies the cloned Y.XmlElement.
    */
-  getOrCreateChild(tagName: string): MeiElement {
-    const existing = this.element.getChildElement(tagName);
-    if (existing) {
-      return existing;
-    }
+  public produce(recipe: (draft: Y.XmlElement) => void): MeiElement {
+    const clone = this.yNode.clone();
+    // In Yjs, a cloned node must be attached to a Y.Doc before its attributes
+    // or children can be accessed. We use a temporary document for this purpose.
+    const tempDoc = new Y.Doc();
+    tempDoc.getXmlFragment("tmp").push([clone]);
 
-    const parentId = this.element.id;
-    if (!parentId) {
-      throw new Error(
-        `Cannot create child <${tagName}> on an element without an id.`,
-      );
-    }
-
-    const newId = generateId(tagName.toLowerCase());
-    this.element.doc.update(addElement(parentId, tagName, newId));
-
-    // Retrieve via DOM traversal instead of getElementById because idMap index
-    // might not be updated yet if this is called within a batch transaction.
-    const newElement = this.element.getChildElement(tagName);
-    if (!newElement) {
-      throw new Error(
-        `Failed to create or retrieve new child <${tagName}> with id ${newId}.`,
-      );
-    }
-    return newElement;
+    recipe(clone);
+    return new MeiElement(clone);
   }
 
+  // --------------------------------------------------------------------------
+  // Serialize
+  // --------------------------------------------------------------------------
+
   /**
-   * Replaces this element's attributes and children with the content of the provided MEI XML string.
-   * This is a destructive operation that maintains the Yjs identity of this element but
-   * recreates all its descendants.
-   * @param xml The new MEI XML string.
-   * @param origin The origin of the update (optional).
+   * Returns the XML string representation of this element.
    */
-  replaceWith(
-    xml: string,
-    // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
-    origin?: any,
-  ): void {
-    const myId = this.element.id;
-    if (!myId) {
-      console.warn("Cannot replace elements without IDs.");
-      return;
-    }
-    this.element.doc.update(replaceElement(myId, xml), origin);
+  toXmlString(): string {
+    return serializeYNode(this.yNode, 0);
   }
 }

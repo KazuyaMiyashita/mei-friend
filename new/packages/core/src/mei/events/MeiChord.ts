@@ -9,7 +9,7 @@ import { getDuration } from "./utils.js";
 export class MeiChord extends MeiElement {
   static create(element: MeiElement): MeiChord | undefined {
     if (element.tagName === "chord") {
-      return new MeiChord(element.yNode, element.doc);
+      return new MeiChord(element.yNode);
     }
     return undefined;
   }
