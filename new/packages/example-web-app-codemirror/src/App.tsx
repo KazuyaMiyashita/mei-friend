@@ -77,10 +77,10 @@ export default function App() {
   useEffect(() => {
     if (!meiFriend) return;
 
-    setTitle(meiFriend.mei?.head?.getTitle() || "");
+    setTitle(meiFriend.api.getTitle() || "");
 
     const unregister = meiFriend.onUpdate((events) => {
-      setTitle(meiFriend.mei?.head?.getTitle() || "");
+      setTitle(meiFriend.api.getTitle() || "");
 
       setLogs((prev) => {
         const newLogs = events.map((e) => {

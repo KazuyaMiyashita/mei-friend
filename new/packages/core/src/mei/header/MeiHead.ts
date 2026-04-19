@@ -1,4 +1,5 @@
 import { MeiElement } from "../../MeiElement.js";
+import { MeiFileDesc } from "./MeiFileDesc.js";
 
 /**
  * Wrapper for <meiHead> element.
@@ -25,30 +26,5 @@ export class MeiHead extends MeiElement {
    */
   public getTitle(): string | undefined {
     return this.fileDesc?.titleStmt?.title?.textContent;
-  }
-}
-
-/**
- * Wrapper for <fileDesc> element.
- */
-export class MeiFileDesc extends MeiElement {
-  /**
-   * Returns the title statement element.
-   */
-  get titleStmt(): MeiTitleStmt | undefined {
-    const el = this.getChildElement("titleStmt");
-    return el ? new MeiTitleStmt(el.yNode) : undefined;
-  }
-}
-
-/**
- * Wrapper for <titleStmt> element.
- */
-export class MeiTitleStmt extends MeiElement {
-  /**
-   * Returns the title element.
-   */
-  get title(): MeiElement | undefined {
-    return this.getChildElement("title");
   }
 }

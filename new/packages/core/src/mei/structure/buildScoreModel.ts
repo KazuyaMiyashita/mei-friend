@@ -8,9 +8,9 @@ import {
   type StaffModel,
 } from "../../models/score.js";
 import { getDuration } from "../events/utils.js";
-import { MeiMeterSig } from "../metadata/MeiMeterSig.js";
-import { MeiScoreDef } from "../metadata/MeiScoreDef.js";
-import { getGlobalMeter } from "../metadata/meter.js";
+import { MeiMeterSig } from "../score-def/MeiMeterSig.js";
+import { MeiScoreDef } from "../score-def/MeiScoreDef.js";
+import { getGlobalMeter } from "../score-def/meter.js";
 
 const EVENT_TAGS = new Set(["note", "rest", "chord", "space", "mRest"]);
 const CONTAINER_TAGS = new Set(["beam", "tuplet", "ftrem", "btrem"]);

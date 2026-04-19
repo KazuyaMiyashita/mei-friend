@@ -1,9 +1,9 @@
 import { DOMParser } from "@xmldom/xmldom";
 import * as Y from "yjs";
+import { MeiApi } from "./MeiApi.js";
 import { MeiElement } from "./MeiElement.js";
-import type { MeiUpdateEvent } from "./MeiUpdate.js";
+import type { MeiUpdateEvent } from "./MeiUpdateEvent.js";
 import { Mei } from "./mei/Mei.js";
-import { buildScoreModel } from "./mei/structure/buildScoreModel.js";
 import type { ScoreModel } from "./models/score.js";
 import { generateId } from "./utils/id.js";
 import { serializeYNode } from "./utils/serialize.js";
@@ -148,11 +148,10 @@ export class MeiFriend {
   }
 
   /**
-   * Returns a Mei wrapper for high-level operations on the score content.
+   * High-level API for interacting with the MEI document content.
    */
-  public get mei(): Mei | undefined {
-    const root = this.getRootElement();
-    return root ? new Mei(root) : undefined;
+  public get api(): MeiApi {
+    return new MeiApi(() => this.getRootElement());
   }
 
   /**
@@ -161,9 +160,7 @@ export class MeiFriend {
    */
   public getScoreModel(): ScoreModel {
     if (!this._scoreModelCache) {
-      const root = this.getRootElement();
-      if (!root) throw new Error("Document has no root element");
-      this._scoreModelCache = buildScoreModel(root);
+      this._scoreModelCache = this.api.toScoreModel();
     }
     return this._scoreModelCache;
   }
@@ -281,9 +278,9 @@ export class MeiFriend {
   // --------------------------------------------------------------------------
 
   /**
-   * Returns the root <mei> element wrapped in a MeiElement.
+   * Returns the root <mei> element wrapped in a Mei wrapper.
    */
-  public getRootElement(): MeiElement | undefined {
+  public getRootElement(): Mei | undefined {
     const rootWrapper = this.getInternalRootWrapper();
     if (!rootWrapper) return undefined;
 
@@ -293,7 +290,8 @@ export class MeiFriend {
         (child): child is Y.XmlElement =>
           child instanceof Y.XmlElement && child.nodeName === "mei",
       );
-    return meiNode ? new MeiElement(meiNode) : undefined;
+
+    return meiNode ? new Mei(meiNode) : undefined;
   }
 
   /**

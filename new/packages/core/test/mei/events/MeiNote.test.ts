@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { MeiFriend } from "../../src/MeiFriend.js";
-import { MeiNote } from "../../src/mei/events/MeiNote.js";
-import { MeiRest } from "../../src/mei/events/MeiRest.js";
+import { MeiFriend } from "../../../src/MeiFriend.js";
+import { MeiNote } from "../../../src/mei/events/MeiNote.js";
+import { MeiRest } from "../../../src/mei/events/MeiRest.js";
 
 describe("MeiNote and MeiRest duration with tuplets", () => {
   it("should calculate correct duration for notes in a tuplet", () => {

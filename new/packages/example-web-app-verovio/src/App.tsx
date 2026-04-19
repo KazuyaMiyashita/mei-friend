@@ -50,7 +50,7 @@ export default function App() {
       if (file) {
         const text = await file.text();
         const instance = MeiFriend.fromXmlString(text);
-        const title = instance.mei?.head?.getTitle() || "Untitled";
+        const title = instance.api.getTitle() || "Untitled";
         setMeiFriend(instance);
         setDraftTitle(title);
         setCurrentTitle(title);
@@ -66,7 +66,7 @@ export default function App() {
     if (!meiFriend) return;
 
     const unregister = meiFriend.onUpdate(() => {
-      const title = meiFriend.mei?.head?.getTitle() || "Untitled";
+      const title = meiFriend.api.getTitle() || "Untitled";
       setDraftTitle(title);
       setCurrentTitle(title);
     });
@@ -124,7 +124,7 @@ export default function App() {
   }, [cursor, meiFriend]);
 
   const handleTitleSubmit = useCallback(() => {
-    const titleEl = meiFriend?.mei?.head?.fileDesc?.titleStmt?.title;
+    const titleEl = meiFriend?.api.mei?.meiHead?.fileDesc?.titleStmt?.title;
     if (meiFriend && titleEl) {
       // Create a new XML string for the title element, preserving its ID
       const safeTitle = escapeXml(draftTitle);
@@ -253,7 +253,7 @@ export function ScoreViewer({ initialXml }) {
         <div className={styles.codeBlock}>
           <pre>
             {`// Get the title
-const title = meiFriend.mei?.head?.getTitle();
+const title = meiFriend.api.getTitle();
 
 // Update the title (assuming the <title> element exists and has an ID "title-1")
 meiFriend.update("title-1", '<title xml:id="title-1">My New Masterpiece</title>');

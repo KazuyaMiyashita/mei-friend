@@ -14,14 +14,14 @@ describe("MeiHead API", () => {
    </meiHead>
 </mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
-    const head = meiFriend.mei!.head!;
+    const head = meiFriend.api.mei!.meiHead!;
     expect(head.getTitle()).toBe("My Work");
   });
 
   it("should return undefined if title is missing", () => {
     const xml = `<mei xmlns="http://www.music-encoding.org/ns/mei" xml:id="m1"><meiHead xml:id="h1"/></mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
-    const head = meiFriend.mei!.head!;
+    const head = meiFriend.api.mei!.meiHead!;
     expect(head.getTitle()).toBeUndefined();
   });
 
@@ -41,7 +41,7 @@ describe("MeiHead API", () => {
     // Perform update
     meiFriend.update("t1", '<title xml:id="t1">Updated Title</title>');
 
-    expect(meiFriend.mei!.head!.getTitle()).toBe("Updated Title");
+    expect(meiFriend.api.mei!.meiHead!.getTitle()).toBe("Updated Title");
   });
 
   it("should work and be undoable as a single step", () => {
@@ -65,20 +65,20 @@ describe("MeiHead API", () => {
 </mei>`;
     meiFriend.update("m1", newMeiXml);
 
-    expect(meiFriend.mei!.head!.getTitle()).toBe("Transacted Title");
+    expect(meiFriend.api.mei!.meiHead!.getTitle()).toBe("Transacted Title");
     expect(meiFriend.canUndo).toBe(true);
 
     // 2. Perform another update
     meiFriend.update("t1", '<title xml:id="t1">Updated Title</title>');
-    expect(meiFriend.mei!.head!.getTitle()).toBe("Updated Title");
+    expect(meiFriend.api.mei!.meiHead!.getTitle()).toBe("Updated Title");
 
     // Undo 2nd update
     meiFriend.undo();
-    expect(meiFriend.mei!.head!.getTitle()).toBe("Transacted Title");
+    expect(meiFriend.api.mei!.meiHead!.getTitle()).toBe("Transacted Title");
 
     // Undo 1st update
     meiFriend.undo();
-    expect(meiFriend.mei!.head).toBeUndefined();
+    expect(meiFriend.api.mei!.meiHead).toBeUndefined();
     expect(meiFriend.getRootElement()!.children.length).toBe(0);
     expect(meiFriend.canUndo).toBe(false);
   });
