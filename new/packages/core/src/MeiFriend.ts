@@ -588,8 +588,8 @@ export class MeiFriend {
         // Node.TEXT_NODE
         case 3: {
           const textValue = (child as Text).nodeValue;
-          // Ignore top-level whitespace text nodes (e.g., between <?xml ... ?> and <mei>)
-          if (domNode.nodeType === 9 && textValue && textValue.trim() === "") {
+          // Ignore whitespace-only text nodes (indentation/newlines between elements)
+          if (textValue && textValue.trim() === "") {
             break;
           }
           if (textValue) {

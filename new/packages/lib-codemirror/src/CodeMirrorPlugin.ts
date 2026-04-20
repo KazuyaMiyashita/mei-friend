@@ -265,7 +265,8 @@ export class CodeMirrorPlugin {
         .sort((a, b) => b.pos.from - a.pos.from);
 
       for (const { event, pos } of sortedEvents) {
-        const newText = event.xmlString;
+        const baseIndent = this.getBaseIndent(pos.from);
+        const newText = this.reindentXml(event.xmlString, baseIndent);
         const oldText = this.view.state.doc.sliceString(pos.from, pos.to);
 
         if (oldText === newText) continue;
@@ -468,6 +469,34 @@ export class CodeMirrorPlugin {
       "invalid",
       "Could not find a valid parent element with xml:id for sync",
     );
+  }
+
+  /**
+   * Returns the whitespace prefix of the line containing `pos`.
+   * This is the indent that precedes the element's opening `<` in the document.
+   */
+  private getBaseIndent(pos: number): string {
+    if (!this.view) return "";
+    const line = this.view.state.doc.lineAt(pos);
+    return this.view.state.doc.sliceString(line.from, pos);
+  }
+
+  /**
+   * Re-indents an XML string (serialized at level 0) so that its children
+   * use `baseIndent` as their base indentation.
+   * The first line is left unchanged because it is inserted directly after
+   * the existing indent in the document.
+   */
+  static reindentXml(xmlString: string, baseIndent: string): string {
+    if (!baseIndent) return xmlString;
+    const lines = xmlString.split("\n");
+    return lines
+      .map((line, i) => (i === 0 ? line : baseIndent + line))
+      .join("\n");
+  }
+
+  private reindentXml(xmlString: string, baseIndent: string): string {
+    return CodeMirrorPlugin.reindentXml(xmlString, baseIndent);
   }
 
   private getElementIdFromNode(node: SyntaxNode): string | null {

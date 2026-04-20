@@ -6,6 +6,13 @@ import { basicSetup, EditorView } from "codemirror";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { CodeMirrorPlugin } from "../src/CodeMirrorPlugin.js";
 
+// Helper: return the leading whitespace of the line containing `offset` in `text`
+function getLineIndent(text: string, offset: number): string {
+  const lineStart = text.lastIndexOf("\n", offset - 1) + 1;
+  const match = text.slice(lineStart).match(/^( *)</);
+  return match ? match[1] : "";
+}
+
 const testXml = `
 <mei xmlns="http://www.music-encoding.org/ns/mei">
   <music>
@@ -291,6 +298,110 @@ describe("CodeMirrorPlugin", () => {
       vi.advanceTimersByTime(100);
 
       vi.useRealTimers();
+      view.destroy();
+      plugin.destroy();
+    });
+  });
+
+  describe("Indentation preservation (model → editor sync)", () => {
+    it("reindentXml: adds baseIndent to every line except the first", () => {
+      const xml = `<layer xml:id="l1">\n  <note xml:id="n1"/>\n  <note xml:id="n2"/>\n</layer>`;
+      const result = CodeMirrorPlugin.reindentXml(xml, "        "); // 8 spaces
+      const lines = result.split("\n");
+      expect(lines[0]).toBe('<layer xml:id="l1">'); // first line unchanged
+      expect(lines[1]).toBe('          <note xml:id="n1"/>'); // 8 + 2
+      expect(lines[2]).toBe('          <note xml:id="n2"/>'); // 8 + 2
+      expect(lines[3]).toBe("        </layer>"); // 8 spaces
+    });
+
+    it("reindentXml: returns original string when baseIndent is empty", () => {
+      const xml = `<note xml:id="n1"/>`;
+      expect(CodeMirrorPlugin.reindentXml(xml, "")).toBe(xml);
+    });
+
+    it("preserves indentation level when model adds a child element", () => {
+      const plugin = new CodeMirrorPlugin(meiFriend);
+      const initialDoc = meiFriend.toXmlString();
+      const view = new EditorView({
+        doc: initialDoc,
+        extensions: [basicSetup, plugin.extensions],
+      });
+
+      // Capture base indent of <layer> in the initial document
+      const layerOffset = initialDoc.indexOf('<layer xml:id="l1"');
+      const expectedLayerIndent = getLineIndent(initialDoc, layerOffset);
+      const expectedChildIndent = `${expectedLayerIndent}  `;
+
+      // Add a third note to the layer via model update
+      meiFriend.update(
+        "l1",
+        '<layer xml:id="l1"><note xml:id="n1" pname="c" oct="4" dur="4"/><note xml:id="n2" pname="d" oct="4" dur="4"/><note xml:id="n3" pname="g" oct="4" dur="4"/></layer>',
+      );
+
+      const docText = view.state.doc.toString();
+
+      // <layer> opening tag must still start at the correct column
+      const layerLineStart =
+        docText.lastIndexOf("\n", docText.indexOf('<layer xml:id="l1"') - 1) +
+        1;
+      const layerActualIndent =
+        docText.slice(layerLineStart).match(/^( *)</)?.[1] ?? "";
+      expect(layerActualIndent).toBe(expectedLayerIndent);
+
+      // Every <note> inside must be indented at expectedChildIndent
+      const noteRegex = /\n( *)<note /g;
+      let match: RegExpExecArray | null;
+      const noteIndents: string[] = [];
+      // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic regex loop
+      while ((match = noteRegex.exec(docText)) !== null) {
+        noteIndents.push(match[1]);
+      }
+      expect(noteIndents.length).toBe(3);
+      for (const indent of noteIndents) {
+        expect(indent).toBe(expectedChildIndent);
+      }
+
+      // Closing </layer> must be at expectedLayerIndent
+      const closingMatch = docText.match(/\n( *)<\/layer>/);
+      expect(closingMatch?.[1]).toBe(expectedLayerIndent);
+
+      view.destroy();
+      plugin.destroy();
+    });
+
+    it("preserves indentation when model removes a child element", () => {
+      const plugin = new CodeMirrorPlugin(meiFriend);
+      const initialDoc = meiFriend.toXmlString();
+      const view = new EditorView({
+        doc: initialDoc,
+        extensions: [basicSetup, plugin.extensions],
+      });
+
+      const layerOffset = initialDoc.indexOf('<layer xml:id="l1"');
+      const expectedLayerIndent = getLineIndent(initialDoc, layerOffset);
+      const expectedChildIndent = `${expectedLayerIndent}  `;
+
+      // Remove n1 from layer
+      meiFriend.update(
+        "l1",
+        '<layer xml:id="l1"><note xml:id="n2" pname="d" oct="4" dur="4"/></layer>',
+      );
+
+      const docText = view.state.doc.toString();
+
+      const noteRegex = /\n( *)<note /g;
+      let match: RegExpExecArray | null;
+      const noteIndents: string[] = [];
+      // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic regex loop
+      while ((match = noteRegex.exec(docText)) !== null) {
+        noteIndents.push(match[1]);
+      }
+      expect(noteIndents.length).toBe(1);
+      expect(noteIndents[0]).toBe(expectedChildIndent);
+
+      const closingMatch = docText.match(/\n( *)<\/layer>/);
+      expect(closingMatch?.[1]).toBe(expectedLayerIndent);
+
       view.destroy();
       plugin.destroy();
     });

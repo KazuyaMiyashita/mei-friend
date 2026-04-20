@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { IdGenerator, MeiFriend, type MeiUpdateEvent } from "../src/index.js";
 
@@ -239,6 +241,40 @@ describe("MeiFriend", () => {
       const root = meiFriend.getRootElement()!;
       expect(root.children.length).toBe(1);
       expect(root.children[0].id).toBeDefined();
+    });
+  });
+
+  describe("Indentation normalization (sample_8_6.mei)", () => {
+    const filePath = resolve(__dirname, "./fixtures/sample_8_6.mei");
+    const rawXml = readFileSync(filePath, "utf-8");
+
+    it("sample file uses 3-space indentation", () => {
+      // Confirm the fixture itself is 3-space indented
+      expect(rawXml).toMatch(/^ {3}</m);
+    });
+
+    it("toXmlString normalizes to 2-space indentation", () => {
+      const meiFriend = MeiFriend.fromXmlString(rawXml);
+      const output = meiFriend.toXmlString(false);
+
+      // Must not contain any line starting with 3 spaces followed by <
+      expect(output).not.toMatch(/^ {3}</m);
+
+      // Must contain lines with 2-space indentation
+      expect(output).toMatch(/^ {2}</m);
+    });
+
+    it("toXmlString does not duplicate indentation on nested elements", () => {
+      const meiFriend = MeiFriend.fromXmlString(rawXml);
+      const output = meiFriend.toXmlString(false);
+
+      // Each line that starts with spaces must use multiples of exactly 2 spaces
+      for (const line of output.split("\n")) {
+        const leading = line.match(/^( *)</);
+        if (leading) {
+          expect(leading[1].length % 2).toBe(0);
+        }
+      }
     });
   });
 });
