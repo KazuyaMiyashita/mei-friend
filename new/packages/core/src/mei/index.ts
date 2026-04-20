@@ -7,6 +7,7 @@ export * from "./header/MeiFileDesc.js";
 export * from "./header/MeiHead.js";
 export * from "./header/MeiTitleStmt.js";
 export * from "./Mei.js";
+export * from "./score-def/MeiKeySig.js";
 export * from "./score-def/MeiMeterSig.js";
 export * from "./score-def/MeiScoreDef.js";
 export * from "./score-def/MeiStaffDef.js";

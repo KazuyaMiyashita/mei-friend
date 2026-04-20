@@ -1,4 +1,5 @@
 import * as Y from "yjs";
+import { NoteEditor } from "./editor/noteEditor.js";
 import type { MeiElement } from "./MeiElement.js";
 import { MeiTempo } from "./mei/events/MeiTempo.js";
 import { MeiTie } from "./mei/events/MeiTie.js";
@@ -33,7 +34,20 @@ function getChildYElement(
  * and converting the MEI structure into logical models.
  */
 export class MeiApi {
-  constructor(private readonly getRoot: () => MeiElement | undefined) {}
+  constructor(
+    private readonly getRoot: () => MeiElement | undefined,
+    private readonly findById: (id: string) => MeiElement | undefined,
+    private readonly getScoreModel: () => ScoreModel,
+  ) {}
+
+  /** Returns the note editor for pitch transposition and other note edits. */
+  get editor(): NoteEditor {
+    return new NoteEditor(
+      this.findById,
+      (tag) => this.getRoot()?.getElementsByTagName(tag) ?? [],
+      this.getScoreModel,
+    );
+  }
 
   /**
    * Returns the root <mei> element wrapped in a Mei wrapper.

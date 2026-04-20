@@ -1,3 +1,4 @@
+export * from "./editor/index.js";
 export * from "./MeiApi.js";
 export * from "./MeiElement.js";
 export * from "./MeiFriend.js";

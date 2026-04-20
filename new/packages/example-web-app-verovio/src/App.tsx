@@ -98,12 +98,42 @@ export default function App() {
           nextCursor = e.shiftKey ? cursor.prevBeat() : cursor.prevEvent();
           break;
         case "ArrowUp":
+          if (e.ctrlKey) {
+            e.preventDefault();
+            if (selectedId) {
+              try {
+                const result = meiFriend.api.editor.pitchUp(selectedId);
+                meiFriend.update(selectedId, result.note.toXmlString());
+                for (const c of result.accidentalCorrections) {
+                  meiFriend.update(c.id, c.element.toXmlString());
+                }
+              } catch {
+                // non-note elements are ignored
+              }
+            }
+            return;
+          }
           e.preventDefault();
           nextCursor = e.shiftKey
             ? cursor.staffUp().snapToBeat()
             : cursor.staffUp().snapToEvent();
           break;
         case "ArrowDown":
+          if (e.ctrlKey) {
+            e.preventDefault();
+            if (selectedId) {
+              try {
+                const result = meiFriend.api.editor.pitchDown(selectedId);
+                meiFriend.update(selectedId, result.note.toXmlString());
+                for (const c of result.accidentalCorrections) {
+                  meiFriend.update(c.id, c.element.toXmlString());
+                }
+              } catch {
+                // non-note elements are ignored
+              }
+            }
+            return;
+          }
           e.preventDefault();
           nextCursor = e.shiftKey
             ? cursor.staffDown().snapToBeat()
@@ -121,7 +151,7 @@ export default function App() {
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [cursor, meiFriend]);
+  }, [cursor, meiFriend, selectedId]);
 
   const handleTitleSubmit = useCallback(() => {
     const titleEl = meiFriend?.api.mei?.meiHead?.fileDesc?.titleStmt?.title;
@@ -183,6 +213,7 @@ export default function App() {
         <VerovioCanvasFooter
           cursor={cursor}
           selectedId={selectedId}
+          meiFriend={meiFriend}
           enabled={!!meiFriend}
         />
       </div>

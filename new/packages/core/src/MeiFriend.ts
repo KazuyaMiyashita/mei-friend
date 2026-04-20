@@ -151,7 +151,11 @@ export class MeiFriend {
    * High-level API for interacting with the MEI document content.
    */
   public get api(): MeiApi {
-    return new MeiApi(() => this.getRootElement());
+    return new MeiApi(
+      () => this.getRootElement(),
+      (id) => this.getElementById(id),
+      () => this.getScoreModel(),
+    );
   }
 
   /**

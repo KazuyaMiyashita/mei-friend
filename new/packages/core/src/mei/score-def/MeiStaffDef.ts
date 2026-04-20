@@ -1,5 +1,6 @@
 import { MeiElement } from "../../MeiElement.js";
 import { Part } from "../../models/elements.js";
+import { MeiKeySig } from "./MeiKeySig.js";
 import { MeiMeterSig } from "./MeiMeterSig.js";
 
 /**
@@ -15,6 +16,11 @@ export class MeiStaffDef extends MeiElement {
 
   get n(): string | undefined {
     return this.getAttribute("n");
+  }
+
+  get keySig(): MeiKeySig | undefined {
+    const el = this.getChildElement("keySig");
+    return el ? new MeiKeySig(el.yNode) : undefined;
   }
 
   get meterSig(): MeiMeterSig | undefined {
