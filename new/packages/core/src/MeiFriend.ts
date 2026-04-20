@@ -577,6 +577,7 @@ export class MeiFriend {
     for (let i = 0; i < domNode.childNodes.length; i++) {
       const child = domNode.childNodes[i];
       switch (child.nodeType) {
+        // Node.ELEMENT_NODE
         case 1: {
           const el = child as Element;
           const yElement = new Y.XmlElement(el.nodeName);
@@ -589,6 +590,7 @@ export class MeiFriend {
           this.populateFromDom(el, yElement);
           break;
         }
+        // Node.TEXT_NODE
         case 3: {
           const textValue = (child as Text).nodeValue;
           // Ignore top-level whitespace text nodes (e.g., between <?xml ... ?> and <mei>)
@@ -601,6 +603,7 @@ export class MeiFriend {
           }
           break;
         }
+        // Node.COMMENT_NODE
         case 8: {
           const commentValue = (child as Comment).nodeValue;
           if (commentValue) {
