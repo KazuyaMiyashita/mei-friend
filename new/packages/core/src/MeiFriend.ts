@@ -82,7 +82,7 @@ export class MeiFriend {
     idGenerator?: IdGenerator,
   ): MeiFriend {
     const instance = new MeiFriend(undefined, idGenerator);
-    instance.replaceDocument(xmlString);
+    instance.replaceXmlString(xmlString);
     // Clear undo history after initial load
     instance.undoManager.clear();
     return instance;
@@ -183,9 +183,9 @@ export class MeiFriend {
    * @param origin The origin of the update (optional).
    * @throws {Error} If the provided XML string is not well-formed.
    */
-  private replaceDocument(
+  public replaceXmlString(
     xmlString: string,
-    // biome-ignore lint/suspicious/noExplicitAny: origin
+    // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
     origin?: any,
   ): void {
     const dom = this.parseAndEnsureIds(xmlString);
@@ -226,16 +226,11 @@ export class MeiFriend {
    * @throws {Error} If validation fails or target is not found.
    */
   public update(
-    targetId: string | null | undefined,
+    targetId: string,
     xmlString: string,
     // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
     origin?: any,
   ): void {
-    if (!targetId) {
-      this.replaceDocument(xmlString, origin);
-      return;
-    }
-
     this.doc.transact(() => {
       const target = this.idMap.get(targetId);
       if (!target?.doc) {
