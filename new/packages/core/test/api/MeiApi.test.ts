@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { MeiFriend } from "../src/MeiFriend.js";
-import { Chord, Note } from "../src/models/containers.js";
-import type { NoteInfo } from "../src/models/score.js";
+import { MeiFriend } from "../../src/MeiFriend.js";
+import { Chord, Note } from "../../src/models/containers.js";
+import type { NoteInfo } from "../../src/models/score.js";
 
 describe("MeiApi", () => {
   describe("Title Management", () => {

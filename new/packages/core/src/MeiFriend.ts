@@ -1,6 +1,6 @@
 import { DOMParser } from "@xmldom/xmldom";
 import * as Y from "yjs";
-import { MeiApi } from "./MeiApi.js";
+import { MeiApi } from "./api/MeiApi.js";
 import { MeiElement } from "./MeiElement.js";
 import type { MeiUpdateEvent } from "./MeiUpdateEvent.js";
 import { Mei } from "./mei/Mei.js";
@@ -151,11 +151,7 @@ export class MeiFriend {
    * High-level API for interacting with the MEI document content.
    */
   public get api(): MeiApi {
-    return new MeiApi(
-      () => this.getRootElement(),
-      (id) => this.getElementById(id),
-      () => this.getScoreModel(),
-    );
+    return new MeiApi(this);
   }
 
   /**

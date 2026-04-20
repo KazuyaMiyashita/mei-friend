@@ -1,14 +1,15 @@
-import type { MeiElement } from "../MeiElement.js";
-import { MeiNote } from "../mei/events/MeiNote.js";
-import { MeiKeySig } from "../mei/score-def/MeiKeySig.js";
+import type { MeiElement } from "../../MeiElement.js";
+import type { MeiFriend } from "../../MeiFriend.js";
+import { MeiNote } from "../../mei/events/MeiNote.js";
+import { MeiKeySig } from "../../mei/score-def/MeiKeySig.js";
 import {
   InternationalPitch,
   InternationalPitchAlter,
   InternationalPitchStep,
   Key,
   type Offset,
-} from "../models/elements.js";
-import type { ScoreModel } from "../models/score.js";
+} from "../../models/elements.js";
+import type { ScoreModel } from "../../models/score.js";
 
 export interface AccidentalCorrection {
   readonly id: string;
@@ -264,15 +265,16 @@ function findContextualAccidUpdates(
  * }
  * ```
  */
-export class NoteEditor {
-  constructor(
-    private readonly getElementById: (id: string) => MeiElement | undefined,
-    private readonly getElementsByTagName: (tag: string) => MeiElement[],
-    private readonly getScoreModel: () => ScoreModel,
-  ) {}
+export class MeiEditor {
+  constructor(private readonly meiFriend: MeiFriend) {}
 
   private transpose(noteId: string, direction: 1 | -1): PitchMoveResult {
-    const element = this.getElementById(noteId);
+    const getElementById = (id: string) => this.meiFriend.getElementById(id);
+    const getElementsByTagName = (tag: string) =>
+      this.meiFriend.getElementsByTagName(tag);
+    const getScoreModel = () => this.meiFriend.getScoreModel();
+
+    const element = getElementById(noteId);
     if (!element) throw new Error(`Element "${noteId}" not found`);
     const note = MeiNote.create(element);
     if (!note) throw new Error(`Element "${noteId}" is not a <note>`);
@@ -287,18 +289,18 @@ export class NoteEditor {
       direction,
     );
 
-    const pos = this.getScoreModel().getPositionById(noteId);
+    const pos = getScoreModel().getPositionById(noteId);
     const staffN = pos?.staffN ?? 1;
 
-    const key = getKeyForStaff(staffN, this.getElementsByTagName);
+    const key = getKeyForStaff(staffN, getElementsByTagName);
     const defaultAlter = getKeyAlter(targetStep, key);
     const alter =
       findPrecedingAccid(
         targetStep,
         targetOctave,
         noteId,
-        this.getElementById,
-        this.getScoreModel,
+        getElementById,
+        getScoreModel,
       ) ?? defaultAlter;
 
     const updatedNote = applyPitch(element, targetStep, alter, targetOctave);
@@ -308,8 +310,8 @@ export class NoteEditor {
           intPitch.step,
           intPitch.octave.value,
           noteId,
-          this.getElementById,
-          this.getScoreModel,
+          getElementById,
+          getScoreModel,
           key,
         )
       : [];
@@ -356,12 +358,12 @@ export class NoteEditor {
    *   (a cancellation that is now redundant) has its `<accid>` child removed.
    * - Scanning stops at the first note with an independent accidental (one
    *   whose alter differs from the key-signature default).
-   * 
+   *
    * TODO: Regarding the pitch of the subsequent notes, it might be possible to maintain the initially applied pitch, but what should be done?
    * TODO: The return value contains multiple Elements, and the user would need to perform several
    *       `meiFriend.update` calls on each of them. We want to consolidate this into a single `update` call.
    *       In that case, the return value would be `MeiStaff`.
-   * 
+   *
    * @param noteId - The `xml:id` of the `<note>` element to move.
    * @returns A `PitchMoveResult` with the updated note and any contextual corrections.
    * @throws If the element is not found or is not a `<note>` with a pitch.

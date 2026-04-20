@@ -1,17 +1,18 @@
 import * as Y from "yjs";
-import { NoteEditor } from "./editor/noteEditor.js";
-import type { MeiElement } from "./MeiElement.js";
-import { MeiTempo } from "./mei/events/MeiTempo.js";
-import { MeiTie } from "./mei/events/MeiTie.js";
-import { Mei } from "./mei/Mei.js";
-import { MeiStaffDef } from "./mei/score-def/MeiStaffDef.js";
-import { getGlobalMeter } from "./mei/score-def/meter.js";
-import { buildScore } from "./mei/structure/buildScore.js";
-import { buildScoreModel } from "./mei/structure/buildScoreModel.js";
-import { MeiMeasure } from "./mei/structure/MeiMeasure.js";
-import type { Score } from "./models/containers.js";
-import type { Meter, NoteInfo, ScoreModel } from "./models/score.js";
-import { generateId } from "./utils/id.js";
+import type { MeiElement } from "../MeiElement.js";
+import type { MeiFriend } from "../MeiFriend.js";
+import { MeiTempo } from "../mei/events/MeiTempo.js";
+import { MeiTie } from "../mei/events/MeiTie.js";
+import type { Mei } from "../mei/Mei.js";
+import { MeiStaffDef } from "../mei/score-def/MeiStaffDef.js";
+import { getGlobalMeter } from "../mei/score-def/meter.js";
+import { buildScore } from "../mei/structure/buildScore.js";
+import { buildScoreModel } from "../mei/structure/buildScoreModel.js";
+import { MeiMeasure } from "../mei/structure/MeiMeasure.js";
+import type { Score } from "../models/containers.js";
+import type { Meter, NoteInfo, ScoreModel } from "../models/score.js";
+import { generateId } from "../utils/id.js";
+import { MeiEditor } from "./editor/MeiEditor.js";
 
 /**
  * Helper to get a child element by tag name from a Y.XmlElement.
@@ -34,27 +35,18 @@ function getChildYElement(
  * and converting the MEI structure into logical models.
  */
 export class MeiApi {
-  constructor(
-    private readonly getRoot: () => MeiElement | undefined,
-    private readonly findById: (id: string) => MeiElement | undefined,
-    private readonly getScoreModel: () => ScoreModel,
-  ) {}
+  constructor(private readonly meiFriend: MeiFriend) {}
 
   /** Returns the note editor for pitch transposition and other note edits. */
-  get editor(): NoteEditor {
-    return new NoteEditor(
-      this.findById,
-      (tag) => this.getRoot()?.getElementsByTagName(tag) ?? [],
-      this.getScoreModel,
-    );
+  get editor(): MeiEditor {
+    return new MeiEditor(this.meiFriend);
   }
 
   /**
    * Returns the root <mei> element wrapped in a Mei wrapper.
    */
   public get mei(): Mei | undefined {
-    const root = this.getRoot();
-    return root ? Mei.create(root) : undefined;
+    return this.meiFriend.getRootElement();
   }
 
   /**
@@ -73,7 +65,7 @@ export class MeiApi {
    * @returns A new MeiElement with the updated title.
    */
   public titleAppended(title = "Untitled"): MeiElement {
-    const root = this.getRoot();
+    const root = this.meiFriend.getRootElement();
     if (!root)
       throw new Error(
         "Cannot append title to a document without a root element",
@@ -117,7 +109,7 @@ export class MeiApi {
 
   /** Returns all <tempo> elements as wrappers. */
   get tempos(): MeiTempo[] {
-    const root = this.getRoot();
+    const root = this.meiFriend.getRootElement();
     if (!root) return [];
     return root
       .getElementsByTagName("tempo")
@@ -127,7 +119,7 @@ export class MeiApi {
 
   /** Returns all <staffDef> elements as wrappers. */
   get staffDefs(): MeiStaffDef[] {
-    const root = this.getRoot();
+    const root = this.meiFriend.getRootElement();
     if (!root) return [];
     return root
       .getElementsByTagName("staffDef")
@@ -137,7 +129,7 @@ export class MeiApi {
 
   /** Returns all <measure> elements as wrappers. */
   get measures(): MeiMeasure[] {
-    const root = this.getRoot();
+    const root = this.meiFriend.getRootElement();
     if (!root) return [];
     return root
       .getElementsByTagName("measure")
@@ -147,7 +139,7 @@ export class MeiApi {
 
   /** Returns all <tie> elements as wrappers. */
   get ties(): MeiTie[] {
-    const root = this.getRoot();
+    const root = this.meiFriend.getRootElement();
     if (!root) return [];
     return root
       .getElementsByTagName("tie")
@@ -157,7 +149,7 @@ export class MeiApi {
 
   /** Returns the global meter information. */
   get meter(): Meter | undefined {
-    const root = this.getRoot();
+    const root = this.meiFriend.getRootElement();
     if (!root) return undefined;
     return getGlobalMeter(root);
   }
@@ -166,7 +158,7 @@ export class MeiApi {
    * Converts the MEI structure into a logical Score model.
    */
   public toScore(): Score<NoteInfo> {
-    const root = this.getRoot();
+    const root = this.meiFriend.getRootElement();
     if (!root) throw new Error("No root element to convert to Score");
     return buildScore(root);
   }
@@ -176,7 +168,7 @@ export class MeiApi {
    * Prefer MeiFriend.getScoreModel() for cached access.
    */
   public toScoreModel(): ScoreModel {
-    const root = this.getRoot();
+    const root = this.meiFriend.getRootElement();
     if (!root) throw new Error("No root element to convert to ScoreModel");
     return buildScoreModel(root);
   }

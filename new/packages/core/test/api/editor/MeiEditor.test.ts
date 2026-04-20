@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { MeiFriend } from "../../src/MeiFriend.js";
-import { MeiNote } from "../../src/mei/events/MeiNote.js";
-import { InternationalPitch } from "../../src/models/elements.js";
+import { MeiFriend } from "../../../src/MeiFriend.js";
+import { MeiNote } from "../../../src/mei/events/MeiNote.js";
+import { InternationalPitch } from "../../../src/models/elements.js";
 
 // ------------------------------------------------------------------ helpers
 
@@ -54,7 +54,7 @@ function makeMei(keySig: string, mode: string, notes: string): string {
 
 // ------------------------------------------------------------------ pitchUp
 
-describe("NoteEditor.pitchUp", () => {
+describe("MeiEditor.pitchUp", () => {
   describe("C Major (no accidentals)", () => {
     it("moves C4 up to D4", () => {
       const mf = MeiFriend.fromXmlString(
@@ -277,7 +277,7 @@ describe("NoteEditor.pitchUp", () => {
 
 // ------------------------------------------------------------------ pitchDown
 
-describe("NoteEditor.pitchDown", () => {
+describe("MeiEditor.pitchDown", () => {
   describe("C Major", () => {
     it("moves D4 down to C4", () => {
       const mf = MeiFriend.fromXmlString(
@@ -382,7 +382,7 @@ describe("NoteEditor.pitchDown", () => {
 
 // ------------------------------------------------------------------ contextual accidental corrections
 
-describe("NoteEditor contextual accidental corrections", () => {
+describe("MeiEditor contextual accidental corrections", () => {
   it("|(#)C C| in C Major: subsequent note's accid.ges cleared after source moves", () => {
     // C#4 (printed) followed by C4 carrying over the sharp (accid.ges="s", no <accid> child).
     // After pitchUp(n1), n1 moves to D4 and n2 should revert to C♮4.
@@ -466,7 +466,7 @@ describe("NoteEditor contextual accidental corrections", () => {
 
 // ------------------------------------------------------------------ error cases
 
-describe("NoteEditor error handling", () => {
+describe("MeiEditor error handling", () => {
   it("throws when element is not found", () => {
     const mf = MeiFriend.fromXmlString(
       makeMei("0", "major", `<note xml:id="n1" pname="c" oct="4" dur="4"/>`),
