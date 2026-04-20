@@ -1,8 +1,64 @@
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  completionKeymap,
+} from "@codemirror/autocomplete";
+import { defaultKeymap, indentWithTab } from "@codemirror/commands";
+import {
+  bracketMatching,
+  defaultHighlightStyle,
+  foldKeymap,
+  indentOnInput,
+  syntaxHighlighting,
+} from "@codemirror/language";
+import { lintKeymap } from "@codemirror/lint";
+import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
+import { EditorState } from "@codemirror/state";
+import {
+  crosshairCursor,
+  drawSelection,
+  dropCursor,
+  EditorView,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  highlightSpecialChars,
+  keymap,
+  lineNumbers,
+  rectangularSelection,
+} from "@codemirror/view";
 import type { MeiFriend } from "@mei-friend/core";
 import { CodeMirrorPlugin, type SyncState } from "@mei-friend/lib-codemirror";
-import { basicSetup, EditorView } from "codemirror";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import styles from "./CodeMirrorEditor.module.css";
+
+// Custom basic setup without history() to avoid conflicts with MeiFriend's Yjs-based undo
+const customSetup = [
+  lineNumbers(),
+  highlightActiveLineGutter(),
+  highlightSpecialChars(),
+  drawSelection(),
+  dropCursor(),
+  EditorState.allowMultipleSelections.of(true),
+  indentOnInput(),
+  syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+  bracketMatching(),
+  closeBrackets(),
+  autocompletion(),
+  rectangularSelection(),
+  crosshairCursor(),
+  highlightActiveLine(),
+  highlightSelectionMatches(),
+  keymap.of([
+    ...closeBracketsKeymap,
+    ...defaultKeymap,
+    ...searchKeymap,
+    ...foldKeymap,
+    ...completionKeymap,
+    ...lintKeymap,
+    indentWithTab,
+  ]),
+];
 
 interface Props {
   meiFriend: MeiFriend;
@@ -36,7 +92,34 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, Props>(
 
       const view = new EditorView({
         doc: meiFriend.toXmlString(),
-        extensions: [basicSetup, plugin.extensions],
+        extensions: [
+          customSetup,
+          plugin.extensions,
+          // Add custom undo/redo keymap that calls MeiFriend
+          keymap.of([
+            {
+              key: "Mod-z",
+              run: () => {
+                meiFriend.undo();
+                return true;
+              },
+            },
+            {
+              key: "Mod-y",
+              run: () => {
+                meiFriend.redo();
+                return true;
+              },
+            },
+            {
+              key: "Mod-Shift-z",
+              run: () => {
+                meiFriend.undo();
+                return true;
+              },
+            },
+          ]),
+        ],
         parent: containerRef.current,
       });
 

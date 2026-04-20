@@ -37,7 +37,7 @@ export function serializeYNode(
   if (yNode instanceof Y.XmlElement) {
     const name = yNode.nodeName;
 
-    // Skip internal root wrappers
+    // Handle special internal types
     if (name === "__root__") {
       const childrenStrs: string[] = [];
       for (const child of yNode.toArray()) {
@@ -47,7 +47,12 @@ export function serializeYNode(
         );
         if (serializedChild) childrenStrs.push(serializedChild);
       }
-      return childrenStrs.join("\n");
+      return childrenStrs.join("");
+    }
+
+    if (name === "__comment__") {
+      const commentText = yNode.get(0)?.toString() || "";
+      return `${indent}<!--${commentText}-->`;
     }
 
     const attrs = yNode.getAttributes();

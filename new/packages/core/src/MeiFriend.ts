@@ -5,7 +5,7 @@ import { MeiElement } from "./MeiElement.js";
 import type { MeiUpdateEvent } from "./MeiUpdateEvent.js";
 import { Mei } from "./mei/Mei.js";
 import type { ScoreModel } from "./models/score.js";
-import { generateId } from "./utils/id.js";
+import { IdGenerator } from "./utils/IdGenerator.js";
 import { serializeYNode } from "./utils/serialize.js";
 
 /**
@@ -18,13 +18,11 @@ import { serializeYNode } from "./utils/serialize.js";
  * 1. **xml:id Enforcement**: To ensure reliable two-way synchronization between the model
  *    and external editors or renderers, this class enforces that **every** XML element
  *    must have a unique `xml:id`.
- *    - On initial load (`fromXmlString`), any elements missing an ID will automatically receive a generated one.
- *    - During updates, any attempt to remove or overwrite an element's `xml:id` will be silently rejected.
+ *    - On initial load (`fromXmlString`) or element updates (`update`), any elements missing an ID will automatically receive a generated one.
  *
  * 2. **Structural Focus**: MeiFriend handles only well-formed XML and manages internal state
- *    by focusing strictly on structural elements and attributes. Consequently, it intentionally ignores:
- *    - Insignificant whitespace (e.g., indentation) between elements.
- *    - XML Comments (`<!-- ... -->`).
+ *    by focusing strictly on structural elements and attributes. XML comments (`<!-- ... -->`)
+ *    are preserved. Consequently, it intentionally ignores:
  *    - CDATA sections.
  *    - XML Declarations (`<?xml ... ?>`).
  *    - The initial order of attributes.
@@ -46,12 +44,17 @@ export class MeiFriend {
   private readonly elementToIdMap = new Map<Y.XmlElement, string>();
   /** Cached ScoreModel; invalidated on every document update. */
   private _scoreModelCache: ScoreModel | null = null;
+  /** Internal ID Generator for auto-assigning IDs */
+  public readonly idGenerator: IdGenerator;
 
   /** The tag name for the internal root wrapper element. */
   private static readonly ROOT_WRAPPER_TAG = "__root__";
+  /** The tag name for internal comment wrapper elements. */
+  public static readonly COMMENT_WRAPPER_TAG = "__comment__";
 
-  constructor(doc?: Y.Doc) {
+  constructor(doc?: Y.Doc, idGenerator?: IdGenerator) {
     this.doc = doc ?? new Y.Doc();
+    this.idGenerator = idGenerator ?? new IdGenerator();
     this.xmlRoot = this.doc.getXmlFragment("mei");
     this.undoManager = new Y.UndoManager(this.xmlRoot);
 
@@ -70,61 +73,18 @@ export class MeiFriend {
   /**
    * Creates a new MeiFriend instance from an MEI XML string.
    * @param xmlString The MEI XML string to parse.
+   * @param idGenerator Optional custom ID generator.
    * @returns A new MeiFriend instance.
    * @throws {Error} If the provided XML string is not well-formed.
    */
-  public static fromXmlString(xmlString: string): MeiFriend {
-    const instance = new MeiFriend();
-    const parser = new DOMParser();
-    const dom = parser.parseFromString(xmlString, "application/xml");
-
-    // Check for parsing errors
-    const parserError = dom.getElementsByTagName("parsererror");
-    if (parserError.length > 0) {
-      throw new Error(`XML Parsing Error: ${parserError[0].textContent}`);
-    }
-
-    // Ensure all elements have IDs
-    // biome-ignore lint/suspicious/noExplicitAny: xmldom Element lacks some browser DOM properties but is structurally compatible for our needs.
-    const ensureIds = (el: any) => {
-      if (!el.getAttribute("xml:id") && !el.getAttribute("id")) {
-        el.setAttribute("xml:id", generateId(el.tagName.toLowerCase()));
-      }
-      for (let i = 0; i < el.children.length; i++) {
-        ensureIds(el.children[i]);
-      }
-    };
-    if (dom.documentElement) {
-      ensureIds(dom.documentElement);
-    }
-
-    // Populate from DOM
-    instance.doc.transact(() => {
-      // Create root wrapper if it doesn't exist
-      let rootWrapper = instance.xmlRoot
-        .toArray()
-        .find(
-          (child): child is Y.XmlElement =>
-            child instanceof Y.XmlElement &&
-            child.nodeName === MeiFriend.ROOT_WRAPPER_TAG,
-        );
-
-      if (!rootWrapper) {
-        rootWrapper = new Y.XmlElement(MeiFriend.ROOT_WRAPPER_TAG);
-        instance.xmlRoot.push([rootWrapper]);
-      } else {
-        // Clear existing content if it was somehow already there
-        if (rootWrapper.length > 0) rootWrapper.delete(0, rootWrapper.length);
-      }
-
-      if (dom.documentElement) {
-        instance.populateFromDom(dom as unknown as Node, rootWrapper);
-      }
-    });
-
+  public static fromXmlString(
+    xmlString: string,
+    idGenerator?: IdGenerator,
+  ): MeiFriend {
+    const instance = new MeiFriend(undefined, idGenerator);
+    instance.replaceDocument(xmlString);
     // Clear undo history after initial load
     instance.undoManager.clear();
-
     return instance;
   }
 
@@ -165,43 +125,127 @@ export class MeiFriend {
     return this._scoreModelCache;
   }
 
+  private parseAndEnsureIds(
+    xmlString: string,
+    targetId?: string | null,
+    // biome-ignore lint/suspicious/noExplicitAny: xmldom Document compatibility
+  ): any {
+    const parser = new DOMParser();
+    const dom = parser.parseFromString(xmlString, "application/xml");
+
+    const parserError = dom.getElementsByTagName("parsererror");
+    if (parserError.length > 0) {
+      throw new Error(`XML Parsing Error: ${parserError[0].textContent}`);
+    }
+
+    const newEl = dom.documentElement;
+    if (!newEl) {
+      throw new Error("Invalid XML provided for update.");
+    }
+
+    // biome-ignore lint/suspicious/noExplicitAny: xmldom Element compatibility
+    const ensureIds = (el: any, isRoot: boolean) => {
+      let id = el.getAttribute("xml:id") || el.getAttribute("id");
+      if (isRoot && targetId) {
+        if (id && id !== targetId) {
+          throw new Error(
+            `Update failed: ID mismatch. Target is "${targetId}", provided XML has "${id}"`,
+          );
+        }
+        if (!id) {
+          el.setAttribute("xml:id", targetId);
+          id = targetId;
+        }
+      } else if (!id) {
+        id = this.idGenerator.generate(el.nodeName.toLowerCase());
+        el.setAttribute("xml:id", id);
+      }
+
+      const children = el.childNodes;
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        if (child.nodeType === 1) {
+          // biome-ignore lint/suspicious/noExplicitAny: xmldom Element compatibility
+          ensureIds(child as any, false);
+        }
+      }
+    };
+    ensureIds(newEl, true);
+
+    return dom;
+  }
+
+  /**
+   * Replaces the entire document content with the provided MEI XML string.
+   * This is equivalent to calling `fromXmlString`, but it updates the existing instance.
+   *
+   * @param xmlString The new MEI XML string.
+   * @param origin The origin of the update (optional).
+   * @throws {Error} If the provided XML string is not well-formed.
+   */
+  private replaceDocument(
+    xmlString: string,
+    // biome-ignore lint/suspicious/noExplicitAny: origin
+    origin?: any,
+  ): void {
+    const dom = this.parseAndEnsureIds(xmlString);
+
+    this.doc.transact(() => {
+      let rootWrapper = this.getInternalRootWrapper();
+      if (!rootWrapper) {
+        rootWrapper = new Y.XmlElement(MeiFriend.ROOT_WRAPPER_TAG);
+        this.xmlRoot.push([rootWrapper]);
+      } else {
+        // Clear existing content
+        if (rootWrapper.length > 0) {
+          rootWrapper.delete(0, rootWrapper.length);
+        }
+      }
+
+      this.populateFromDom(dom as unknown as Node, rootWrapper);
+
+      // Immediately index the new structure
+      this.buildIndex(rootWrapper);
+    }, origin);
+
+    this.undoManager.stopCapturing();
+  }
+
   /**
    * Performs a single element replacement operation in a single transaction.
    * This is the primary method for updating the document.
    *
    * **Constraints**:
    * 1. The root element of `xmlString` must have an `xml:id` (or `id`) that exactly matches `targetId`.
-   * 2. Every single child element within `xmlString` must also have an `xml:id`.
+   * 2. Every single child element within `xmlString` must also have an `xml:id` (auto-assigned if missing).
    * 3. The tag name of the root element in `xmlString` must match the existing element.
    *
-   * If any of these constraints are violated, this method will throw an Error and
-   * no changes will be applied.
-   *
-   * For automatically assigning IDs to a raw XML string before calling this method,
-   * use the `assignIds()` utility.
-   *
-   * @param targetId The xml:id of the existing element to replace.
+   * @param targetId The xml:id of the existing element to replace. If null or undefined, replaces the entire document.
    * @param xmlString The new MEI XML string for this element.
    * @param origin The origin of the update (optional).
    * @throws {Error} If validation fails or target is not found.
    */
   public update(
-    targetId: string,
+    targetId: string | null | undefined,
     xmlString: string,
     // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
     origin?: any,
   ): void {
+    if (!targetId) {
+      this.replaceDocument(xmlString, origin);
+      return;
+    }
+
     this.doc.transact(() => {
       const target = this.idMap.get(targetId);
       if (!target?.doc) {
         throw new Error(`Element with ID "${targetId}" not found for update.`);
       }
 
-      const parser = new DOMParser();
-      const dom = parser.parseFromString(xmlString, "application/xml");
+      const dom = this.parseAndEnsureIds(xmlString, targetId);
       const newEl = dom.documentElement;
       if (!newEl) {
-        throw new Error("Invalid XML provided for update.");
+        throw new Error("Parsed document lacks a root element.");
       }
 
       // Check if tag name matches
@@ -210,32 +254,6 @@ export class MeiFriend {
           `Update failed: Tag name mismatch. Expected <${target.nodeName}>, got <${newEl.nodeName}>`,
         );
       }
-
-      // 1. Strict ID validation
-      // biome-ignore lint/suspicious/noExplicitAny: xmldom Element lacks some browser DOM properties but is structurally compatible for our needs.
-      const validateIds = (el: any, isRoot: boolean) => {
-        const id = el.getAttribute("xml:id") || el.getAttribute("id");
-        if (!id) {
-          throw new Error(
-            `Update failed: Missing xml:id on <${el.nodeName}>. All elements must have an ID.`,
-          );
-        }
-        if (isRoot && id !== targetId) {
-          throw new Error(
-            `Update failed: ID mismatch. Target is "${targetId}", provided XML has "${id}"`,
-          );
-        }
-
-        const children = el.childNodes;
-        for (let i = 0; i < children.length; i++) {
-          const child = children[i];
-          if (child.nodeType === 1) {
-            // biome-ignore lint/suspicious/noExplicitAny: xmldom Element compatibility
-            validateIds(child as any, false);
-          }
-        }
-      };
-      validateIds(newEl, true);
 
       // 2. Sync attributes
       const currentAttrs = target.getAttributes();
@@ -307,7 +325,7 @@ export class MeiFriend {
       this.elementToIdMap.delete(yNode);
       return undefined;
     }
-    return yNode ? new MeiElement(yNode) : undefined;
+    return yNode ? new MeiElement(yNode, this.idGenerator) : undefined;
   }
 
   /**
@@ -322,7 +340,7 @@ export class MeiFriend {
     const result: MeiElement[] = [];
     for (const node of nodes) {
       if (node.doc) {
-        result.push(new MeiElement(node));
+        result.push(new MeiElement(node, this.idGenerator));
       } else {
         // Lazy cleanup
         nodes.delete(node);
@@ -573,9 +591,23 @@ export class MeiFriend {
         }
         case 3: {
           const textValue = (child as Text).nodeValue;
-          if (textValue && textValue.trim() !== "") {
+          // Ignore top-level whitespace text nodes (e.g., between <?xml ... ?> and <mei>)
+          if (domNode.nodeType === 9 && textValue && textValue.trim() === "") {
+            break;
+          }
+          if (textValue) {
             const yText = new Y.XmlText(textValue);
             yParent.push([yText]);
+          }
+          break;
+        }
+        case 8: {
+          const commentValue = (child as Comment).nodeValue;
+          if (commentValue) {
+            const yElement = new Y.XmlElement(MeiFriend.COMMENT_WRAPPER_TAG);
+            const yText = new Y.XmlText(commentValue);
+            yParent.push([yElement]);
+            yElement.push([yText]);
           }
           break;
         }

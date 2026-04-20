@@ -11,7 +11,6 @@ import { buildScoreModel } from "../mei/structure/buildScoreModel.js";
 import { MeiMeasure } from "../mei/structure/MeiMeasure.js";
 import type { Score } from "../models/containers.js";
 import type { Meter, NoteInfo, ScoreModel } from "../models/score.js";
-import { generateId } from "../utils/id.js";
 import { MeiEditor } from "./editor/MeiEditor.js";
 
 /**
@@ -75,28 +74,40 @@ export class MeiApi {
       let meiHead = getChildYElement(draft, "meiHead");
       if (!meiHead) {
         meiHead = new Y.XmlElement("meiHead");
-        meiHead.setAttribute("xml:id", generateId("meiHead"));
+        meiHead.setAttribute(
+          "xml:id",
+          this.meiFriend.idGenerator.generate("meiHead"),
+        );
         draft.insert(0, [meiHead]);
       }
 
       let fileDesc = getChildYElement(meiHead, "fileDesc");
       if (!fileDesc) {
         fileDesc = new Y.XmlElement("fileDesc");
-        fileDesc.setAttribute("xml:id", generateId("fileDesc"));
+        fileDesc.setAttribute(
+          "xml:id",
+          this.meiFriend.idGenerator.generate("fileDesc"),
+        );
         meiHead.insert(0, [fileDesc]);
       }
 
       let titleStmt = getChildYElement(fileDesc, "titleStmt");
       if (!titleStmt) {
         titleStmt = new Y.XmlElement("titleStmt");
-        titleStmt.setAttribute("xml:id", generateId("titleStmt"));
+        titleStmt.setAttribute(
+          "xml:id",
+          this.meiFriend.idGenerator.generate("titleStmt"),
+        );
         fileDesc.insert(0, [titleStmt]);
       }
 
       let titleEl = getChildYElement(titleStmt, "title");
       if (!titleEl) {
         titleEl = new Y.XmlElement("title");
-        titleEl.setAttribute("xml:id", generateId("title"));
+        titleEl.setAttribute(
+          "xml:id",
+          this.meiFriend.idGenerator.generate("title"),
+        );
         titleStmt.insert(0, [titleEl]);
       }
 

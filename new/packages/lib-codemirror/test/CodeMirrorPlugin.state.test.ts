@@ -148,9 +148,10 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
       changes: { from: insertPos, to: insertPos, insert: newNoteText },
     });
 
-    await new Promise((r) => setTimeout(r, 100));
-
     // CodeMirror text should now contain a generated xml:id
+    // We wait a bit longer because it goes from CodeMirror -> Model -> CodeMirror
+    await new Promise((r) => setTimeout(r, 200));
+
     const updatedDoc = view.state.doc.toString();
     expect(updatedDoc).toMatch(/xml:id="note-[a-z0-9]+"/);
 

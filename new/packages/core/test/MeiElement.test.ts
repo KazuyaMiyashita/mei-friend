@@ -145,14 +145,14 @@ describe("MeiElement", () => {
       expect(root.getAttribute("label")).toBe("old");
     });
 
-    it("should fail if recipe removes ID", () => {
+    it("should generate a new ID if recipe removes ID", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
       const root = meiFriend.getRootElement()!;
-      expect(() =>
-        root.produce((draft) => {
-          draft.removeAttribute("xml:id");
-        }),
-      ).toThrowError(/MeiElement validation failed/);
+      const newRoot = root.produce((draft) => {
+        draft.removeAttribute("xml:id");
+      });
+      expect(newRoot.id).toBeDefined();
+      expect(newRoot.id).not.toBe(root.id);
     });
   });
 });

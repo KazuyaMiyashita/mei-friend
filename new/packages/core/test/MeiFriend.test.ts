@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { MeiFriend, type MeiUpdateEvent } from "../src/index.js";
+import { IdGenerator, MeiFriend, type MeiUpdateEvent } from "../src/index.js";
 
 describe("MeiFriend", () => {
   beforeAll(() => {
@@ -212,26 +212,28 @@ describe("MeiFriend", () => {
       expect(meiFriend.getElementById("n1")).toBeDefined();
     });
 
-    it("should fail if root element is missing an ID in update", () => {
+    it("should auto-assign root ID in update if missing", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
-      expect(() => meiFriend.update("m1", "<mei/>")).toThrowError(
-        /Missing xml:id on <mei>/,
-      );
+      // Should NOT throw, should use "m1" for root
+      meiFriend.update("m1", "<mei/>");
+      expect(meiFriend.getElementById("m1")).toBeDefined();
     });
 
-    it("should fail if child element is missing an ID in update", () => {
+    it("should auto-assign child ID in update if missing", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
-      expect(() =>
-        meiFriend.update("m1", '<mei xml:id="m1"><note/></mei>'),
-      ).toThrowError(/Missing xml:id on <note>/);
+      // Should NOT throw, should assign an ID to <note>
+      meiFriend.update("m1", '<mei xml:id="m1"><note/></mei>');
+      const root = meiFriend.getRootElement()!;
+      expect(root.children.length).toBe(1);
+      expect(root.children[0].id).toBeDefined();
     });
 
-    it("should succeed with assignIds utility", async () => {
-      const { assignIds } = await import("../src/utils/assignIds.js");
+    it("should succeed with IdGenerator utility", () => {
+      const generator = new IdGenerator();
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
 
       // This would fail without assignIds
-      const newXml = assignIds("<mei><note/></mei>", "m1");
+      const newXml = generator.assignIds("<mei><note/></mei>", "m1");
       meiFriend.update("m1", newXml);
 
       const root = meiFriend.getRootElement()!;

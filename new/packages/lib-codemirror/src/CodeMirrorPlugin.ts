@@ -10,7 +10,7 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
-import { generateId, MeiFriend, type MeiUpdateEvent } from "@mei-friend/core";
+import { MeiFriend, type MeiUpdateEvent } from "@mei-friend/core";
 import { indentationMarkers } from "@replit/codemirror-indentation-markers";
 import { DOMParser } from "@xmldom/xmldom";
 import {
@@ -222,8 +222,10 @@ export class CodeMirrorPlugin {
   private handleModelUpdate(events: MeiUpdateEvent[]): void {
     if (!this.view) return;
 
-    // Avoid feedback loops from this specific plugin instance
-    if (events.some((e) => e.origin === this.options.origin)) return;
+    // We used to skip events from this.options.origin here to avoid feedback loops.
+    // However, since MeiFriend.update now auto-assigns IDs, we WANT to receive
+    // those updates back so that the IDs appear in the editor.
+    // The feedback loop is stopped by handleDocChange checking if the normalized XML matches.
 
     // Policy 1: Always apply external changes even if we are in an invalid/pending state.
     const prevStatus = this.syncStatus;
@@ -263,26 +265,35 @@ export class CodeMirrorPlugin {
         .sort((a, b) => b.pos.from - a.pos.from);
 
       for (const { event, pos } of sortedEvents) {
-        // Granular Update:
-        // Instead of replacing the whole parent, we only replace the target element.
-        // This preserves surrounding comments and indentation.
-
-        // The event already contains the fully serialized XML string for the modified element
         const newText = event.xmlString;
+        const oldText = this.view.state.doc.sliceString(pos.from, pos.to);
 
-        // Try to match indentation of the original line
-        const line = this.view.state.doc.lineAt(pos.from);
-        const indentMatch = line.text.match(/^(\s*)/);
-        const indent = indentMatch ? indentMatch[1] : "";
-        const indentedText = newText
-          .split("\n")
-          .map((l: string, i: number) => (i === 0 ? l : indent + l))
-          .join("\n");
+        if (oldText === newText) continue;
+
+        // Simple prefix/suffix diff to preserve cursor position for small changes (like ID injection)
+        let commonPrefix = 0;
+        while (
+          commonPrefix < oldText.length &&
+          commonPrefix < newText.length &&
+          oldText[commonPrefix] === newText[commonPrefix]
+        ) {
+          commonPrefix++;
+        }
+
+        let commonSuffix = 0;
+        while (
+          commonSuffix < oldText.length - commonPrefix &&
+          commonSuffix < newText.length - commonPrefix &&
+          oldText[oldText.length - 1 - commonSuffix] ===
+            newText[newText.length - 1 - commonSuffix]
+        ) {
+          commonSuffix++;
+        }
 
         changes.push({
-          from: pos.from,
-          to: pos.to,
-          insert: indentedText,
+          from: pos.from + commonPrefix,
+          to: pos.to - commonSuffix,
+          insert: newText.slice(commonPrefix, newText.length - commonSuffix),
         });
       }
 
@@ -391,116 +402,72 @@ export class CodeMirrorPlugin {
       return;
     }
 
-    // ------------------------------------------------------------------------
-    // ID Auto-Generation & Insertion
-    // ------------------------------------------------------------------------
-    const idChanges: { from: number; insert: string }[] = [];
-    dirty.node.cursor().iterate((node) => {
-      if (node.name === "Element") {
-        const id = this.getElementIdFromNode(node.node);
-        if (!id) {
-          const tag = node.node.firstChild;
-          if (
-            tag &&
-            (tag.name === "OpenTag" || tag.name === "SelfClosingTag")
-          ) {
-            const tagNameNode = tag.getChild("TagName");
-            if (tagNameNode) {
-              const tagName = this.view?.state.doc.sliceString(
-                tagNameNode.from,
-                tagNameNode.to,
-              );
-              if (tagName) {
-                const generatedId = generateId(tagName.toLowerCase());
-                idChanges.push({
-                  from: tagNameNode.to,
-                  insert: ` xml:id="${generatedId}"`,
-                });
-              }
-            }
-          }
-        }
-      }
-      return true;
-    });
-
-    if (idChanges.length > 0) {
-      this.view?.dispatch({
-        changes: idChanges,
-        annotations: [Transaction.userEvent.of("id-injection")],
-      });
-      return;
-    }
-
     const id =
       newElement.getAttribute("xml:id") || newElement.getAttribute("id");
-    if (!id) {
-      this.setSyncState("invalid", "Missing xml:id in changed element");
-      return;
-    }
 
-    const targetMeiElement = this.meiFriend.getElementById(id);
-    if (!targetMeiElement) {
-      // New element at the top level of the dirty range.
-      // We should sync from its parent.
-      let curr = dirty.node.parent;
-      while (curr) {
-        if (curr.name === "Element") {
-          const parentId = this.getElementIdFromNode(curr);
-          const parentMei = parentId
-            ? this.meiFriend.getElementById(parentId)
-            : null;
-          if (parentId && parentMei) {
-            const parentText = this.view?.state.doc.sliceString(
-              curr.from,
-              curr.to,
-            );
+    const targetMeiElement = id ? this.meiFriend.getElementById(id) : null;
 
-            if (parentText) {
-              // Check if normalized XML matches before replacing
-              try {
-                const tempMei = MeiFriend.fromXmlString(parentText);
-                const tempStr = tempMei.toXmlString(false).trim();
-                const currentStr = parentMei.toXmlString().trim();
-                if (tempStr === currentStr) {
-                  this.syncStatus = "idle";
-                  return;
-                }
-              } catch (_e) {
-                // Ignore and proceed with replacement if temp parsing fails
-              }
-
-              this.meiFriend.update(parentId, parentText, this.options.origin);
-            }
-            this.checkFullSyntaxError();
-            return;
-          }
+    if (id && targetMeiElement) {
+      // Check if normalized XML matches before replacing
+      try {
+        const tempMei = MeiFriend.fromXmlString(dirty.text);
+        const tempStr = tempMei.toXmlString(false).trim();
+        const currentStr = targetMeiElement.toXmlString().trim();
+        if (tempStr === currentStr) {
+          this.syncStatus = "idle";
+          return;
         }
-        curr = curr.parent;
+      } catch (_e) {
+        // Ignore and proceed with replacement if temp parsing fails
       }
-      this.setSyncState(
-        "invalid",
-        "Could not find a valid parent element with xml:id for sync",
-      );
+
+      this.meiFriend.update(id, dirty.text, this.options.origin);
+      this.checkFullSyntaxError();
       return;
     }
 
-    // Check if normalized XML matches before replacing
-    try {
-      const tempMei = MeiFriend.fromXmlString(dirty.text);
-      const tempStr = tempMei.toXmlString(false).trim();
-      const currentStr = targetMeiElement.toXmlString().trim();
-      if (tempStr === currentStr) {
-        this.syncStatus = "idle";
-        return;
+    // If the changed element has no ID or is not in the model,
+    // we must find a parent that IS in the model and sync from it.
+    let curr = dirty.node.parent;
+    while (curr) {
+      if (curr.name === "Element") {
+        const parentId = this.getElementIdFromNode(curr);
+        const parentMei = parentId
+          ? this.meiFriend.getElementById(parentId)
+          : null;
+        if (parentId && parentMei) {
+          const parentText = this.view?.state.doc.sliceString(
+            curr.from,
+            curr.to,
+          );
+
+          if (parentText) {
+            // Check if normalized XML matches before replacing
+            try {
+              const tempMei = MeiFriend.fromXmlString(parentText);
+              const tempStr = tempMei.toXmlString(false).trim();
+              const currentStr = parentMei.toXmlString().trim();
+              if (tempStr === currentStr) {
+                this.syncStatus = "idle";
+                return;
+              }
+            } catch (_e) {
+              // Ignore and proceed with replacement if temp parsing fails
+            }
+
+            this.meiFriend.update(parentId, parentText, this.options.origin);
+          }
+          this.checkFullSyntaxError();
+          return;
+        }
       }
-    } catch (_e) {
-      // Ignore and proceed with replacement if temp parsing fails
+      curr = curr.parent;
     }
 
-    // Use destructive reconstruction for simple and robust synchronization
-    this.meiFriend.update(id, dirty.text, this.options.origin);
-    this.checkFullSyntaxError();
+    this.setSyncState(
+      "invalid",
+      "Could not find a valid parent element with xml:id for sync",
+    );
   }
 
   private getElementIdFromNode(node: SyntaxNode): string | null {

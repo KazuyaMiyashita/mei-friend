@@ -1,4 +1,5 @@
 import * as Y from "yjs";
+import { IdGenerator } from "./utils/IdGenerator.js";
 import { serializeYNode } from "./utils/serialize.js";
 
 /**
@@ -8,8 +9,9 @@ import { serializeYNode } from "./utils/serialize.js";
  * This class is a Read-only view of a Y.XmlElement. For all document modifications,
  * use `MeiFriend.update(xmlId, xmlString)`.
  *
- * **Constraint**: Every MeiElement must have a valid `xml:id`. If the underlying
- * Y.XmlElement is missing an ID, the constructor will throw an Error.
+ * **Constraint**: Every MeiElement will have an `xml:id`. If the underlying
+ * Y.XmlElement is missing an ID, this class will automatically generate and
+ * assign one during instantiation.
  */
 export class MeiElement {
   /**
@@ -17,12 +19,15 @@ export class MeiElement {
    */
   public readonly id: string;
 
-  constructor(public readonly yNode: Y.XmlElement) {
-    const id = yNode.getAttribute("xml:id") || yNode.getAttribute("id");
+  constructor(
+    public readonly yNode: Y.XmlElement,
+    private readonly idGenerator?: IdGenerator,
+  ) {
+    let id = yNode.getAttribute("xml:id") || yNode.getAttribute("id");
     if (!id) {
-      throw new Error(
-        `MeiElement validation failed: Every element must have an xml:id. Tag: <${yNode.nodeName}>`,
-      );
+      const gen = idGenerator ?? new IdGenerator();
+      id = gen.generate(yNode.nodeName.toLowerCase());
+      yNode.setAttribute("xml:id", id);
     }
     this.id = id;
   }
@@ -41,7 +46,7 @@ export class MeiElement {
     return this.yNode
       .toArray()
       .filter((child): child is Y.XmlElement => child instanceof Y.XmlElement)
-      .map((child) => new MeiElement(child));
+      .map((child) => new MeiElement(child, this.idGenerator));
   }
 
   /**
@@ -51,7 +56,7 @@ export class MeiElement {
     const parent = this.yNode.parent;
     if (parent instanceof Y.XmlElement) {
       if (parent.nodeName === "__root__") return undefined;
-      return new MeiElement(parent);
+      return new MeiElement(parent, this.idGenerator);
     }
     return undefined;
   }
@@ -68,7 +73,7 @@ export class MeiElement {
         for (let i = index + 1; i < siblings.length; i++) {
           const sibling = siblings[i];
           if (sibling instanceof Y.XmlElement) {
-            return new MeiElement(sibling);
+            return new MeiElement(sibling, this.idGenerator);
           }
         }
       }
@@ -88,7 +93,7 @@ export class MeiElement {
         for (let i = index - 1; i >= 0; i--) {
           const sibling = siblings[i];
           if (sibling instanceof Y.XmlElement) {
-            return new MeiElement(sibling);
+            return new MeiElement(sibling, this.idGenerator);
           }
         }
       }
@@ -129,7 +134,7 @@ export class MeiElement {
         const child = node.get(i);
         if (child instanceof Y.XmlElement) {
           if (child.nodeName === tagName) {
-            result.push(new MeiElement(child));
+            result.push(new MeiElement(child, this.idGenerator));
           }
           traverse(child);
         }
@@ -169,7 +174,7 @@ export class MeiElement {
         (child): child is Y.XmlElement =>
           child instanceof Y.XmlElement && child.nodeName === tagName,
       );
-    return yChild ? new MeiElement(yChild) : undefined;
+    return yChild ? new MeiElement(yChild, this.idGenerator) : undefined;
   }
 
   // --------------------------------------------------------------------------
@@ -183,8 +188,7 @@ export class MeiElement {
    * The returned element is detached from the document and can be used to
    * update the original via `MeiFriend.update(id, newElement.toXmlString())`.
    *
-   * **Note**: If the recipe removes the `xml:id` or the resulting element structure
-   * is invalid according to MeiElement constraints, this method will throw an Error.
+   * **Note**: If the recipe removes the `xml:id`, a new one will be auto-generated.
    *
    * @param recipe A function that modifies the cloned Y.XmlElement.
    */
@@ -196,7 +200,7 @@ export class MeiElement {
     tempDoc.getXmlFragment("tmp").push([clone]);
 
     recipe(clone);
-    return new MeiElement(clone);
+    return new MeiElement(clone, this.idGenerator);
   }
 
   // --------------------------------------------------------------------------

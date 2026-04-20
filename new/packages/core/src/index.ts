@@ -4,6 +4,5 @@ export * from "./MeiFriend.js";
 export * from "./MeiUpdateEvent.js";
 export * from "./mei/index.js";
 export * from "./models/index.js";
-export * from "./utils/assignIds.js";
-export * from "./utils/id.js";
+export * from "./utils/IdGenerator.js";
 export * from "./utils/serialize.js";
