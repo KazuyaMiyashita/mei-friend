@@ -1,6 +1,6 @@
 import * as Y from "yjs";
 import { IdGenerator } from "./utils/IdGenerator.js";
-import { serializeYNode } from "./utils/serialize.js";
+import { ROOT_WRAPPER_TAG, XmlSerde } from "./utils/XmlSerde.js";
 
 /**
  * MeiElement wraps a Y.XmlElement and provides a clean API for DOM operations
@@ -18,18 +18,20 @@ export class MeiElement {
    * The xml:id or id of the element. Guaranteed to be present.
    */
   public readonly id: string;
+  private readonly serde: XmlSerde;
 
   constructor(
     public readonly yNode: Y.XmlElement,
     private readonly idGenerator?: IdGenerator,
   ) {
+    const gen = idGenerator ?? new IdGenerator();
     let id = yNode.getAttribute("xml:id") || yNode.getAttribute("id");
     if (!id) {
-      const gen = idGenerator ?? new IdGenerator();
       id = gen.generate(yNode.nodeName.toLowerCase());
       yNode.setAttribute("xml:id", id);
     }
     this.id = id;
+    this.serde = new XmlSerde(gen);
   }
 
   /**
@@ -55,7 +57,7 @@ export class MeiElement {
   get parentElement(): MeiElement | undefined {
     const parent = this.yNode.parent;
     if (parent instanceof Y.XmlElement) {
-      if (parent.nodeName === "__root__") return undefined;
+      if (parent.nodeName === ROOT_WRAPPER_TAG) return undefined;
       return new MeiElement(parent, this.idGenerator);
     }
     return undefined;
@@ -211,6 +213,6 @@ export class MeiElement {
    * Returns the XML string representation of this element.
    */
   toXmlString(): string {
-    return serializeYNode(this.yNode, 0);
+    return this.serde.serialize(this.yNode, 0);
   }
 }

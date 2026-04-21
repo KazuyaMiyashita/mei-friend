@@ -1,4 +1,3 @@
-import { DOMParser } from "@xmldom/xmldom";
 import * as Y from "yjs";
 import { MeiApi } from "./api/MeiApi.js";
 import { MeiElement } from "./MeiElement.js";
@@ -6,7 +5,7 @@ import type { MeiUpdateEvent } from "./MeiUpdateEvent.js";
 import { Mei } from "./mei/Mei.js";
 import type { ScoreModel } from "./models/score.js";
 import { IdGenerator } from "./utils/IdGenerator.js";
-import { serializeYNode } from "./utils/serialize.js";
+import { ROOT_WRAPPER_TAG, XmlSerde } from "./utils/XmlSerde.js";
 
 /**
  * MeiFriend represents a single Music Encoding Initiative (MEI) score.
@@ -46,15 +45,13 @@ export class MeiFriend {
   private _scoreModelCache: ScoreModel | null = null;
   /** Internal ID Generator for auto-assigning IDs */
   public readonly idGenerator: IdGenerator;
-
-  /** The tag name for the internal root wrapper element. */
-  private static readonly ROOT_WRAPPER_TAG = "__root__";
-  /** The tag name for internal comment wrapper elements. */
-  public static readonly COMMENT_WRAPPER_TAG = "__comment__";
+  /** Handles XML serialization and deserialization. */
+  private readonly serde: XmlSerde;
 
   constructor(doc?: Y.Doc, idGenerator?: IdGenerator) {
     this.doc = doc ?? new Y.Doc();
     this.idGenerator = idGenerator ?? new IdGenerator();
+    this.serde = new XmlSerde(this.idGenerator);
     this.xmlRoot = this.doc.getXmlFragment("mei");
     this.undoManager = new Y.UndoManager(this.xmlRoot);
 
@@ -98,7 +95,7 @@ export class MeiFriend {
     const rootWrapper = this.getInternalRootWrapper();
     if (!rootWrapper) return "";
 
-    const serialized = serializeYNode(rootWrapper, 0);
+    const serialized = this.serde.serialize(rootWrapper, 0);
     if (!serialized) return "";
 
     const declaration = includeDeclaration
@@ -125,56 +122,6 @@ export class MeiFriend {
     return this._scoreModelCache;
   }
 
-  private parseAndEnsureIds(
-    xmlString: string,
-    targetId?: string | null,
-    // biome-ignore lint/suspicious/noExplicitAny: xmldom Document compatibility
-  ): any {
-    const parser = new DOMParser();
-    const dom = parser.parseFromString(xmlString, "application/xml");
-
-    const parserError = dom.getElementsByTagName("parsererror");
-    if (parserError.length > 0) {
-      throw new Error(`XML Parsing Error: ${parserError[0].textContent}`);
-    }
-
-    const newEl = dom.documentElement;
-    if (!newEl) {
-      throw new Error("Invalid XML provided for update.");
-    }
-
-    // biome-ignore lint/suspicious/noExplicitAny: xmldom Element compatibility
-    const ensureIds = (el: any, isRoot: boolean) => {
-      let id = el.getAttribute("xml:id") || el.getAttribute("id");
-      if (isRoot && targetId) {
-        if (id && id !== targetId) {
-          throw new Error(
-            `Update failed: ID mismatch. Target is "${targetId}", provided XML has "${id}"`,
-          );
-        }
-        if (!id) {
-          el.setAttribute("xml:id", targetId);
-          id = targetId;
-        }
-      } else if (!id) {
-        id = this.idGenerator.generate(el.nodeName.toLowerCase());
-        el.setAttribute("xml:id", id);
-      }
-
-      const children = el.childNodes;
-      for (let i = 0; i < children.length; i++) {
-        const child = children[i];
-        if (child.nodeType === 1) {
-          // biome-ignore lint/suspicious/noExplicitAny: xmldom Element compatibility
-          ensureIds(child as any, false);
-        }
-      }
-    };
-    ensureIds(newEl, true);
-
-    return dom;
-  }
-
   /**
    * Replaces the entire document content with the provided MEI XML string.
    * This is equivalent to calling `fromXmlString`, but it updates the existing instance.
@@ -188,23 +135,21 @@ export class MeiFriend {
     // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
     origin?: any,
   ): void {
-    const dom = this.parseAndEnsureIds(xmlString);
+    const dom = this.serde.parse(xmlString);
 
     this.doc.transact(() => {
       let rootWrapper = this.getInternalRootWrapper();
       if (!rootWrapper) {
-        rootWrapper = new Y.XmlElement(MeiFriend.ROOT_WRAPPER_TAG);
+        rootWrapper = new Y.XmlElement(ROOT_WRAPPER_TAG);
         this.xmlRoot.push([rootWrapper]);
       } else {
-        // Clear existing content
         if (rootWrapper.length > 0) {
           rootWrapper.delete(0, rootWrapper.length);
         }
       }
 
-      this.populateFromDom(dom as unknown as Node, rootWrapper);
+      this.serde.populateFromDom(dom as unknown as Node, rootWrapper);
 
-      // Immediately index the new structure
       this.buildIndex(rootWrapper);
     }, origin);
 
@@ -237,20 +182,18 @@ export class MeiFriend {
         throw new Error(`Element with ID "${targetId}" not found for update.`);
       }
 
-      const dom = this.parseAndEnsureIds(xmlString, targetId);
+      const dom = this.serde.parse(xmlString, targetId);
       const newEl = dom.documentElement;
       if (!newEl) {
         throw new Error("Parsed document lacks a root element.");
       }
 
-      // Check if tag name matches
       if (newEl.nodeName !== target.nodeName) {
         throw new Error(
           `Update failed: Tag name mismatch. Expected <${target.nodeName}>, got <${newEl.nodeName}>`,
         );
       }
 
-      // 2. Sync attributes
       const currentAttrs = target.getAttributes();
       for (const key in currentAttrs) {
         if (key !== "xml:id" && key !== "id") {
@@ -265,16 +208,13 @@ export class MeiFriend {
         }
       }
 
-      // 3. Destructive replace children
       const length = target.length;
       if (length > 0) target.delete(0, length);
-      this.populateFromDom(newEl as unknown as Node, target);
+      this.serde.populateFromDom(newEl as unknown as Node, target);
 
-      // Immediately index the new structure
       this.buildIndex(target);
     }, origin);
 
-    // Ensure this update is its own undo step
     this.undoManager.stopCapturing();
   }
 
@@ -315,7 +255,6 @@ export class MeiFriend {
   public getElementById(xmlId: string): MeiElement | undefined {
     const yNode = this.idMap.get(xmlId);
     if (yNode && !yNode.doc) {
-      // Lazy cleanup: the node was detached but still in our index.
       this.idMap.delete(xmlId);
       this.elementToIdMap.delete(yNode);
       return undefined;
@@ -337,7 +276,6 @@ export class MeiFriend {
       if (node.doc) {
         result.push(new MeiElement(node, this.idGenerator));
       } else {
-        // Lazy cleanup
         nodes.delete(node);
         this.elementToIdMap.delete(node);
       }
@@ -378,8 +316,7 @@ export class MeiFriend {
         }
 
         if (targetElement?.doc) {
-          if (targetElement.nodeName === MeiFriend.ROOT_WRAPPER_TAG) {
-            // If the root wrapper itself changed, we report the root <mei> element.
+          if (targetElement.nodeName === ROOT_WRAPPER_TAG) {
             const rootMei = this.getRootElement();
             if (rootMei) {
               meiEvents.push({
@@ -396,7 +333,7 @@ export class MeiFriend {
             if (xmlId) {
               meiEvents.push({
                 xmlId,
-                xmlString: serializeYNode(targetElement, 0),
+                xmlString: this.serde.serialize(targetElement, 0),
                 origin: transaction.origin,
                 isLocal: transaction.local,
               });
@@ -461,8 +398,7 @@ export class MeiFriend {
       .toArray()
       .find(
         (child): child is Y.XmlElement =>
-          child instanceof Y.XmlElement &&
-          child.nodeName === MeiFriend.ROOT_WRAPPER_TAG,
+          child instanceof Y.XmlElement && child.nodeName === ROOT_WRAPPER_TAG,
       );
   }
 
@@ -519,7 +455,7 @@ export class MeiFriend {
 
   private buildIndex(node: Y.XmlFragment | Y.XmlElement): void {
     if (node instanceof Y.XmlElement) {
-      if (node.nodeName !== MeiFriend.ROOT_WRAPPER_TAG) {
+      if (node.nodeName !== ROOT_WRAPPER_TAG) {
         const id = node.getAttribute("xml:id") || node.getAttribute("id");
         if (id) {
           this.idMap.set(id, node);
@@ -563,53 +499,5 @@ export class MeiFriend {
       }
     };
     traverse(node);
-  }
-
-  private populateFromDom(
-    domNode: Node,
-    yParent: Y.XmlFragment | Y.XmlElement,
-  ): void {
-    for (let i = 0; i < domNode.childNodes.length; i++) {
-      const child = domNode.childNodes[i];
-      switch (child.nodeType) {
-        // Node.ELEMENT_NODE
-        case 1: {
-          const el = child as Element;
-          const yElement = new Y.XmlElement(el.nodeName);
-          const attrs = el.attributes;
-          for (let j = 0; j < attrs.length; j++) {
-            const attr = attrs[j];
-            yElement.setAttribute(attr.name, attr.value);
-          }
-          yParent.push([yElement]);
-          this.populateFromDom(el, yElement);
-          break;
-        }
-        // Node.TEXT_NODE
-        case 3: {
-          const textValue = (child as Text).nodeValue;
-          // Ignore whitespace-only text nodes (indentation/newlines between elements)
-          if (textValue && textValue.trim() === "") {
-            break;
-          }
-          if (textValue) {
-            const yText = new Y.XmlText(textValue);
-            yParent.push([yText]);
-          }
-          break;
-        }
-        // Node.COMMENT_NODE
-        case 8: {
-          const commentValue = (child as Comment).nodeValue;
-          if (commentValue) {
-            const yElement = new Y.XmlElement(MeiFriend.COMMENT_WRAPPER_TAG);
-            const yText = new Y.XmlText(commentValue);
-            yParent.push([yElement]);
-            yElement.push([yText]);
-          }
-          break;
-        }
-      }
-    }
   }
 }

@@ -5,4 +5,4 @@ export * from "./MeiUpdateEvent.js";
 export * from "./mei/index.js";
 export * from "./models/index.js";
 export * from "./utils/IdGenerator.js";
-export * from "./utils/serialize.js";
+export * from "./utils/XmlSerde.js";
