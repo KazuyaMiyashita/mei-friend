@@ -1,5 +1,5 @@
 import { Cursor, MeiFriend } from "@mei-friend/core";
-import type { SyncState } from "@mei-friend/lib-codemirror";
+import type { EditorCursorInfo, SyncState } from "@mei-friend/lib-codemirror";
 import { VerovioCanvas } from "@mei-friend/lib-verovio-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -13,6 +13,7 @@ import {
   CodeMirrorEditor,
   type CodeMirrorEditorRef,
 } from "./components/CodeMirrorEditor";
+import { CodeMirrorEditorFooter } from "./components/CodeMirrorEditorFooter";
 import { VerovioCanvasFooter } from "./components/VerovioCanvasFooter";
 
 interface LogEntry {
@@ -38,6 +39,8 @@ export default function App() {
   const [cursor, setCursor] = useState<Cursor | null>(null);
 
   const [syncState, setSyncState] = useState<SyncState>({ status: "idle" });
+  const [editorCursorInfo, setEditorCursorInfo] =
+    useState<EditorCursorInfo | null>(null);
   const editorRef = useRef<CodeMirrorEditorRef>(null);
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -189,17 +192,17 @@ export default function App() {
   }, [cursor, meiFriend, selectedId]);
 
   const renderStatusIndicator = (state: SyncState) => {
-    if (state.status === "dirty") {
-      return <span className={styles.dirtyDot} title="Unsaved changes" />;
-    }
-    if (state.status === "invalid") {
-      return (
-        <span className={styles.invalidBadge} title={state.error}>
-          invalid{state.error ? `: ${state.error}` : ""}
-        </span>
-      );
-    }
-    return null;
+    if (state.status === "idle") return null;
+    return (
+      <>
+        <span className={styles.dirtyDot} />
+        {state.status === "invalid" && (
+          <span className={styles.invalidBadge} title={state.error}>
+            invalid{state.error ? `: ${state.error}` : ""}
+          </span>
+        )}
+      </>
+    );
   };
 
   const handleClearLogs = useCallback(() => {
@@ -319,12 +322,13 @@ export default function App() {
                       Apply
                     </button>
                     <span className={styles.applyShortcut}>⌘↵</span>
+                    <span className={styles.headerDivider} />
                     <button
                       className={styles.refreshBtn}
                       onClick={() => editorRef.current?.refresh()}
                       title="Overwrite from MeiFriend Model"
                       type="button"
-                      disabled={!meiFriend}
+                      disabled={!meiFriend || syncState.status === "idle"}
                     >
                       Refresh
                     </button>
@@ -338,6 +342,7 @@ export default function App() {
                       meiFriend={meiFriend}
                       origin="codemirror"
                       onStateChange={setSyncState}
+                      onCursorChange={setEditorCursorInfo}
                     />
                   ) : (
                     <div className={styles.editorPlaceholder}>
@@ -346,7 +351,10 @@ export default function App() {
                   )}
                 </div>
 
-                <div className={styles.emptyFooter} />
+                <CodeMirrorEditorFooter
+                  cursorInfo={editorCursorInfo}
+                  enabled={!!meiFriend}
+                />
               </div>
             </Panel>
           </PanelGroup>

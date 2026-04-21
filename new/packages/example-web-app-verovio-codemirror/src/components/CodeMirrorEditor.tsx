@@ -28,7 +28,11 @@ import {
   rectangularSelection,
 } from "@codemirror/view";
 import type { MeiFriend } from "@mei-friend/core";
-import { CodeMirrorPlugin, type SyncState } from "@mei-friend/lib-codemirror";
+import {
+  CodeMirrorPlugin,
+  type EditorCursorInfo,
+  type SyncState,
+} from "@mei-friend/lib-codemirror";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import styles from "./CodeMirrorEditor.module.css";
 
@@ -64,6 +68,7 @@ interface Props {
   meiFriend: MeiFriend;
   origin?: string;
   onStateChange?: (state: SyncState) => void;
+  onCursorChange?: (info: EditorCursorInfo) => void;
 }
 
 export interface CodeMirrorEditorRef {
@@ -73,9 +78,16 @@ export interface CodeMirrorEditorRef {
 }
 
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, Props>(
-  ({ meiFriend, origin, onStateChange }, ref) => {
+  ({ meiFriend, origin, onStateChange, onCursorChange }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const pluginRef = useRef<CodeMirrorPlugin | null>(null);
+
+    // Keep callback refs up to date on every render so the plugin always calls
+    // the latest version without needing to recreate the editor.
+    const onStateChangeRef = useRef(onStateChange);
+    onStateChangeRef.current = onStateChange;
+    const onCursorChangeRef = useRef(onCursorChange);
+    onCursorChangeRef.current = onCursorChange;
 
     useImperativeHandle(ref, () => ({
       refresh: () => {
@@ -91,8 +103,9 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, Props>(
       if (!containerRef.current) return;
 
       const plugin = new CodeMirrorPlugin(meiFriend, {
-        origin: origin,
-        onStateChange: onStateChange,
+        origin,
+        onStateChange: (state) => onStateChangeRef.current?.(state),
+        onCursorChange: (info) => onCursorChangeRef.current?.(info),
       });
       pluginRef.current = plugin;
 
@@ -107,7 +120,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, Props>(
         plugin.destroy();
         pluginRef.current = null;
       };
-    }, [meiFriend, origin, onStateChange]);
+    }, [meiFriend, origin]);
 
     return <div ref={containerRef} className={styles.editorContainer} />;
   },

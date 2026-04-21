@@ -9,6 +9,12 @@
   font-size: 0.75rem;
   min-height: 28px;
   flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.footerToolbar::-webkit-scrollbar {
+  display: none;
 }
 
 .statusItem {
@@ -18,6 +24,7 @@
   padding: 0 12px;
   border-right: 1px solid #c8c8c8;
   height: 16px;
+  flex-shrink: 0;
 }
 
 .statusItem:last-child {
@@ -34,4 +41,12 @@
   display: inline-block;
   min-width: 1ch;
   color: #000;
+}
+
+.statusValueId {
+  min-width: 12ch;
+}
+
+.statusValueFixed {
+  min-width: 4ch;
 }

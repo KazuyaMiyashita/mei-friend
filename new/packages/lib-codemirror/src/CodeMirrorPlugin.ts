@@ -186,11 +186,22 @@ const customTheme = EditorView.theme({
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+export interface EditorCursorInfo {
+  /** 1-based line number. */
+  line: number;
+  /** 1-based column number. */
+  col: number;
+  /** xml:id of the nearest enclosing XML element, if any. */
+  xmlId?: string;
+}
+
 export interface CodeMirrorPluginOptions {
   /** The origin identifier for updates from this plugin. Defaults to "codemirror". */
   origin?: string;
   /** Callback triggered when the synchronization state changes. */
   onStateChange?: (state: SyncState) => void;
+  /** Callback triggered when the cursor position or enclosing element changes. */
+  onCursorChange?: (info: EditorCursorInfo) => void;
 }
 
 /**
@@ -215,6 +226,7 @@ export class CodeMirrorPlugin {
   private options: Required<CodeMirrorPluginOptions>;
   private unregisterUpdate: (() => void) | null = null;
   private _syncState: SyncState = { status: "idle" };
+  private _lastCursorInfo: EditorCursorInfo | null = null;
   /** True while meiFriend.update/replaceXmlString is in progress, so we recognise the echo. */
   private _applyInProgress = false;
 
@@ -223,6 +235,7 @@ export class CodeMirrorPlugin {
     this.options = {
       origin: options.origin ?? "codemirror",
       onStateChange: options.onStateChange ?? (() => {}),
+      onCursorChange: options.onCursorChange ?? (() => {}),
     };
   }
 
@@ -255,11 +268,16 @@ export class CodeMirrorPlugin {
         });
         return {
           update: (update: ViewUpdate) => {
-            if (!update.docChanged) return;
-            const newVal = update.state.field(DirtyStateField);
-            const oldVal = update.startState.field(DirtyStateField);
-            if (newVal === oldVal) return;
-            this.updateSyncStateFromDirty(update.state, newVal);
+            if (update.docChanged) {
+              const newVal = update.state.field(DirtyStateField);
+              const oldVal = update.startState.field(DirtyStateField);
+              if (newVal !== oldVal) {
+                this.updateSyncStateFromDirty(update.state, newVal);
+              }
+            }
+            if (update.docChanged || update.selectionSet) {
+              this.emitCursorChange(update.state);
+            }
           },
           destroy: () => {
             this.unregisterUpdate?.();
@@ -674,6 +692,38 @@ export class CodeMirrorPlugin {
   }
 
   // ── Cursor helpers ────────────────────────────────────────────────────────
+
+  private getXmlIdAtCursor(state: EditorState): string | undefined {
+    const pos = state.selection.main.head;
+    const tree = syntaxTree(state);
+    let node: SyntaxNode | null = tree.resolve(pos, 0);
+    while (node) {
+      if (node.name === "Element") {
+        const id = getElementId(state, node);
+        if (id) return id;
+      }
+      node = node.parent;
+    }
+    return undefined;
+  }
+
+  private emitCursorChange(state: EditorState): void {
+    const pos = state.selection.main.head;
+    const line = state.doc.lineAt(pos);
+    const info: EditorCursorInfo = {
+      line: line.number,
+      col: pos - line.from + 1,
+      xmlId: this.getXmlIdAtCursor(state),
+    };
+    if (
+      this._lastCursorInfo?.line === info.line &&
+      this._lastCursorInfo?.col === info.col &&
+      this._lastCursorInfo?.xmlId === info.xmlId
+    )
+      return;
+    this._lastCursorInfo = info;
+    this.options.onCursorChange(info);
+  }
 
   private restoreCursorContext(view: EditorView, ctx: CursorContext): void {
     const state = view.state;

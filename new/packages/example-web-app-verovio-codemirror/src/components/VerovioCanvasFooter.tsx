@@ -1,6 +1,6 @@
 import { type Cursor, type MeiFriend, MeiNote } from "@mei-friend/core";
 import { useEffect, useState } from "react";
-import styles from "./VerovioCanvasFooter.module.css";
+import styles from "./footer.module.css";
 
 interface Props {
   cursor: Cursor | null;
@@ -67,26 +67,21 @@ export function VerovioCanvasFooter({
 
       <div className={styles.statusItem}>
         <span className={styles.statusLabel}>Offset</span>
-        <span className={styles.statusValue} style={{ minWidth: "40px" }}>
+        <span className={styles.statusValue}>
           {enabled && pos ? pos.offset.toString() : "-"}
         </span>
       </div>
 
       <div className={styles.statusItem}>
         <span className={styles.statusLabel}>ID</span>
-        <span
-          className={styles.statusValue}
-          style={{ minWidth: "12ch", fontSize: "10px" }}
-        >
+        <span className={`${styles.statusValue} ${styles.statusValueId}`}>
           {enabled && selectedId ? selectedId : "-"}
         </span>
       </div>
 
       <div className={styles.statusItem}>
         <span className={styles.statusLabel}>Pitch</span>
-        <span className={styles.statusValue} style={{ minWidth: "4ch" }}>
-          {pitch ?? "-"}
-        </span>
+        <span className={styles.statusValue}>{pitch ?? "-"}</span>
       </div>
     </div>
   );
