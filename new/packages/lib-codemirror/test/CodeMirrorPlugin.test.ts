@@ -106,7 +106,6 @@ describe("CodeMirrorPlugin", () => {
 
       const docText = view.state.doc.toString();
       expect(docText).toContain('xml:id="n3"');
-      // Relaxed check: just ensure it's synced and roughly looks correct
       expect(docText).toContain(
         '<note xml:id="n3" dur="4" oct="4" pname="g"/>',
       );
@@ -153,10 +152,9 @@ describe("CodeMirrorPlugin", () => {
     });
   });
 
-  describe("CodeMirror -> MeiFriend sync (Editor to Model)", () => {
-    it("should sync text changes to the model after a delay", async () => {
-      vi.useFakeTimers();
-      const plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 50 });
+  describe("CodeMirror -> MeiFriend sync via Apply", () => {
+    it("should sync attribute changes via apply()", () => {
+      const plugin = new CodeMirrorPlugin(meiFriend);
       const view = new EditorView({
         doc: meiFriend.toXmlString(),
         extensions: [basicSetup, plugin.extensions],
@@ -165,26 +163,31 @@ describe("CodeMirrorPlugin", () => {
       const docText = view.state.doc.toString();
       const pos = docText.indexOf('pname="c"') + 7;
 
+      // Edit the attribute value
       view.dispatch({
         changes: { from: pos, to: pos + 1, insert: "b" },
       });
 
-      // Not synced yet
+      expect(plugin.isDirty).toBe(true);
+      expect(plugin.state.status).toBe("dirty");
+
+      // Model not updated yet
       expect(meiFriend.getElementById("n1")?.getAttribute("pname")).toBe("c");
 
-      vi.advanceTimersByTime(100);
+      // Apply syncs to model
+      const result = plugin.apply();
+      expect(result).toBe(true);
 
-      // Now synced
       expect(meiFriend.getElementById("n1")?.getAttribute("pname")).toBe("b");
+      expect(plugin.isDirty).toBe(false);
+      expect(plugin.state.status).toBe("idle");
 
-      vi.useRealTimers();
       view.destroy();
       plugin.destroy();
     });
 
-    it("should sync element structural changes from text", async () => {
-      vi.useFakeTimers();
-      const plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 0 });
+    it("should sync element structural changes via apply()", () => {
+      const plugin = new CodeMirrorPlugin(meiFriend);
       const view = new EditorView({
         doc: meiFriend.toXmlString(),
         extensions: [basicSetup, plugin.extensions],
@@ -202,20 +205,18 @@ describe("CodeMirrorPlugin", () => {
         },
       });
 
-      vi.advanceTimersByTime(10);
+      plugin.apply();
 
       const n3 = meiFriend.getElementById("n3");
       expect(n3).toBeDefined();
       expect(n3?.getAttribute("pname")).toBe("a");
 
-      vi.useRealTimers();
       view.destroy();
       plugin.destroy();
     });
 
-    it("should skip update if only formatting/whitespace changes", async () => {
-      vi.useFakeTimers();
-      const plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 0 });
+    it("should be dirty but NOT update model when only whitespace is changed", () => {
+      const plugin = new CodeMirrorPlugin(meiFriend);
       const view = new EditorView({
         doc: meiFriend.toXmlString(),
         extensions: [basicSetup, plugin.extensions],
@@ -232,20 +233,16 @@ describe("CodeMirrorPlugin", () => {
         changes: { from: n1Pos + 5, to: n1Pos + 5, insert: " " },
       });
 
-      vi.advanceTimersByTime(10);
-
-      // Should have been processed but no Yjs update triggered
-      expect(plugin.state.status).toBe("idle");
+      // Status is dirty (editor differs from base), but model is NOT updated automatically
+      expect(plugin.state.status).toBe("dirty");
       expect(onUpdateSpy).not.toHaveBeenCalled();
 
-      vi.useRealTimers();
       view.destroy();
       plugin.destroy();
     });
 
-    it("should auto-inject xml:id when a new element is typed", async () => {
-      vi.useFakeTimers();
-      const plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 0 });
+    it("should auto-inject xml:id when apply() is called on an element without one", () => {
+      const plugin = new CodeMirrorPlugin(meiFriend);
       const view = new EditorView({
         doc: meiFriend.toXmlString(),
         extensions: [basicSetup, plugin.extensions],
@@ -254,7 +251,7 @@ describe("CodeMirrorPlugin", () => {
       const docText = view.state.doc.toString();
       const n1Pos = docText.indexOf('<note xml:id="n1"');
 
-      // Type a new note without ID
+      // Type a new note without ID before n1
       view.dispatch({
         changes: {
           from: n1Pos,
@@ -263,41 +260,61 @@ describe("CodeMirrorPlugin", () => {
         },
       });
 
-      // Wait for sync to model
-      vi.advanceTimersByTime(10);
+      expect(plugin.isDirty).toBe(true);
 
-      // Now wait for model sync back to editor (this is another turn)
-      // In tests, this happens immediately because it's synchronous in MeiFriend,
-      // but we need to let the promise resolve or similar if there were any.
-      // Actually, meiFriend.update triggers onUpdate which calls handleModelUpdate synchronously.
+      // Apply: the layer element is dirty (contains changes), MeiFriend assigns IDs
+      plugin.apply();
 
-      // The plugin should have received an xml:id from the model update
+      // The plugin receives the echo from MeiFriend with auto-generated xml:id
       const updatedText = view.state.doc.toString();
       expect(updatedText).toMatch(/<note xml:id="[a-zA-Z0-9-]+" pname="e"\/>/);
 
-      vi.useRealTimers();
       view.destroy();
       plugin.destroy();
     });
 
-    it("should not trigger a feedback loop", async () => {
-      vi.useFakeTimers();
-      const plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 0 });
+    it("should not trigger a feedback loop", () => {
+      const plugin = new CodeMirrorPlugin(meiFriend);
       const view = new EditorView({
         doc: meiFriend.toXmlString(),
         extensions: [basicSetup, plugin.extensions],
       });
       const dispatchSpy = vi.spyOn(view, "dispatch");
 
-      // Change from model
+      // External model change
       meiFriend.update("n1", '<note xml:id="n1" pname="g" oct="4" dur="4" />');
 
-      // The dispatch should have happened for model-sync
-      expect(dispatchSpy).toHaveBeenCalled();
+      // At most one dispatch (for the element-level sync)
+      const syncDispatches = dispatchSpy.mock.calls.filter(
+        ([tr]) => tr && "changes" in tr,
+      );
+      expect(syncDispatches.length).toBeLessThanOrEqual(1);
 
-      vi.advanceTimersByTime(100);
+      view.destroy();
+      plugin.destroy();
+    });
 
-      vi.useRealTimers();
+    it("apply() should return false for invalid XML", () => {
+      const plugin = new CodeMirrorPlugin(meiFriend);
+      const view = new EditorView({
+        doc: meiFriend.toXmlString(),
+        extensions: [basicSetup, plugin.extensions],
+      });
+
+      const docText = view.state.doc.toString();
+      const n1Pos = docText.indexOf('<note xml:id="n1"');
+      const n1End = docText.indexOf('"/>', n1Pos + 20) + 2;
+
+      // Break the element by removing the closing />
+      view.dispatch({
+        changes: { from: n1End, to: n1End + 1, insert: "" },
+      });
+
+      const result = plugin.apply();
+      expect(result).toBe(false);
+      // Model should NOT be updated
+      expect(meiFriend.getElementById("n1")?.getAttribute("pname")).toBe("c");
+
       view.destroy();
       plugin.destroy();
     });

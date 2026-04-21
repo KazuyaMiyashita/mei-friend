@@ -188,19 +188,18 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [cursor, meiFriend, selectedId]);
 
-  const getStatusClass = (state: SyncState) => {
-    switch (state.status) {
-      case "idle":
-        return styles.statusIdle;
-      case "pending":
-        return styles.statusPending;
-      case "invalid":
-        return styles.statusInvalid;
-      case "applying_external":
-        return styles.statusApplying;
-      default:
-        return "";
+  const renderStatusIndicator = (state: SyncState) => {
+    if (state.status === "dirty") {
+      return <span className={styles.dirtyDot} title="Unsaved changes" />;
     }
+    if (state.status === "invalid") {
+      return (
+        <span className={styles.invalidBadge} title={state.error}>
+          invalid{state.error ? `: ${state.error}` : ""}
+        </span>
+      );
+    }
+    return null;
   };
 
   const handleClearLogs = useCallback(() => {
@@ -307,29 +306,29 @@ export default function App() {
                 <div className={styles.panelHeader}>
                   <div className={styles.panelHeaderLeft}>
                     <h3>CodeMirror</h3>
-                    <span
-                      className={`${styles.statusBadge} ${getStatusClass(syncState)}`}
-                    >
-                      {syncState.status}
-                    </span>
-                    {syncState.error && (
-                      <span
-                        className={styles.errorMessage}
-                        title={syncState.error}
-                      >
-                        {syncState.error}
-                      </span>
-                    )}
+                    {renderStatusIndicator(syncState)}
                   </div>
-                  <button
-                    className={styles.refreshBtn}
-                    onClick={() => editorRef.current?.refresh()}
-                    title="Overwrite from MeiFriend Model"
-                    type="button"
-                    disabled={!meiFriend}
-                  >
-                    Refresh
-                  </button>
+                  <div className={styles.panelHeaderRight}>
+                    <button
+                      className={styles.applyBtn}
+                      onClick={() => editorRef.current?.apply()}
+                      title="Apply changes to model (Cmd+Enter)"
+                      type="button"
+                      disabled={!meiFriend || syncState.status !== "dirty"}
+                    >
+                      Apply
+                    </button>
+                    <span className={styles.applyShortcut}>⌘↵</span>
+                    <button
+                      className={styles.refreshBtn}
+                      onClick={() => editorRef.current?.refresh()}
+                      title="Overwrite from MeiFriend Model"
+                      type="button"
+                      disabled={!meiFriend}
+                    >
+                      Refresh
+                    </button>
+                  </div>
                 </div>
 
                 <div className={styles.editorWrapper}>

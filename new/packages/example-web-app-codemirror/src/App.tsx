@@ -138,7 +138,7 @@ export default function App() {
     switch (state.status) {
       case "idle":
         return styles.statusIdle;
-      case "pending":
+      case "dirty":
         return styles.statusPending;
       case "invalid":
         return styles.statusInvalid;

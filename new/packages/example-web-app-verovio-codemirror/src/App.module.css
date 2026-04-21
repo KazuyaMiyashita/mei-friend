@@ -140,6 +140,12 @@
   gap: 0.5rem;
 }
 
+.panelHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 /* ── Verovio panel ── */
 
 .verovioPanel {
@@ -230,49 +236,55 @@
   flex-shrink: 0;
 }
 
-/* ── Status badge & controls ── */
+/* ── Status indicators ── */
 
-.statusBadge {
-  font-size: 0.65rem;
-  padding: 0.1rem 0.35rem;
-  border-radius: 10px;
-  font-weight: bold;
-  text-transform: uppercase;
-  border: 1px solid transparent;
+.dirtyDot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #3b82f6;
+  flex-shrink: 0;
 }
 
-.statusIdle {
-  color: #64748b;
-  background-color: #f1f5f9;
-  border-color: #e2e8f0;
-}
-
-.statusPending {
-  color: #d97706;
-  background-color: #fffbeb;
-  border-color: #fde68a;
-}
-
-.statusInvalid {
+.invalidBadge {
+  font-size: 0.68rem;
+  font-family: monospace;
   color: #dc2626;
   background-color: #fef2f2;
-  border-color: #fecaca;
-}
-
-.statusApplying {
-  color: #2563eb;
-  background-color: #eff6ff;
-  border-color: #bfdbfe;
-}
-
-.errorMessage {
-  font-size: 0.7rem;
-  color: #dc2626;
-  max-width: 200px;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: monospace;
+}
+
+.applyShortcut {
+  font-size: 0.68rem;
+  color: #999;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.applyBtn {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  background-color: #e8f4e8;
+  border: 1px solid #999;
+  border-radius: 4px;
+}
+
+.applyBtn:hover:not(:disabled) {
+  background-color: #c8e8c8;
+}
+
+.applyBtn:disabled {
+  color: #bbb;
+  cursor: not-allowed;
+  background-color: #f5f5f5;
 }
 
 .refreshBtn {

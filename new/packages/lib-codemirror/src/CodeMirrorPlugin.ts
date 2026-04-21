@@ -1,7 +1,21 @@
-import { indentWithTab } from "@codemirror/commands";
+import {
+  history,
+  historyKeymap,
+  indentWithTab,
+  isolateHistory,
+} from "@codemirror/commands";
 import { xml } from "@codemirror/lang-xml";
-import { ensureSyntaxTree, indentUnit, syntaxTree } from "@codemirror/language";
-import { type Extension, type Range, Transaction } from "@codemirror/state";
+import { indentUnit, syntaxTree } from "@codemirror/language";
+import {
+  Annotation,
+  type EditorState,
+  type Extension,
+  Prec,
+  type Range,
+  StateEffect,
+  StateField,
+  Transaction,
+} from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -10,53 +24,135 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
-import { MeiFriend, type MeiUpdateEvent } from "@mei-friend/core";
+import type { MeiFriend, MeiUpdateEvent } from "@mei-friend/core";
 import { indentationMarkers } from "@replit/codemirror-indentation-markers";
 import { DOMParser } from "@xmldom/xmldom";
 import {
+  type CursorContext,
+  captureCursorContext,
+  findAttributeNode,
+  getAncestorElementIds,
   getElementAtRange,
+  getElementId,
   hasSyntaxError,
+  spliceDirtyIntoNewXml,
   XmlIdIndexField,
 } from "./LezerUtils.js";
 
+// ── Annotations & Effects ────────────────────────────────────────────────────
+
 /**
- * Options for CodeMirrorPlugin.
+ * Marks the source of a dispatch:
+ * - "apply":   editor content was applied to MeiFriend (echo or direct apply)
+ * - "refresh": editor was refreshed from the MeiFriend model
+ * - "external": a change came in from MeiFriend that was not initiated by this plugin's apply
  */
-export interface CodeMirrorPluginOptions {
-  /** Whether to sync changes automatically. Defaults to true. */
-  autoSync?: boolean;
-  /** Debounce interval for syncing from CodeMirror to MeiFriend (ms). Defaults to 300. */
-  syncDelay?: number;
-  /** The origin identifier for updates from this plugin. Defaults to "codemirror". */
-  origin?: string;
-  /** Callback triggered when the synchronization state changes. */
-  onStateChange?: (state: SyncState) => void;
+export const MeiSyncAnnotation = Annotation.define<
+  "apply" | "refresh" | "external"
+>();
+
+/**
+ * Carries an explicit new DirtyInfo value to override position-mapping logic
+ * in DirtyStateField, or null to clear dirty state.
+ */
+export const SetDirtyEffect = StateEffect.define<DirtyInfo | null>();
+
+// ── DirtyStateField ──────────────────────────────────────────────────────────
+
+export interface DirtyInfo {
+  /** xml:id of the element being edited, or null when no element is identifiable. */
+  xmlId: string | null;
+  /** Editor range [from, to) covering the dirty element. */
+  from: number;
+  to: number;
 }
 
-/**
- * Current status of the synchronization between CodeMirror and MeiFriend.
- */
-export type SyncStatus = "idle" | "pending" | "invalid" | "applying_external";
-
-/**
- * Current state of the synchronization, including optional error information.
- */
-export interface SyncState {
-  status: SyncStatus;
-  error?: string;
+interface DirtyStateValue {
+  /** null = editor content matches last applied/refreshed state */
+  dirty: DirtyInfo | null;
+  /** Full editor text as of the last Apply or Refresh. */
+  lastAppliedDoc: string;
 }
 
-/**
- * Decoration for syntax errors.
- */
+export const DirtyStateField = StateField.define<DirtyStateValue>({
+  create(state) {
+    return { dirty: null, lastAppliedDoc: state.doc.toString() };
+  },
+
+  update(value, tr) {
+    const annotation = tr.annotation(MeiSyncAnnotation);
+
+    // Apply or Refresh clears dirty and records the new baseline.
+    if (annotation === "apply" || annotation === "refresh") {
+      return { dirty: null, lastAppliedDoc: tr.newDoc.toString() };
+    }
+
+    // Always honour explicit SetDirtyEffect first.
+    for (const effect of tr.effects) {
+      if (effect.is(SetDirtyEffect)) {
+        return { dirty: effect.value, lastAppliedDoc: value.lastAppliedDoc };
+      }
+    }
+
+    if (!tr.docChanged) return value;
+
+    // External update: map existing dirty position through the changeset.
+    if (annotation === "external") {
+      if (value.dirty) {
+        const newFrom = tr.changes.mapPos(value.dirty.from);
+        const newTo = tr.changes.mapPos(value.dirty.to, 1);
+        return {
+          dirty: { ...value.dirty, from: newFrom, to: newTo },
+          lastAppliedDoc: value.lastAppliedDoc,
+        };
+      }
+      return value;
+    }
+
+    // User edit: expand the dirty range to cover all changed positions.
+    let rangeFrom = Number.POSITIVE_INFINITY;
+    let rangeTo = Number.NEGATIVE_INFINITY;
+    tr.changes.iterChanges((_fromA, _toA, fromB, toB) => {
+      if (fromB < rangeFrom) rangeFrom = fromB;
+      if (toB > rangeTo) rangeTo = toB;
+    });
+
+    if (rangeFrom === Number.POSITIVE_INFINITY) return value;
+
+    // Merge with the previous dirty range (mapped through changes).
+    if (value.dirty) {
+      const mappedFrom = tr.changes.mapPos(value.dirty.from);
+      const mappedTo = tr.changes.mapPos(value.dirty.to, 1);
+      if (mappedFrom < rangeFrom) rangeFrom = mappedFrom;
+      if (mappedTo > rangeTo) rangeTo = mappedTo;
+    }
+
+    const isDirtyNow = tr.newDoc.toString() !== value.lastAppliedDoc;
+    if (!isDirtyNow) {
+      return { dirty: null, lastAppliedDoc: value.lastAppliedDoc };
+    }
+
+    // Find the smallest enclosing element without syntax errors.
+    const element = getElementAtRange(tr.state, rangeFrom, rangeTo);
+    const dirty: DirtyInfo = element
+      ? {
+          xmlId: getElementId(tr.state, element.node),
+          from: element.from,
+          to: element.to,
+        }
+      : { xmlId: null, from: 0, to: tr.newDoc.length };
+
+    return { dirty, lastAppliedDoc: value.lastAppliedDoc };
+  },
+});
+
+// ── Decorations & Theme ──────────────────────────────────────────────────────
+
 const errorMark = Decoration.mark({
   class: "cm-mei-syntax-error",
   attributes: { title: "Syntax Error" },
 });
 
-/**
- * CodeMirror extension to highlight syntax error nodes.
- */
 const errorHighlighter = EditorView.decorations.of((view) => {
   const decorations: Range<Decoration>[] = [];
   for (const { from, to } of view.visibleRanges) {
@@ -80,54 +176,79 @@ const errorHighlighter = EditorView.decorations.of((view) => {
   return Decoration.set(decorations);
 });
 
-/**
- * Default CSS for error highlighting and custom tweaks.
- */
 const customTheme = EditorView.theme({
-  // Syntax error - just wavy underline, no background color
   ".cm-mei-syntax-error": {
     textDecoration: "underline wavy red",
   },
-  // Disable highlightSelectionMatches background
   ".cm-selectionMatch": {
     backgroundColor: "transparent !important",
   },
 });
 
+// ── Types ────────────────────────────────────────────────────────────────────
+
+export interface CodeMirrorPluginOptions {
+  /** The origin identifier for updates from this plugin. Defaults to "codemirror". */
+  origin?: string;
+  /** Callback triggered when the synchronization state changes. */
+  onStateChange?: (state: SyncState) => void;
+}
+
 /**
- * CodeMirrorPlugin provides a bridge between MeiFriend's Yjs-based model
- * and the CodeMirror text editor.
+ * Status of the editor relative to the MeiFriend model.
+ * - "idle":              editor content matches the model
+ * - "dirty":            editor has unsaved changes
+ * - "invalid":          editor content has XML/syntax errors; Apply is blocked
+ * - "applying_external": model is pushing an update to the editor
  */
+export type SyncStatus = "idle" | "dirty" | "invalid" | "applying_external";
+
+export interface SyncState {
+  status: SyncStatus;
+  error?: string;
+}
+
+// ── CodeMirrorPlugin ─────────────────────────────────────────────────────────
+
 export class CodeMirrorPlugin {
   private view: EditorView | null = null;
   private meiFriend: MeiFriend;
   private options: Required<CodeMirrorPluginOptions>;
-  private syncTimeout: ReturnType<typeof setTimeout> | null = null;
   private unregisterUpdate: (() => void) | null = null;
   private _syncState: SyncState = { status: "idle" };
+  /** True while meiFriend.update/replaceXmlString is in progress, so we recognise the echo. */
+  private _applyInProgress = false;
 
   constructor(meiFriend: MeiFriend, options: CodeMirrorPluginOptions = {}) {
     this.meiFriend = meiFriend;
     this.options = {
-      autoSync: options.autoSync ?? true,
-      syncDelay: options.syncDelay ?? 300,
       origin: options.origin ?? "codemirror",
       onStateChange: options.onStateChange ?? (() => {}),
     };
   }
 
-  /**
-   * Returns CodeMirror extensions to enable MEI editing and synchronization.
-   */
   public get extensions(): Extension {
     return [
       xml({ autoCloseTags: false }),
       XmlIdIndexField,
+      DirtyStateField,
       errorHighlighter,
       customTheme,
       indentUnit.of("  "),
       indentationMarkers(),
-      keymap.of([indentWithTab]),
+      history(),
+      keymap.of([indentWithTab, ...historyKeymap]),
+      Prec.highest(
+        keymap.of([
+          {
+            key: "Mod-Enter",
+            run: () => {
+              this.apply();
+              return true;
+            },
+          },
+        ]),
+      ),
       ViewPlugin.define((view) => {
         this.view = view;
         this.unregisterUpdate = this.meiFriend.onUpdate((events) => {
@@ -135,13 +256,11 @@ export class CodeMirrorPlugin {
         });
         return {
           update: (update: ViewUpdate) => {
-            if (
-              update.docChanged &&
-              this.options.autoSync &&
-              this.syncStatus !== "applying_external"
-            ) {
-              this.scheduleSync(update);
-            }
+            if (!update.docChanged) return;
+            const newVal = update.state.field(DirtyStateField);
+            const oldVal = update.startState.field(DirtyStateField);
+            if (newVal === oldVal) return;
+            this.updateSyncStateFromDirty(update.state, newVal);
           },
           destroy: () => {
             this.unregisterUpdate?.();
@@ -153,407 +272,129 @@ export class CodeMirrorPlugin {
     ];
   }
 
+  // ── Public API ─────────────────────────────────────────────────────────────
+
   public get state(): SyncState {
     return this._syncState;
   }
 
-  private get syncStatus(): SyncStatus {
-    return this._syncState.status;
-  }
-
-  private set syncStatus(status: SyncStatus) {
-    this.setSyncState(status);
-  }
-
-  private setSyncState(status: SyncStatus, error?: string) {
-    if (this._syncState.status !== status || this._syncState.error !== error) {
-      this._syncState = { status, error };
-      this.options.onStateChange(this._syncState);
-    }
+  public get isDirty(): boolean {
+    if (!this.view) return false;
+    return this.view.state.field(DirtyStateField).dirty !== null;
   }
 
   /**
-   * Parses an XML string and returns the DOM and any error messages.
+   * Applies the editor content to the MeiFriend model.
+   * @returns true if the apply succeeded, false if blocked by errors.
    */
-  private parseXml(xml: string): {
-    dom: ReturnType<DOMParser["parseFromString"]>;
-    error?: string;
-  } {
-    let parserErrorMsg = "";
-    const parser = new DOMParser({
-      onError: (level, msg) => {
-        if (level === "error" || level === "fatalError") {
-          if (!parserErrorMsg) parserErrorMsg = msg;
-        }
-      },
-    });
+  public apply(): boolean {
+    if (!this.view) return false;
+    const dirtyValue = this.view.state.field(DirtyStateField);
+    if (!dirtyValue.dirty) return false;
 
-    const dom = parser.parseFromString(xml, "application/xml");
-    const parserErrorElements = dom.getElementsByTagName("parsererror");
-    if (parserErrorMsg || parserErrorElements.length > 0) {
-      const errorText =
-        parserErrorMsg ||
-        (parserErrorElements.length > 0
-          ? parserErrorElements[0].textContent
-          : "Unknown XML error");
-      return { dom, error: errorText || "Unknown XML error" };
-    }
-    return { dom };
-  }
+    const { dirty } = dirtyValue;
+    const view = this.view;
 
-  /**
-   * Checks for syntax errors in the full document and updates the sync state.
-   */
-  private checkFullSyntaxError(): void {
-    if (!this.view) return;
-    const hasError = hasSyntaxError(
-      (
-        ensureSyntaxTree(this.view.state, this.view.state.doc.length, 100) ||
-        syntaxTree(this.view.state)
-      ).topNode,
-    );
-    if (hasError) {
-      this.setSyncState("invalid", "Lezer syntax error");
+    // Lezer syntax check
+    if (dirty.xmlId) {
+      const element = getElementAtRange(view.state, dirty.from, dirty.to);
+      if (!element || hasSyntaxError(element.node)) {
+        this.setSyncState("invalid", "Syntax error in edited element");
+        return false;
+      }
     } else {
-      this.syncStatus = "idle";
-    }
-  }
-
-  private handleModelUpdate(events: MeiUpdateEvent[]): void {
-    if (!this.view) return;
-
-    // We used to skip events from this.options.origin here to avoid feedback loops.
-    // However, since MeiFriend.update now auto-assigns IDs, we WANT to receive
-    // those updates back so that the IDs appear in the editor.
-    // The feedback loop is stopped by handleDocChange checking if the normalized XML matches.
-
-    // Policy 1: Always apply external changes even if we are in an invalid/pending state.
-    const prevStatus = this.syncStatus;
-    this.syncStatus = "applying_external";
-
-    try {
-      // Full document refresh when:
-      // 1. The document is currently invalid (Lezer tree positions are unreliable).
-      // 2. A document-replace event was received (new IDs assigned by MeiFriend must be reflected).
-      const hasDocumentReplace = events.some(
-        (e) => e.type === "document-replace",
-      );
-      if (prevStatus === "invalid" || hasDocumentReplace) {
-        const xml = this.meiFriend.toXmlString();
-        this.view.dispatch({
-          changes: { from: 0, to: this.view.state.doc.length, insert: xml },
-          annotations: [Transaction.userEvent.of("model-sync")],
-        });
-        return;
-      }
-
-      const idMap = this.view.state.field(XmlIdIndexField);
-      const changes: { from: number; to: number; insert: string }[] = [];
-
-      // Sort events by position in the document (descending) to avoid offset shifts
-      const sortedEvents = events
-        .map((event) => {
-          const id = event.xmlId;
-          const pos = id ? idMap.get(id) : null;
-          return { event, pos };
-        })
-        .filter(
-          (
-            item,
-          ): item is {
-            event: MeiUpdateEvent;
-            pos: { from: number; to: number };
-          } => item.pos !== null,
-        )
-        .sort((a, b) => b.pos.from - a.pos.from);
-
-      for (const { event, pos } of sortedEvents) {
-        const baseIndent = this.getBaseIndent(pos.from);
-        const newText = this.reindentXml(event.xmlString, baseIndent);
-        const oldText = this.view.state.doc.sliceString(pos.from, pos.to);
-
-        if (oldText === newText) continue;
-
-        // Simple prefix/suffix diff to preserve cursor position for small changes (like ID injection)
-        let commonPrefix = 0;
-        while (
-          commonPrefix < oldText.length &&
-          commonPrefix < newText.length &&
-          oldText[commonPrefix] === newText[commonPrefix]
-        ) {
-          commonPrefix++;
-        }
-
-        let commonSuffix = 0;
-        while (
-          commonSuffix < oldText.length - commonPrefix &&
-          commonSuffix < newText.length - commonPrefix &&
-          oldText[oldText.length - 1 - commonSuffix] ===
-            newText[newText.length - 1 - commonSuffix]
-        ) {
-          commonSuffix++;
-        }
-
-        changes.push({
-          from: pos.from + commonPrefix,
-          to: pos.to - commonSuffix,
-          insert: newText.slice(commonPrefix, newText.length - commonSuffix),
-        });
-      }
-
-      if (changes.length > 0) {
-        this.view.dispatch({
-          changes,
-          annotations: [Transaction.userEvent.of("model-sync")],
-        });
-      }
-    } finally {
-      // Return to Idle if we were not pending, and there are no syntax errors.
-      // If we were pending, keep pending until the timeout fires.
-      if (prevStatus === "pending") {
-        this.syncStatus = "pending";
-      } else {
-        this.checkFullSyntaxError();
+      // No identifiable element — check full document
+      if (hasSyntaxError(syntaxTree(view.state).topNode)) {
+        this.setSyncState("invalid", "Syntax error in document");
+        return false;
       }
     }
-  }
 
-  private scheduleSync(update: {
-    changes: {
-      iterChanges: (
-        fn: (fromA: number, toA: number, fromB: number, toB: number) => void,
-      ) => void;
-    };
-  }): void {
-    this.syncStatus = "pending";
-    if (this.syncTimeout) {
-      clearTimeout(this.syncTimeout);
-    }
+    const ctx = captureCursorContext(view.state);
+    const dirtyText = view.state.doc.sliceString(dirty.from, dirty.to);
 
-    this.syncTimeout = setTimeout(() => {
+    if (dirty.xmlId) {
+      // Validate the element fragment
+      const { error } = this.parseXml(dirtyText);
+      if (error) {
+        this.setSyncState("invalid", `XML error: ${error}`);
+        return false;
+      }
+
+      const targetElement = this.meiFriend.getElementById(dirty.xmlId);
+      if (!targetElement) {
+        return this.applyFullDocument(view, ctx);
+      }
+
+      this._applyInProgress = true;
       try {
-        this.handleDocChange(update);
-      } catch (e) {
-        console.error("Error in handleDocChange:", e);
-        this.setSyncState(
-          "invalid",
-          e instanceof Error ? e.message : String(e),
-        );
+        this.meiFriend.update(dirty.xmlId, dirtyText, this.options.origin);
+      } finally {
+        this._applyInProgress = false;
       }
-    }, this.options.syncDelay);
-  }
-
-  private handleDocChange(update: {
-    changes: {
-      iterChanges: (
-        fn: (fromA: number, toA: number, fromB: number, toB: number) => void,
-      ) => void;
-    };
-  }): void {
-    if (!this.view) return;
-
-    // Strict validation of the full document
-    const fullXml = this.view.state.doc.toString();
-    const { error: fullXmlError } = this.parseXml(fullXml);
-    if (fullXmlError) {
-      this.setSyncState("invalid", `Full XML error: ${fullXmlError}`);
-      return;
+    } else {
+      return this.applyFullDocument(view, ctx);
     }
 
-    const cmChanges: { fromB: number; toB: number }[] = [];
-    update.changes.iterChanges((_fromA, _toA, fromB, toB) => {
-      cmChanges.push({ fromB, toB });
+    if (ctx && this.view) {
+      this.restoreCursorContext(this.view, ctx);
+    }
+    this.setSyncState("idle");
+    return true;
+  }
+
+  /** Full-document replace path used when no element ID is available. */
+  private applyFullDocument(
+    view: EditorView,
+    ctx: CursorContext | null,
+  ): boolean {
+    const fullXml = view.state.doc.toString();
+    const { error } = this.parseXml(fullXml);
+    if (error) {
+      this.setSyncState("invalid", `XML error: ${error}`);
+      return false;
+    }
+
+    this._applyInProgress = true;
+    try {
+      this.meiFriend.replaceXmlString(fullXml, this.options.origin);
+    } finally {
+      this._applyInProgress = false;
+    }
+
+    if (ctx && this.view) {
+      this.restoreCursorContext(this.view, ctx);
+    }
+    this.setSyncState("idle");
+    return true;
+  }
+
+  /**
+   * Overwrites the editor with the current MeiFriend model state.
+   * Cursor position is restored to the equivalent location in the new content.
+   */
+  public refresh(): void {
+    if (!this.view) return;
+    const view = this.view;
+    const ctx = captureCursorContext(view.state);
+    const newXml = this.meiFriend.toXmlString();
+
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: newXml },
+      annotations: [
+        MeiSyncAnnotation.of("refresh"),
+        Transaction.addToHistory.of(false),
+      ],
     });
 
-    if (cmChanges.length === 0) {
-      this.checkFullSyntaxError();
-      return;
+    if (ctx && this.view) {
+      this.restoreCursorContext(this.view, ctx);
     }
-
-    // For simplicity, find the range that covers all changes in this turn
-    const from = Math.min(...cmChanges.map((c) => c.fromB));
-    const to = Math.max(...cmChanges.map((c) => c.toB));
-
-    const dirty = getElementAtRange(this.view.state, from, to);
-    if (!dirty) {
-      this.checkFullSyntaxError();
-      return;
-    }
-
-    // Check for syntax errors via Lezer
-    if (hasSyntaxError(dirty.node)) {
-      this.setSyncState("invalid", "Lezer syntax error in changed element");
-      return;
-    }
-
-    // We can't easily use the full 'dom' here because it's a different document structure
-    // than what was previously parsed from a fragment.
-    // However, since we've already confirmed the full document is valid,
-    // we can proceed with confidence using dirty.text for fragment-based updates
-    // as long as we re-verify the fragment itself if needed, or just trust it.
-    // To be safe and meet the "strict" requirement, we parse the fragment too.
-    const { dom: fragmentDom, error: fragmentError } = this.parseXml(
-      dirty.text,
-    );
-    if (fragmentError) {
-      this.setSyncState("invalid", `XML fragment error: ${fragmentError}`);
-      return;
-    }
-    const newElement = fragmentDom.documentElement;
-
-    if (!newElement) {
-      this.setSyncState("invalid", "No root element in XML fragment");
-      return;
-    }
-
-    const id =
-      newElement.getAttribute("xml:id") || newElement.getAttribute("id");
-
-    const targetMeiElement = id ? this.meiFriend.getElementById(id) : null;
-
-    if (id && targetMeiElement) {
-      // Check if normalized XML matches before replacing
-      try {
-        const tempMei = MeiFriend.fromXmlString(dirty.text);
-        const tempStr = tempMei.toXmlString(false).trim();
-        const currentStr = targetMeiElement.toXmlString().trim();
-        if (tempStr === currentStr) {
-          this.syncStatus = "idle";
-          return;
-        }
-      } catch (_e) {
-        // Ignore and proceed with replacement if temp parsing fails
-      }
-
-      this.meiFriend.update(id, dirty.text, this.options.origin);
-      this.checkFullSyntaxError();
-      return;
-    }
-
-    // If the changed element has no ID or is not in the model,
-    // we must find a parent that IS in the model and sync from it.
-    let curr = dirty.node.parent;
-    while (curr) {
-      if (curr.name === "Element") {
-        const parentId = this.getElementIdFromNode(curr);
-        const parentMei = parentId
-          ? this.meiFriend.getElementById(parentId)
-          : null;
-        if (parentId && parentMei) {
-          const parentText = this.view?.state.doc.sliceString(
-            curr.from,
-            curr.to,
-          );
-
-          if (parentText) {
-            // Check if normalized XML matches before replacing
-            try {
-              const tempMei = MeiFriend.fromXmlString(parentText);
-              const tempStr = tempMei.toXmlString(false).trim();
-              const currentStr = parentMei.toXmlString().trim();
-              if (tempStr === currentStr) {
-                this.syncStatus = "idle";
-                return;
-              }
-            } catch (_e) {
-              // Ignore and proceed with replacement if temp parsing fails
-            }
-
-            this.meiFriend.update(parentId, parentText, this.options.origin);
-          }
-          this.checkFullSyntaxError();
-          return;
-        }
-      }
-      curr = curr.parent;
-    }
-
-    // No parent with ID found — this is a root-level (full document) replacement.
-    // Fall back to replaceXmlString instead of marking as invalid.
-    this.meiFriend.replaceXmlString(dirty.text, this.options.origin);
-    this.checkFullSyntaxError();
-  }
-
-  /**
-   * Returns the whitespace prefix of the line containing `pos`.
-   * This is the indent that precedes the element's opening `<` in the document.
-   */
-  private getBaseIndent(pos: number): string {
-    if (!this.view) return "";
-    const line = this.view.state.doc.lineAt(pos);
-    return this.view.state.doc.sliceString(line.from, pos);
-  }
-
-  /**
-   * Re-indents an XML string (serialized at level 0) so that its children
-   * use `baseIndent` as their base indentation.
-   * The first line is left unchanged because it is inserted directly after
-   * the existing indent in the document.
-   */
-  static reindentXml(xmlString: string, baseIndent: string): string {
-    if (!baseIndent) return xmlString;
-    const lines = xmlString.split("\n");
-    return lines
-      .map((line, i) => (i === 0 ? line : baseIndent + line))
-      .join("\n");
-  }
-
-  private reindentXml(xmlString: string, baseIndent: string): string {
-    return CodeMirrorPlugin.reindentXml(xmlString, baseIndent);
-  }
-
-  private getElementIdFromNode(node: SyntaxNode): string | null {
-    if (!this.view) return null;
-    const state = this.view.state;
-    // Lezer XML parser structure:
-    // Element -> (OpenTag | SelfClosingTag) -> Attribute -> AttributeName, AttributeValue
-    const tag = node.firstChild;
-    if (!tag || (tag.name !== "OpenTag" && tag.name !== "SelfClosingTag"))
-      return null;
-
-    let curr = tag.firstChild;
-    while (curr) {
-      if (curr.name === "Attribute") {
-        const nameNode = curr.getChild("AttributeName");
-        if (nameNode) {
-          const name = state.doc.sliceString(nameNode.from, nameNode.to);
-          if (name === "xml:id" || name === "id") {
-            const valueNode = curr.getChild("AttributeValue");
-            if (valueNode) {
-              let value = state.doc.sliceString(valueNode.from, valueNode.to);
-              if (
-                (value.startsWith('"') && value.endsWith('"')) ||
-                (value.startsWith("'") && value.endsWith("'"))
-              ) {
-                value = value.slice(1, -1);
-              }
-              return value;
-            }
-          }
-        }
-      }
-      curr = curr.nextSibling;
-    }
-    return null;
-  }
-
-  /**
-   * Cleans up resources used by the plugin.
-   */
-  public destroy(): void {
-    if (this.syncTimeout) {
-      clearTimeout(this.syncTimeout);
-    }
-    this.unregisterUpdate?.();
-    this.unregisterUpdate = null;
-    // We don't destroy the view here because we don't own it anymore.
-    this.view = null;
+    this.setSyncState("idle");
   }
 
   /**
    * Selects and scrolls to the element with the given xml:id.
-   * @param xmlId The xml:id of the element to jump to.
-   * @returns True if the element was found and jumped to.
    */
   public jumpToElement(xmlId: string): boolean {
     if (!this.view) return false;
@@ -569,9 +410,6 @@ export class CodeMirrorPlugin {
     return false;
   }
 
-  /**
-   * Returns the underlying CodeMirror EditorView instance.
-   */
   public get editorView(): EditorView {
     if (!this.view) {
       throw new Error(
@@ -581,21 +419,421 @@ export class CodeMirrorPlugin {
     return this.view;
   }
 
-  /**
-   * Refreshes the editor content with the current state of the MeiFriend model.
-   * This overrides any local unsynced changes.
-   */
-  public refresh(): void {
+  public destroy(): void {
+    this.unregisterUpdate?.();
+    this.unregisterUpdate = null;
+    this.view = null;
+  }
+
+  // ── Model → Editor sync ────────────────────────────────────────────────────
+
+  private handleModelUpdate(events: MeiUpdateEvent[]): void {
     if (!this.view) return;
-    const _prevState = this.state;
-    this.syncStatus = "applying_external";
-    try {
-      const xml = this.meiFriend.toXmlString();
-      this.view.dispatch({
-        changes: { from: 0, to: this.view.state.doc.length, insert: xml },
-      });
-    } finally {
-      this.syncStatus = "idle";
+    const view = this.view;
+    const state = view.state;
+    const dirtyValue = state.field(DirtyStateField);
+
+    // ── Case A: Echo from our own apply ─────────────────────────────────────
+    if (this._applyInProgress) {
+      const hasDocReplace = events.some((e) => e.type === "document-replace");
+      if (hasDocReplace) {
+        const newXml = this.meiFriend.toXmlString();
+        view.dispatch({
+          changes: { from: 0, to: state.doc.length, insert: newXml },
+          annotations: [
+            MeiSyncAnnotation.of("apply"),
+            Transaction.addToHistory.of(false),
+          ],
+        });
+      } else {
+        const changes = this.computeElementChanges(events, state);
+        // Always dispatch with "apply" annotation to clear dirty, even if no text changed.
+        view.dispatch({
+          changes,
+          annotations: [
+            MeiSyncAnnotation.of("apply"),
+            Transaction.addToHistory.of(false),
+          ],
+        });
+      }
+      return;
+    }
+
+    // ── Case B: External document replace ───────────────────────────────────
+    if (events.some((e) => e.type === "document-replace")) {
+      const newXml = this.meiFriend.toXmlString();
+
+      if (dirtyValue.dirty) {
+        const { dirty } = dirtyValue;
+        const conflicted = this.isExternalConflict(state, dirty, events);
+
+        if (conflicted || !dirty.xmlId) {
+          this.applyConflictingUpdate(view, newXml, dirty.xmlId);
+        } else {
+          this.applyPreservingDirty(view, state, newXml, dirty);
+        }
+      } else {
+        view.dispatch({
+          changes: { from: 0, to: state.doc.length, insert: newXml },
+          annotations: [
+            MeiSyncAnnotation.of("external"),
+            Transaction.addToHistory.of(false),
+          ],
+        });
+        this.setSyncState("idle");
+      }
+      return;
+    }
+
+    // ── Case C: External element-level updates ───────────────────────────────
+    if (dirtyValue.dirty) {
+      const { dirty } = dirtyValue;
+      const conflicted = this.isExternalConflict(state, dirty, events);
+
+      if (conflicted) {
+        // Full refresh to correctly replace conflicted content even if the editor is broken
+        const newXml = this.meiFriend.toXmlString();
+        this.applyConflictingUpdate(view, newXml, dirty.xmlId);
+      } else {
+        // Apply only changes to elements outside the dirty range
+        const changes = this.computeElementChangesExcluding(
+          events,
+          state,
+          dirty,
+        );
+        if (changes.length > 0) {
+          view.dispatch({
+            changes,
+            annotations: [
+              MeiSyncAnnotation.of("external"),
+              Transaction.addToHistory.of(false),
+            ],
+          });
+        }
+        // Keep dirty status; DirtyStateField maps positions automatically
+      }
+    } else {
+      const changes = this.computeElementChanges(events, state);
+      if (changes.length > 0) {
+        view.dispatch({
+          changes,
+          annotations: [
+            MeiSyncAnnotation.of("external"),
+            Transaction.addToHistory.of(false),
+          ],
+        });
+      }
+      this.setSyncState("idle");
     }
   }
+
+  // ── Helpers for handleModelUpdate ─────────────────────────────────────────
+
+  /** Full refresh that discards dirty edits, with cursor moved to the dirty element. */
+  private applyConflictingUpdate(
+    view: EditorView,
+    newXml: string,
+    dirtyXmlId: string | null,
+  ): void {
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: newXml },
+      effects: [SetDirtyEffect.of(null)],
+      annotations: [
+        MeiSyncAnnotation.of("external"),
+        Transaction.addToHistory.of(false),
+      ],
+    });
+    this.moveCursorToElement(view, dirtyXmlId);
+    this.setSyncState("idle");
+    this.createUndoBoundary(view);
+  }
+
+  /** Updates all elements except the dirty one, preserving the dirty text. */
+  private applyPreservingDirty(
+    view: EditorView,
+    state: EditorState,
+    newXml: string,
+    dirty: DirtyInfo,
+  ): void {
+    if (!dirty.xmlId) return;
+    const dirtyText = state.doc.sliceString(dirty.from, dirty.to);
+    const spliceResult = spliceDirtyIntoNewXml(newXml, dirty.xmlId, dirtyText);
+
+    if (spliceResult) {
+      const { result, from, to } = spliceResult;
+      view.dispatch({
+        changes: { from: 0, to: state.doc.length, insert: result },
+        effects: [SetDirtyEffect.of({ xmlId: dirty.xmlId, from, to })],
+        annotations: [
+          MeiSyncAnnotation.of("external"),
+          Transaction.addToHistory.of(false),
+        ],
+      });
+      // Dirty status is preserved; keep current sync state
+    } else {
+      // Dirty element was removed from the model - treat as conflict
+      this.applyConflictingUpdate(view, newXml, dirty.xmlId);
+    }
+  }
+
+  /** Returns true if any of the external events affect the dirty element or its ancestors. */
+  private isExternalConflict(
+    state: EditorState,
+    dirty: DirtyInfo,
+    events: MeiUpdateEvent[],
+  ): boolean {
+    // If we can't identify the dirty element (broken XML / root-level edit),
+    // treat any external update as a conflict so the external change always wins.
+    if (!dirty.xmlId) return events.length > 0;
+
+    const idMap = state.field(XmlIdIndexField);
+
+    for (const event of events) {
+      const { xmlId } = event;
+      if (!xmlId) continue;
+
+      // Direct match with dirty element
+      if (xmlId === dirty.xmlId) return true;
+
+      // Ancestor: event element's range contains the dirty range
+      const pos = idMap.get(xmlId);
+      if (pos && pos.from <= dirty.from && pos.to >= dirty.to) return true;
+    }
+
+    // Also check Lezer-based ancestors for events whose IDs may not be in the idMap
+    const ancestorIds = new Set(getAncestorElementIds(state, dirty.from));
+    for (const event of events) {
+      if (event.xmlId && ancestorIds.has(event.xmlId)) return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Builds CodeMirror change specs for element-update events.
+   * Changes are sorted descending by position to avoid offset drift.
+   */
+  private computeElementChanges(
+    events: MeiUpdateEvent[],
+    state: EditorState,
+  ): { from: number; to: number; insert: string }[] {
+    const idMap = state.field(XmlIdIndexField);
+    const changes: { from: number; to: number; insert: string }[] = [];
+
+    type ElementChange = {
+      event: MeiUpdateEvent;
+      pos: { from: number; to: number };
+    };
+    const sorted: ElementChange[] = events
+      .filter((e) => e.type === "element-update")
+      .flatMap((event) => {
+        const pos = event.xmlId ? idMap.get(event.xmlId) : undefined;
+        return pos ? [{ event, pos }] : [];
+      })
+      .sort((a, b) => b.pos.from - a.pos.from);
+
+    for (const { event, pos } of sorted) {
+      const baseIndent = this.getBaseIndent(state, pos.from);
+      const newText = CodeMirrorPlugin.reindentXml(event.xmlString, baseIndent);
+      const oldText = state.doc.sliceString(pos.from, pos.to);
+      if (oldText === newText) continue;
+
+      // Prefix/suffix diff to minimise edits and preserve cursor position
+      let prefix = 0;
+      while (
+        prefix < oldText.length &&
+        prefix < newText.length &&
+        oldText[prefix] === newText[prefix]
+      )
+        prefix++;
+
+      let suffix = 0;
+      while (
+        suffix < oldText.length - prefix &&
+        suffix < newText.length - prefix &&
+        oldText[oldText.length - 1 - suffix] ===
+          newText[newText.length - 1 - suffix]
+      )
+        suffix++;
+
+      changes.push({
+        from: pos.from + prefix,
+        to: pos.to - suffix,
+        insert: newText.slice(prefix, newText.length - suffix),
+      });
+    }
+
+    return changes;
+  }
+
+  /** Like computeElementChanges but skips any event whose range overlaps the dirty range. */
+  private computeElementChangesExcluding(
+    events: MeiUpdateEvent[],
+    state: EditorState,
+    dirty: DirtyInfo,
+  ): { from: number; to: number; insert: string }[] {
+    const idMap = state.field(XmlIdIndexField);
+    const filtered = events.filter((e) => {
+      if (e.type !== "element-update" || !e.xmlId) return false;
+      const pos = idMap.get(e.xmlId);
+      if (!pos) return true;
+      // Skip events whose range overlaps with the dirty element (includes descendants)
+      return !(pos.from < dirty.to && pos.to > dirty.from);
+    });
+    return this.computeElementChanges(filtered, state);
+  }
+
+  // ── Cursor helpers ────────────────────────────────────────────────────────
+
+  private restoreCursorContext(view: EditorView, ctx: CursorContext): void {
+    const state = view.state;
+    const idMap = state.field(XmlIdIndexField);
+    const elementRange = idMap.get(ctx.xmlId);
+    if (!elementRange) return;
+
+    let targetPos: number;
+
+    if (ctx.kind === "attribute-value" && ctx.attrName) {
+      const attrRange = findAttributeNode(
+        state,
+        elementRange.from,
+        ctx.attrName,
+      );
+      if (attrRange) {
+        // attrRange includes surrounding quotes; skip the opening quote
+        const valueFrom = attrRange.from + 1;
+        const valueTo = attrRange.to - 1;
+        targetPos = Math.min(valueFrom + (ctx.offsetInValue ?? 0), valueTo);
+      } else {
+        targetPos = this.findOpenTagEnd(state, elementRange.from);
+      }
+    } else {
+      targetPos = this.findOpenTagEnd(state, elementRange.from);
+    }
+
+    view.dispatch({
+      selection: { anchor: targetPos },
+      scrollIntoView: true,
+      annotations: [Transaction.addToHistory.of(false)],
+    });
+  }
+
+  /** Returns the position just before `>` (OpenTag) or `/>` (SelfClosingTag). */
+  private findOpenTagEnd(state: EditorState, elementFrom: number): number {
+    const tree = syntaxTree(state);
+    const node = tree.resolve(elementFrom, 1);
+
+    let elemNode: SyntaxNode | null = node;
+    while (elemNode && elemNode.name !== "Element") {
+      elemNode = elemNode.parent;
+    }
+    if (!elemNode) return elementFrom;
+
+    const firstChild = elemNode.firstChild;
+    if (!firstChild) return elementFrom;
+
+    if (firstChild.name === "SelfClosingTag") return firstChild.to - 2; // before />
+    if (firstChild.name === "OpenTag") return firstChild.to - 1; // before >
+    return elementFrom;
+  }
+
+  private moveCursorToElement(view: EditorView, xmlId: string | null): void {
+    if (!xmlId) return;
+    const idMap = view.state.field(XmlIdIndexField);
+    const pos = idMap.get(xmlId);
+    if (pos) {
+      view.dispatch({
+        selection: { anchor: pos.from },
+        scrollIntoView: true,
+        annotations: [Transaction.addToHistory.of(false)],
+      });
+    }
+  }
+
+  /** Creates an undo history boundary to prevent undoing past a conflict point. */
+  private createUndoBoundary(view: EditorView): void {
+    view.dispatch({
+      annotations: [isolateHistory.of("full")],
+    });
+  }
+
+  // ── Status management ─────────────────────────────────────────────────────
+
+  private updateSyncStateFromDirty(
+    state: EditorState,
+    dirtyValue: DirtyStateValue,
+  ): void {
+    if (!dirtyValue.dirty) {
+      this.setSyncState("idle");
+      return;
+    }
+    const { dirty } = dirtyValue;
+
+    let hasErr: boolean;
+    if (dirty.xmlId) {
+      // Check the specific dirty element
+      const elem = getElementAtRange(state, dirty.from, dirty.to);
+      hasErr = !elem || hasSyntaxError(elem.node);
+    } else {
+      // No identified element (e.g. broken XML or root-level edit) — check the full tree
+      hasErr = hasSyntaxError(syntaxTree(state).topNode);
+    }
+
+    if (hasErr) {
+      this.setSyncState("invalid", "Syntax error in edited element");
+    } else {
+      this.setSyncState("dirty");
+    }
+  }
+
+  private setSyncState(status: SyncStatus, error?: string): void {
+    if (this._syncState.status !== status || this._syncState.error !== error) {
+      this._syncState = { status, error };
+      this.options.onStateChange(this._syncState);
+    }
+  }
+
+  // ── XML utilities ─────────────────────────────────────────────────────────
+
+  private parseXml(xmlStr: string): {
+    dom: ReturnType<DOMParser["parseFromString"]>;
+    error?: string;
+  } {
+    let parserErrorMsg = "";
+    const parser = new DOMParser({
+      onError: (level, msg) => {
+        if (level === "error" || level === "fatalError") {
+          if (!parserErrorMsg) parserErrorMsg = msg;
+        }
+      },
+    });
+    const dom = parser.parseFromString(xmlStr, "application/xml");
+    const parserErrorElements = dom.getElementsByTagName("parsererror");
+    if (parserErrorMsg || parserErrorElements.length > 0) {
+      const errorText =
+        parserErrorMsg ||
+        (parserErrorElements.length > 0
+          ? parserErrorElements[0].textContent
+          : "Unknown XML error");
+      return { dom, error: errorText || "Unknown XML error" };
+    }
+    return { dom };
+  }
+
+  /** Returns the whitespace prefix of the line containing pos. */
+  private getBaseIndent(state: EditorState, pos: number): string {
+    const line = state.doc.lineAt(pos);
+    return state.doc.sliceString(line.from, pos);
+  }
+
+  static reindentXml(xmlString: string, baseIndent: string): string {
+    if (!baseIndent) return xmlString;
+    const lines = xmlString.split("\n");
+    return lines
+      .map((line, i) => (i === 0 ? line : baseIndent + line))
+      .join("\n");
+  }
 }
+
+// Re-export DirtyStateValue type for tests
+export type { DirtyStateValue };

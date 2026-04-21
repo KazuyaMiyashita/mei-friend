@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CodeMirrorPlugin } from "../src/CodeMirrorPlugin.js";
 import { XmlIdIndexField } from "../src/LezerUtils.js";
 
-describe("CodeMirrorPlugin Sync State Machine", () => {
+describe("CodeMirrorPlugin State Machine", () => {
   let meiFriend: MeiFriend;
   let plugin: CodeMirrorPlugin;
   let view: EditorView;
@@ -64,7 +64,7 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
     meiFriend = MeiFriend.fromXmlString(initialXml);
     const parent = document.createElement("div");
     document.body.appendChild(parent);
-    plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 10 });
+    plugin = new CodeMirrorPlugin(meiFriend);
     view = new EditorView({
       doc: meiFriend.toXmlString(),
       extensions: [basicSetup, plugin.extensions],
@@ -77,9 +77,12 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
     return idMap.get(id);
   }
 
-  it("should transition from idle to pending to idle on valid input", async () => {
+  it("should be idle when content matches model", () => {
     expect(plugin.state.status).toBe("idle");
+    expect(plugin.isDirty).toBe(false);
+  });
 
+  it("should become dirty on any edit and apply transitions back to idle", () => {
     const pos = getElementPos("n-1")!;
     const oldText = view.state.doc.sliceString(pos.from, pos.to);
     const newText = oldText.replace('pname="c"', 'pname="d"');
@@ -88,42 +91,40 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
       changes: { from: pos.from, to: pos.to, insert: newText },
     });
 
-    expect(plugin.state.status).toBe("pending");
+    expect(plugin.state.status).toBe("dirty");
+    expect(plugin.isDirty).toBe(true);
 
-    await new Promise((r) => setTimeout(r, 100));
+    const success = plugin.apply();
+    expect(success).toBe(true);
 
     expect(plugin.state.status).toBe("idle");
+    expect(plugin.isDirty).toBe(false);
     const note = meiFriend.getElementById("n-1");
     expect(note?.getAttribute("pname")).toBe("d");
   });
 
-  it("should transition to invalid on syntax error and retain text", async () => {
+  it("should become invalid on Lezer syntax error, apply() returns false", () => {
     const pos = getElementPos("n-1")!;
     const oldText = view.state.doc.sliceString(pos.from, pos.to);
-    // Create an invalid tag (not closed)
+    // Remove closing /> to create a Lezer syntax error
     const invalidText = oldText.replace("/>", "");
 
     view.dispatch({
       changes: { from: pos.from, to: pos.to, insert: invalidText },
     });
 
-    expect(plugin.state.status).toBe("pending");
-
-    await new Promise((r) => setTimeout(r, 100));
-
     expect(plugin.state.status).toBe("invalid");
-    expect(view.state.doc.toString()).toContain('pname="c"');
+
+    // apply() should be blocked
+    const result = plugin.apply();
+    expect(result).toBe(false);
 
     // Core model should NOT be updated
     const note = meiFriend.getElementById("n-1");
     expect(note?.getAttribute("pname")).toBe("c");
 
-    // Fix the error by appending the missing closure and fixing pname
-    const currentText = view.state.doc.sliceString(
-      pos.from,
-      pos.from + invalidText.length,
-    );
-    const fixedText = `${currentText.replace('pname="c"', 'pname="e"')}/>`;
+    // Fix the error
+    const fixedText = `${invalidText.replace('pname="c"', 'pname="e"')}/>`;
     view.dispatch({
       changes: {
         from: pos.from,
@@ -132,37 +133,69 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
       },
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    expect(plugin.state.status).toBe("dirty");
+    plugin.apply();
     expect(plugin.state.status).toBe("idle");
     expect(meiFriend.getElementById("n-1")?.getAttribute("pname")).toBe("e");
   });
 
-  it("should auto-generate xml:id when a new element is added without one", async () => {
+  it("should auto-generate xml:id when a new element is added and applied", () => {
     const layerPos = getElementPos("l-1")!;
 
-    // Insert a new note without ID inside the layer, after the first note
+    // Insert a new note without ID inside the layer
     const newNoteText = '\n                  <note dur="8" oct="4" pname="g"/>';
-    const insertPos = layerPos.to - 10; // near the end of the layer
+    const insertPos = layerPos.to - 10;
 
     view.dispatch({
       changes: { from: insertPos, to: insertPos, insert: newNoteText },
     });
 
-    // CodeMirror text should now contain a generated xml:id
-    // We wait a bit longer because it goes from CodeMirror -> Model -> CodeMirror
-    await new Promise((r) => setTimeout(r, 200));
+    expect(plugin.isDirty).toBe(true);
 
+    // Apply: sends to MeiFriend which assigns xml:id
+    const result = plugin.apply();
+    expect(result).toBe(true);
+
+    // After apply, editor receives echo with auto-generated xml:id
     const updatedDoc = view.state.doc.toString();
     expect(updatedDoc).toMatch(/xml:id="note-[a-z0-9]+"/);
-
-    await new Promise((r) => setTimeout(r, 100));
 
     const notes = meiFriend.getElementsByTagName("note");
     expect(notes.length).toBe(2);
     expect(notes.some((n) => n.getAttribute("pname") === "g")).toBe(true);
   });
 
-  it("should perform Policy 1 (Force Override) when external change arrives during invalid state", async () => {
+  it("should accept external change when dirty element is updated externally (conflict)", () => {
+    const pos = getElementPos("n-1")!;
+
+    // Local edit: change pname to "e" (makes editor dirty)
+    const oldText = view.state.doc.sliceString(pos.from, pos.to);
+    view.dispatch({
+      changes: {
+        from: pos.from,
+        to: pos.to,
+        insert: oldText.replace('pname="c"', 'pname="e"'),
+      },
+    });
+
+    expect(plugin.isDirty).toBe(true);
+
+    // External update: change pname to "f"
+    meiFriend.update(
+      "n-1",
+      '<note xml:id="n-1" pname="f" oct="4" dur="4" />',
+      "external",
+    );
+
+    // External change wins; editor shows pname="f"
+    const updatedText = view.state.doc.toString();
+    expect(updatedText).toContain('pname="f"');
+    expect(updatedText).not.toContain('pname="e"');
+    expect(plugin.isDirty).toBe(false);
+    expect(plugin.state.status).toBe("idle");
+  });
+
+  it("should accept external change even when editor is in invalid (broken) state", () => {
     const pos = getElementPos("n-1")!;
 
     // Local: break the XML of n-1
@@ -170,7 +203,6 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
       changes: { from: pos.to - 2, to: pos.to, insert: ' pname="' },
     });
 
-    await new Promise((r) => setTimeout(r, 100));
     expect(plugin.state.status).toBe("invalid");
 
     // External: change pname to "f"
@@ -180,47 +212,119 @@ describe("CodeMirrorPlugin Sync State Machine", () => {
       "external",
     );
 
-    // CodeMirror should be updated immediately and fix the syntax
+    // Editor should be updated immediately and fix the syntax
     const updatedText = view.state.doc.toString();
     expect(updatedText).toContain('pname="f"');
-    expect(updatedText).not.toContain('pname=" '); // original broken part should be gone
+    expect(plugin.state.status).toBe("idle");
+    expect(plugin.isDirty).toBe(false);
+  });
+
+  it("should discard dirty edits when an ancestor element is updated externally", () => {
+    // Per spec: external update to dirty element OR ITS PARENT discards dirty edits.
+    const pos = getElementPos("n-1")!;
+    const originalN1Text = view.state.doc.sliceString(pos.from, pos.to);
+
+    const dirtyText = originalN1Text.replace('pname="c"', 'pname="x"');
+    view.dispatch({
+      changes: { from: pos.from, to: pos.to, insert: dirtyText },
+    });
+    expect(plugin.isDirty).toBe(true);
+
+    // External: update the parent measure (which contains n-1 as descendant)
+    meiFriend.update(
+      "ms-1",
+      '<measure xml:id="ms-1" n="1"><staff xml:id="st-1"><layer xml:id="l-1"><note xml:id="n-1" dur="4" oct="4" pname="c"/></layer></staff></measure>',
+      "external",
+    );
+
+    // Ancestor update → dirty edits are discarded, external (model) content wins
+    const updatedPos = view.state.field(XmlIdIndexField).get("n-1")!;
+    const updatedText = view.state.doc.sliceString(
+      updatedPos.from,
+      updatedPos.to,
+    );
+    expect(updatedText).not.toContain('pname="x"');
+    expect(plugin.isDirty).toBe(false);
     expect(plugin.state.status).toBe("idle");
   });
 
-  it("should mark 'a>' as invalid due to strict XML validation", async () => {
-    vi.useFakeTimers();
-    // Start with a valid root element so getElementAtRange doesn't return null
-    meiFriend.update("m-1", '<mei xml:id="m-1"><music xml:id="m1"/></mei>');
-
-    const plugin = new CodeMirrorPlugin(meiFriend, { syncDelay: 50 });
-    const view = new EditorView({
-      doc: meiFriend.toXmlString(),
-      extensions: [basicSetup, plugin.extensions],
+  it("should preserve dirty element text when an unrelated sibling is updated externally", () => {
+    // Per spec: external update that doesn't change the dirty element preserves it.
+    const _noteXml = `<note xml:id="n-1" dur="4" oct="4" pname="c"/>`;
+    const meiFriendWithSibling = MeiFriend.fromXmlString(
+      initialXml.replace(
+        '<note xml:id="n-1" dur="4" oct="4" pname="c"/>',
+        '<note xml:id="n-1" dur="4" oct="4" pname="c"/>\n                  <note xml:id="n-2" dur="8" oct="5" pname="g"/>',
+      ),
+    );
+    // Rebuild with sibling
+    const localPlugin = new CodeMirrorPlugin(meiFriendWithSibling);
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const localView = new EditorView({
+      doc: meiFriendWithSibling.toXmlString(),
+      extensions: [basicSetup, localPlugin.extensions],
+      parent,
     });
 
-    const docText = view.state.doc.toString();
-    const pos = docText.indexOf("</mei>");
+    const idMap = localView.state.field(XmlIdIndexField);
+    const n1Pos = idMap.get("n-1")!;
+    const n1Text = localView.state.doc.sliceString(n1Pos.from, n1Pos.to);
 
-    // Insert 'a>' before </mei>
-    // Resulting XML: ...<music xml:id="m1"/>a></mei>
-    // This is valid as text content inside <mei>, BUT if the user wants it to be invalid,
-    // they probably mean 'a>' as a top-level or structural error.
-    // Wait, <mei>a></mei> IS valid XML.
-    // If they meant <a> (missing close tag), that IS invalid.
+    // Make n-1 dirty
+    const dirtyN1 = n1Text.replace('pname="c"', 'pname="x"');
+    localView.dispatch({
+      changes: { from: n1Pos.from, to: n1Pos.to, insert: dirtyN1 },
+    });
+    expect(localPlugin.isDirty).toBe(true);
 
+    // External update to sibling n-2 only
+    meiFriendWithSibling.update(
+      "n-2",
+      '<note xml:id="n-2" dur="8" oct="5" pname="f"/>',
+      "external",
+    );
+
+    // n-1 dirty text should be preserved
+    const updatedIdMap = localView.state.field(XmlIdIndexField);
+    const newN1Pos = updatedIdMap.get("n-1")!;
+    const newN1Text = localView.state.doc.sliceString(
+      newN1Pos.from,
+      newN1Pos.to,
+    );
+    expect(newN1Text).toContain('pname="x"');
+    expect(localPlugin.isDirty).toBe(true);
+
+    // n-2 should reflect external update
+    const newN2Pos = updatedIdMap.get("n-2")!;
+    const newN2Text = localView.state.doc.sliceString(
+      newN2Pos.from,
+      newN2Pos.to,
+    );
+    expect(newN2Text).toContain('pname="f"');
+
+    localView.destroy();
+    localPlugin.destroy();
+  });
+
+  it("should not be dirty after refresh()", () => {
+    const pos = getElementPos("n-1")!;
+    const oldText = view.state.doc.sliceString(pos.from, pos.to);
     view.dispatch({
-      changes: { from: pos, to: pos, insert: "<a>" },
+      changes: {
+        from: pos.from,
+        to: pos.to,
+        insert: oldText.replace('pname="c"', 'pname="e"'),
+      },
     });
 
-    vi.advanceTimersByTime(100);
+    expect(plugin.isDirty).toBe(true);
 
-    expect(plugin.state.status).toBe("invalid");
-    expect(plugin.state.error).toBeDefined();
-    // xmldom error message should contain something about tag mismatch
-    expect(plugin.state.error).toMatch(/mismatch/i);
+    plugin.refresh();
 
-    vi.useRealTimers();
-    view.destroy();
-    plugin.destroy();
+    expect(plugin.isDirty).toBe(false);
+    expect(plugin.state.status).toBe("idle");
+    // Model unchanged (refresh only overwrites editor with model content)
+    expect(meiFriend.getElementById("n-1")?.getAttribute("pname")).toBe("c");
   });
 });

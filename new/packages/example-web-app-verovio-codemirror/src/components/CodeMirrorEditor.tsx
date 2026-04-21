@@ -32,7 +32,7 @@ import { CodeMirrorPlugin, type SyncState } from "@mei-friend/lib-codemirror";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import styles from "./CodeMirrorEditor.module.css";
 
-// Custom basic setup without history() to avoid conflicts with MeiFriend's Yjs-based undo
+// Custom basic setup without history() — history is provided by CodeMirrorPlugin.
 const customSetup = [
   lineNumbers(),
   highlightActiveLineGutter(),
@@ -68,6 +68,8 @@ interface Props {
 
 export interface CodeMirrorEditorRef {
   refresh: () => void;
+  apply: () => boolean;
+  get isDirty(): boolean;
 }
 
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, Props>(
@@ -78,6 +80,10 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, Props>(
     useImperativeHandle(ref, () => ({
       refresh: () => {
         pluginRef.current?.refresh();
+      },
+      apply: () => pluginRef.current?.apply() ?? false,
+      get isDirty() {
+        return pluginRef.current?.isDirty ?? false;
       },
     }));
 
@@ -92,34 +98,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, Props>(
 
       const view = new EditorView({
         doc: meiFriend.toXmlString(),
-        extensions: [
-          customSetup,
-          plugin.extensions,
-          // Add custom undo/redo keymap that calls MeiFriend
-          keymap.of([
-            {
-              key: "Mod-z",
-              run: () => {
-                meiFriend.undo();
-                return true;
-              },
-            },
-            {
-              key: "Mod-y",
-              run: () => {
-                meiFriend.redo();
-                return true;
-              },
-            },
-            {
-              key: "Mod-Shift-z",
-              run: () => {
-                meiFriend.undo();
-                return true;
-              },
-            },
-          ]),
-        ],
+        extensions: [customSetup, plugin.extensions],
         parent: containerRef.current,
       });
 
