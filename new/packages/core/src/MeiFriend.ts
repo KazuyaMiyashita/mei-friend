@@ -1,7 +1,11 @@
 import * as Y from "yjs";
 import { MeiApi } from "./api/MeiApi.js";
 import { MeiElement } from "./MeiElement.js";
-import type { MeiUpdateEvent } from "./MeiUpdateEvent.js";
+import type {
+  DocumentReplaceEvent,
+  ElementUpdateEvent,
+  MeiUpdateEvent,
+} from "./MeiUpdateEvent.js";
 import { Mei } from "./mei/Mei.js";
 import type { ScoreModel } from "./models/score.js";
 import { IdGenerator } from "./utils/IdGenerator.js";
@@ -299,7 +303,8 @@ export class MeiFriend {
   public onUpdate(callback: (events: MeiUpdateEvent[]) => void): () => void {
     // biome-ignore lint/suspicious/noExplicitAny: yEvents can contain various types of events.
     const observer = (yEvents: Y.YEvent<any>[], transaction: Y.Transaction) => {
-      const meiEvents: MeiUpdateEvent[] = [];
+      let documentReplaceEvent: DocumentReplaceEvent | null = null;
+      const elementEvents: ElementUpdateEvent[] = [];
 
       for (const e of yEvents) {
         const yEvent = e as Y.YXmlEvent;
@@ -317,21 +322,27 @@ export class MeiFriend {
 
         if (targetElement?.doc) {
           if (targetElement.nodeName === ROOT_WRAPPER_TAG) {
-            const rootMei = this.getRootElement();
-            if (rootMei) {
-              meiEvents.push({
-                xmlId: rootMei.id,
-                xmlString: rootMei.toXmlString(),
-                origin: transaction.origin,
-                isLocal: transaction.local,
-              });
+            // replaceXmlString deletes all children of ROOT_WRAPPER_TAG and re-inserts new
+            // ones, which produces many Yjs events. Deduplicate into a single document-replace.
+            if (!documentReplaceEvent) {
+              const rootMei = this.getRootElement();
+              if (rootMei) {
+                documentReplaceEvent = {
+                  type: "document-replace",
+                  xmlId: rootMei.id,
+                  xmlString: rootMei.toXmlString(),
+                  origin: transaction.origin,
+                  isLocal: transaction.local,
+                };
+              }
             }
           } else {
             const xmlId =
               targetElement.getAttribute("xml:id") ||
               targetElement.getAttribute("id");
             if (xmlId) {
-              meiEvents.push({
+              elementEvents.push({
+                type: "element-update",
                 xmlId,
                 xmlString: this.serde.serialize(targetElement, 0),
                 origin: transaction.origin,
@@ -342,6 +353,10 @@ export class MeiFriend {
         }
       }
 
+      // If a document-replace occurred, suppress all element-update events and emit only the single replace event.
+      const meiEvents: MeiUpdateEvent[] = documentReplaceEvent
+        ? [documentReplaceEvent]
+        : elementEvents;
       if (meiEvents.length > 0) {
         callback(meiEvents);
       }

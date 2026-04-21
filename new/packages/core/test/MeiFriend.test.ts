@@ -131,6 +131,7 @@ describe("MeiFriend", () => {
       meiFriend.update("m1", '<mei xml:id="m1" pname="c"/>', "plugin-a");
 
       expect(captured.length).toBeGreaterThan(0);
+      expect(captured[0].type).toBe("element-update");
       expect(captured[0].xmlId).toBe("m1");
       expect(captured[0].xmlString).toContain('pname="c"');
       expect(captured[0].origin).toBe("plugin-a");
@@ -147,9 +148,9 @@ describe("MeiFriend", () => {
       // Structural change by adding child to n1
       meiFriend.update("n1", '<note xml:id="n1"><accid xml:id="a1"/></note>');
       expect(captured.some((e) => e.xmlId === "n1")).toBe(true);
-      expect(captured.find((e) => e.xmlId === "n1")?.xmlString).toContain(
-        "<accid",
-      );
+      const n1Event = captured.find((e) => e.xmlId === "n1");
+      expect(n1Event?.type).toBe("element-update");
+      expect(n1Event?.xmlString).toContain("<accid");
 
       captured.length = 0;
 
@@ -158,6 +159,26 @@ describe("MeiFriend", () => {
       expect(
         captured.some((e) => e.xmlId === "a1" && e.xmlString.includes("sharp")),
       ).toBe(true);
+    });
+
+    it("should emit a single document-replace event on replaceXmlString", () => {
+      const meiFriend = MeiFriend.fromXmlString(
+        '<mei xml:id="m1"><note xml:id="n1"/></mei>',
+      );
+      const captured: MeiUpdateEvent[] = [];
+      meiFriend.onUpdate((events) => captured.push(...events));
+
+      meiFriend.replaceXmlString(
+        '<mei xml:id="m2"><rest xml:id="r1"/></mei>',
+        "test-origin",
+      );
+
+      expect(captured.length).toBe(1);
+      expect(captured[0].type).toBe("document-replace");
+      expect(captured[0].xmlId).toBe("m2");
+      expect(captured[0].xmlString).toContain("<rest");
+      expect(captured[0].origin).toBe("test-origin");
+      expect(captured[0].isLocal).toBe(true);
     });
   });
 

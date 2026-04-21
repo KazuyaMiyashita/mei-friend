@@ -232,10 +232,13 @@ export class CodeMirrorPlugin {
     this.syncStatus = "applying_external";
 
     try {
-      // If the document is currently invalid, Lezer tree positions are unreliable.
-      // A granular update might accidentally replace large valid portions of the document.
-      // Therefore, if the state is invalid, perform a full document refresh.
-      if (prevStatus === "invalid") {
+      // Full document refresh when:
+      // 1. The document is currently invalid (Lezer tree positions are unreliable).
+      // 2. A document-replace event was received (new IDs assigned by MeiFriend must be reflected).
+      const hasDocumentReplace = events.some(
+        (e) => e.type === "document-replace",
+      );
+      if (prevStatus === "invalid" || hasDocumentReplace) {
         const xml = this.meiFriend.toXmlString();
         this.view.dispatch({
           changes: { from: 0, to: this.view.state.doc.length, insert: xml },
@@ -465,10 +468,10 @@ export class CodeMirrorPlugin {
       curr = curr.parent;
     }
 
-    this.setSyncState(
-      "invalid",
-      "Could not find a valid parent element with xml:id for sync",
-    );
+    // No parent with ID found — this is a root-level (full document) replacement.
+    // Fall back to replaceXmlString instead of marking as invalid.
+    this.meiFriend.replaceXmlString(dirty.text, this.options.origin);
+    this.checkFullSyntaxError();
   }
 
   /**
