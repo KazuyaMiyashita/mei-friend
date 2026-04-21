@@ -80,7 +80,15 @@ function serializeYNode(
           serializeYNode(child as Y.XmlFragment | Y.XmlElement | Y.XmlText, 0),
         );
       }
-      return `${indent}<${name}${attrStr}>${childrenStrs.join("")}</${name}>`;
+      const text = childrenStrs.join("");
+      if (text.includes("\n")) {
+        const indentedText = text
+          .split("\n")
+          .map((line) => "  ".repeat(level + 1) + line)
+          .join("\n");
+        return `${indent}<${name}${attrStr}>\n${indentedText}\n${indent}</${name}>`;
+      }
+      return `${indent}<${name}${attrStr}>${text}</${name}>`;
     }
 
     const childrenStrs: string[] = [];
@@ -193,10 +201,26 @@ export class XmlSerde {
         // Node.TEXT_NODE
         case 3: {
           const textValue = (child as Text).nodeValue;
-          if (textValue && textValue.trim() === "") break;
           if (textValue) {
-            const yText = new Y.XmlText(textValue);
-            yParent.push([yText]);
+            // Only strip if it's purely structural whitespace (newlines + indent)
+            // If it contains non-whitespace, we want to be careful.
+            if (textValue.includes("\n")) {
+              const cleanedText = textValue
+                .split("\n")
+                .map((line) => line.trim())
+                .filter((line) => line !== "")
+                .join("\n");
+              if (cleanedText !== "") {
+                const yText = new Y.XmlText(cleanedText);
+                yParent.push([yText]);
+              }
+            } else {
+              // Single line text node - preserve as is (might be just a space between elements)
+              if (textValue !== "") {
+                const yText = new Y.XmlText(textValue);
+                yParent.push([yText]);
+              }
+            }
           }
           break;
         }

@@ -227,4 +227,47 @@ describe("XmlSerde.populateFromDom", () => {
     const p = root.get(0) as Y.XmlElement;
     expect(p.get(0)?.toString()).toBe("hello");
   });
+
+  it("strips structural whitespace from text nodes during parsing", () => {
+    const serde = makeSerde();
+    const xml = `
+<a xml:id="a1">
+  Hello
+  World
+</a>`.trim();
+    const dom = serde.parse(xml);
+    const root = new Y.XmlElement(ROOT_WRAPPER_TAG);
+    new Y.Doc().getXmlFragment("tmp").push([root]);
+    serde.populateFromDom(dom as unknown as Node, root);
+
+    const a = root.get(0) as Y.XmlElement;
+    expect(a.get(0)?.toString()).toBe("Hello\nWorld");
+  });
+
+  it("serializes single-line text content inline", () => {
+    const serde = makeSerde();
+    const xml = '<a xml:id="a1">Hello</a>';
+    const dom = serde.parse(xml);
+    const root = new Y.XmlElement(ROOT_WRAPPER_TAG);
+    new Y.Doc().getXmlFragment("tmp").push([root]);
+    serde.populateFromDom(dom as unknown as Node, root);
+
+    expect(serde.serialize(root, 0)).toBe('<a xml:id="a1">Hello</a>');
+  });
+
+  it("serializes multi-line text content as a block", () => {
+    const serde = makeSerde();
+    const xml = `
+<a xml:id="a1">
+  Line 1
+  Line 2
+</a>`.trim();
+    const dom = serde.parse(xml);
+    const root = new Y.XmlElement(ROOT_WRAPPER_TAG);
+    new Y.Doc().getXmlFragment("tmp").push([root]);
+    serde.populateFromDom(dom as unknown as Node, root);
+
+    const expected = '<a xml:id="a1">\n  Line 1\n  Line 2\n</a>';
+    expect(serde.serialize(root, 0)).toBe(expected);
+  });
 });

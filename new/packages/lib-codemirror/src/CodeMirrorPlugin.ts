@@ -30,7 +30,6 @@ import { DOMParser } from "@xmldom/xmldom";
 import {
   type CursorContext,
   captureCursorContext,
-  findAttributeNode,
   getAncestorElementIds,
   getElementAtRange,
   getElementId,
@@ -381,10 +380,7 @@ export class CodeMirrorPlugin {
 
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: newXml },
-      annotations: [
-        MeiSyncAnnotation.of("refresh"),
-        Transaction.addToHistory.of(false),
-      ],
+      annotations: [MeiSyncAnnotation.of("refresh")],
     });
 
     if (ctx && this.view) {
@@ -440,20 +436,14 @@ export class CodeMirrorPlugin {
         const newXml = this.meiFriend.toXmlString();
         view.dispatch({
           changes: { from: 0, to: state.doc.length, insert: newXml },
-          annotations: [
-            MeiSyncAnnotation.of("apply"),
-            Transaction.addToHistory.of(false),
-          ],
+          annotations: [MeiSyncAnnotation.of("apply")],
         });
       } else {
         const changes = this.computeElementChanges(events, state);
         // Always dispatch with "apply" annotation to clear dirty, even if no text changed.
         view.dispatch({
           changes,
-          annotations: [
-            MeiSyncAnnotation.of("apply"),
-            Transaction.addToHistory.of(false),
-          ],
+          annotations: [MeiSyncAnnotation.of("apply")],
         });
       }
       return;
@@ -688,34 +678,101 @@ export class CodeMirrorPlugin {
   private restoreCursorContext(view: EditorView, ctx: CursorContext): void {
     const state = view.state;
     const idMap = state.field(XmlIdIndexField);
-    const elementRange = idMap.get(ctx.xmlId);
+    let elementRange = idMap.get(ctx.xmlId);
+
     if (!elementRange) return;
 
-    let targetPos: number;
-
-    if (ctx.kind === "attribute-value" && ctx.attrName) {
-      const attrRange = findAttributeNode(
-        state,
-        elementRange.from,
-        ctx.attrName,
-      );
-      if (attrRange) {
-        // attrRange includes surrounding quotes; skip the opening quote
-        const valueFrom = attrRange.from + 1;
-        const valueTo = attrRange.to - 1;
-        targetPos = Math.min(valueFrom + (ctx.offsetInValue ?? 0), valueTo);
-      } else {
-        targetPos = this.findOpenTagEnd(state, elementRange.from);
+    if (ctx.kind === "new-element" && ctx.childIndex !== undefined) {
+      // Find the n-th child element of the parent
+      const tree = syntaxTree(state);
+      const parentNode = tree.resolve(elementRange.from, 1);
+      let elem: SyntaxNode | null = parentNode;
+      while (elem && elem.name !== "Element") elem = elem.parent;
+      if (elem) {
+        let count = 0;
+        let child = elem.firstChild;
+        while (child) {
+          if (child.name === "Element") {
+            if (count === ctx.childIndex) {
+              elementRange = { from: child.from, to: child.to };
+              console.log(
+                "Restored New Element Range:",
+                elementRange,
+                "count=",
+                count,
+              );
+              break;
+            }
+            count++;
+          }
+          child = child.nextSibling;
+        }
       }
-    } else {
-      targetPos = this.findOpenTagEnd(state, elementRange.from);
     }
 
-    view.dispatch({
-      selection: { anchor: targetPos },
-      scrollIntoView: true,
-      annotations: [Transaction.addToHistory.of(false)],
-    });
+    if (!elementRange) return;
+    const tree = syntaxTree(state);
+    const node = tree.resolve(elementRange.from, 1);
+    let elem: SyntaxNode | null = node;
+    while (elem && elem.name !== "Element") elem = elem.parent;
+    if (!elem) return;
+
+    let targetPos: number | undefined;
+
+    const traverse = (n: SyntaxNode): boolean => {
+      const nodeName = n.name;
+      if (nodeName === "Attribute" && ctx.kind === "attribute-value") {
+        const nameNode = n.getChild("AttributeName");
+        if (
+          nameNode &&
+          state.doc.sliceString(nameNode.from, nameNode.to) === ctx.attrName
+        ) {
+          const valueNode = n.getChild("AttributeValue");
+          if (valueNode) {
+            targetPos = Math.min(
+              valueNode.from + 1 + (ctx.offset ?? 0),
+              valueNode.to - 1,
+            );
+            return true;
+          }
+        }
+      }
+      if (nodeName === "AttributeName" && ctx.kind === "attribute-name") {
+        if (state.doc.sliceString(n.from, n.to) === ctx.attrName) {
+          targetPos = n.from + (ctx.offset ?? 0);
+          return true;
+        }
+      }
+      if (nodeName === "TagName" && ctx.kind === "tag-name") {
+        targetPos = n.from + (ctx.offset ?? 0);
+        return true;
+      }
+      if (nodeName === "Text" && ctx.kind === "text-content") {
+        targetPos = n.from + (ctx.offset ?? 0);
+        return true;
+      }
+
+      let child = n.firstChild;
+      while (child) {
+        if (traverse(child)) return true;
+        child = child.nextSibling;
+      }
+      return false;
+    };
+
+    if (ctx.kind === "element-body" || ctx.kind === "new-element") {
+      targetPos = this.findOpenTagEnd(state, elementRange.from);
+    } else {
+      traverse(elem);
+    }
+
+    if (targetPos !== undefined) {
+      view.dispatch({
+        selection: { anchor: targetPos },
+        scrollIntoView: true,
+        annotations: [Transaction.addToHistory.of(false)],
+      });
+    }
   }
 
   /** Returns the position just before `>` (OpenTag) or `/>` (SelfClosingTag). */

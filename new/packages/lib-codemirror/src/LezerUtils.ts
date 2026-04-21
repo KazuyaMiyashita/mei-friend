@@ -14,11 +14,20 @@ export type XmlIdMap = Map<string, { from: number; to: number }>;
 
 /** Cursor context used for restoring cursor position after Apply/Refresh. */
 export interface CursorContext {
+  /** The target element's ID, or its parent's ID if it's a new element. */
   xmlId: string;
-  kind: "attribute-value" | "element-body";
+  kind:
+    | "attribute-value"
+    | "attribute-name"
+    | "text-content"
+    | "tag-name"
+    | "element-body"
+    | "new-element";
   attrName?: string;
-  /** Byte offset within the attribute value text, excluding quotes. */
-  offsetInValue?: number;
+  /** The relative byte offset within the specific part being edited. */
+  offset?: number;
+  /** If kind === "new-element", which child index this is under the parent. */
+  childIndex?: number;
 }
 
 /**
@@ -159,28 +168,101 @@ export function captureCursorContext(state: EditorState): CursorContext | null {
           ? state.doc.sliceString(nameNode.from, nameNode.to)
           : undefined;
 
-        // Walk up to find the Element
-        let elemNode: SyntaxNode | null = attrNode.parent;
-        while (elemNode && elemNode.name !== "Element") {
-          elemNode = elemNode.parent;
+        const elemNode = findEnclosingElement(attrNode);
+        const ctx = getElementOrParentContext(
+          state,
+          elemNode,
+          "attribute-value",
+        );
+        if (ctx) {
+          ctx.attrName = attrName;
+          ctx.offset = Math.max(0, pos - node.from - 1); // exclude quote
+          return ctx;
         }
-        const xmlId = elemNode ? getElementId(state, elemNode) : null;
-        if (!xmlId) return null;
+      }
+    }
 
-        // Offset within attribute value (excluding opening quote)
-        const offsetInValue = Math.max(0, pos - node.from - 1);
-        return { xmlId, kind: "attribute-value", attrName, offsetInValue };
+    if (node.name === "AttributeName") {
+      const attrNode = node.parent;
+      const attrName = state.doc.sliceString(node.from, node.to);
+      const elemNode = findEnclosingElement(attrNode);
+      const ctx = getElementOrParentContext(state, elemNode, "attribute-name");
+      if (ctx) {
+        ctx.attrName = attrName;
+        ctx.offset = pos - node.from;
+        return ctx;
+      }
+    }
+
+    if (node.name === "TagName") {
+      const elemNode = findEnclosingElement(node);
+      const ctx = getElementOrParentContext(state, elemNode, "tag-name");
+      if (ctx) {
+        ctx.offset = pos - node.from;
+        return ctx;
+      }
+    }
+
+    if (node.name === "Text") {
+      const elemNode = findEnclosingElement(node);
+      const ctx = getElementOrParentContext(state, elemNode, "text-content");
+      if (ctx) {
+        ctx.offset = pos - node.from;
+        return ctx;
       }
     }
 
     if (node.name === "Element") {
-      const xmlId = getElementId(state, node);
-      if (xmlId) {
-        return { xmlId, kind: "element-body" };
-      }
+      return getElementOrParentContext(state, node, "element-body");
     }
 
     node = node.parent;
+  }
+
+  return null;
+}
+
+function findEnclosingElement(node: SyntaxNode | null): SyntaxNode | null {
+  let curr = node;
+  while (curr && curr.name !== "Element") {
+    curr = curr.parent;
+  }
+  return curr;
+}
+
+function getElementOrParentContext(
+  state: EditorState,
+  node: SyntaxNode | null,
+  kind: CursorContext["kind"],
+): CursorContext | null {
+  if (!node) return null;
+  const id = getElementId(state, node);
+  if (id) {
+    return { xmlId: id, kind };
+  }
+
+  // No ID - find closest ancestor with an ID
+  let curr: SyntaxNode | null = node;
+
+  while (curr) {
+    const parent: SyntaxNode | null = curr.parent;
+    if (parent && parent.name === "Element") {
+      const parentId = getElementId(state, parent);
+      if (parentId) {
+        // Calculate childIndex: how many Element siblings precede curr
+        let idx = 0;
+        let sibling = parent.firstChild;
+        while (sibling && sibling.from < curr.from) {
+          if (sibling.name === "Element") {
+            // console.log("  Sibling:", sibling.name, "from:", sibling.from, "to:", sibling.to);
+            idx++;
+          }
+          sibling = sibling.nextSibling;
+        }
+        return { xmlId: parentId, kind, childIndex: idx };
+      }
+    }
+    curr = parent;
   }
 
   return null;
