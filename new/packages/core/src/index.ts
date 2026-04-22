@@ -1,4 +1,5 @@
 export * from "./api/index.js";
+export * from "./MeiDraft.js";
 export * from "./MeiElement.js";
 export * from "./MeiFriend.js";
 export * from "./MeiUpdateEvent.js";

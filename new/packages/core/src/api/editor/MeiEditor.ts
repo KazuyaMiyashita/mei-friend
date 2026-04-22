@@ -160,13 +160,9 @@ export class MeiEditor {
         draft.removeAttribute("accid.ges");
       }
       // Remove any existing <accid> children — moved notes never carry printed accidentals
-      const children = draft.toArray();
+      const children = draft.children;
       for (let i = children.length - 1; i >= 0; i--) {
-        const child = children[i];
-        if (
-          "nodeName" in child &&
-          (child as { nodeName: string }).nodeName === "accid"
-        ) {
+        if (children[i].tagName === "accid") {
           draft.delete(i, 1);
         }
       }

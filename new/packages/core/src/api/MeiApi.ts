@@ -1,25 +1,9 @@
-import * as Y from "yjs";
 import type { MeiElement } from "../MeiElement.js";
 import type { MeiFriend } from "../MeiFriend.js";
 import type { Mei } from "../mei/Mei.js";
 import { buildScoreModel } from "../mei/structure/buildScoreModel.js";
 import type { ScoreModel } from "../models/score.js";
 import { MeiEditor } from "./editor/MeiEditor.js";
-
-/**
- * Helper to get a child element by tag name from a Y.XmlElement.
- */
-function getChildYElement(
-  node: Y.XmlElement,
-  tagName: string,
-): Y.XmlElement | undefined {
-  return node
-    .toArray()
-    .find(
-      (child): child is Y.XmlElement =>
-        child instanceof Y.XmlElement && child.nodeName === tagName,
-    ) as Y.XmlElement | undefined;
-}
 
 /**
  * High-level API for interacting with an MEI document.
@@ -66,33 +50,12 @@ export class MeiApi {
     const mf = this.meiFriend;
 
     return mf.produceElement(root, (draft) => {
-      let meiHead = getChildYElement(draft, "meiHead");
-      if (!meiHead) {
-        meiHead = mf.createElement("meiHead").yNode;
-        draft.insert(0, [meiHead]);
-      }
-
-      let fileDesc = getChildYElement(meiHead, "fileDesc");
-      if (!fileDesc) {
-        fileDesc = mf.createElement("fileDesc").yNode;
-        meiHead.insert(0, [fileDesc]);
-      }
-
-      let titleStmt = getChildYElement(fileDesc, "titleStmt");
-      if (!titleStmt) {
-        titleStmt = mf.createElement("titleStmt").yNode;
-        fileDesc.insert(0, [titleStmt]);
-      }
-
-      let titleEl = getChildYElement(titleStmt, "title");
-      if (!titleEl) {
-        titleEl = mf.createElement("title").yNode;
-        titleStmt.insert(0, [titleEl]);
-      }
-
-      // Clear existing content and set the new title text
-      titleEl.delete(0, titleEl.length);
-      titleEl.insert(0, [new Y.XmlText(title)]);
+      draft
+        .getOrInsertChild("meiHead")
+        .getOrInsertChild("fileDesc")
+        .getOrInsertChild("titleStmt")
+        .getOrInsertChild("title")
+        .setTextContent(title);
     });
   }
 

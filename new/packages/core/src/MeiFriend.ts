@@ -1,5 +1,6 @@
 import * as Y from "yjs";
 import { MeiApi } from "./api/MeiApi.js";
+import { MeiDraft } from "./MeiDraft.js";
 import { MeiElement } from "./MeiElement.js";
 import type {
   DocumentReplaceEvent,
@@ -170,50 +171,48 @@ export class MeiFriend {
   }
 
   /**
-   * Creates a new MeiElement with the given tag name and an auto-assigned xml:id.
-   * The returned element is detached from the document.
-   *
-   * @param tagName The tag name for the new element.
-   * @returns A new MeiElement with a unique xml:id.
-   */
-  public createElement(tagName: string): MeiElement {
-    const id = this.idGenerator.generate(tagName.toLowerCase());
-    const yEl = new Y.XmlElement(tagName);
-    yEl.setAttribute("xml:id", id);
-    return new MeiElement(yEl, id);
-  }
-
-  /**
    * Creates a modified clone of `elem` by applying `recipe` to it.
    * The returned element is detached from the document.
    *
    * To persist the change, pass the result to `updateElement()`.
    *
+   * After the recipe runs, any element in the clone tree that lacks an xml:id
+   * receives one automatically. This means recipes can freely create children
+   * via `draft.getOrInsertChild` without worrying about ID assignment.
+   *
    * @param elem The element to clone and modify.
-   * @param recipe A function that mutates the cloned Y.XmlElement.
+   * @param recipe A function that receives a `MeiDraft` wrapping the cloned element.
+   *   Use `draft.getOrInsertChild(tag)` to build or navigate the element tree, and
+   *   `draft.setAttribute / removeAttribute / setTextContent` for mutations.
    * @returns A new MeiElement wrapping the modified clone.
    */
   public produceElement(
     elem: MeiElement,
-    recipe: (draft: Y.XmlElement) => void,
+    recipe: (draft: MeiDraft) => void,
   ): MeiElement {
     const clone = elem.yNode.clone();
-    // A cloned node must be attached to a Y.Doc before its attributes or children
-    // can be accessed. We use a temporary document for this purpose.
     const tempDoc = new Y.Doc();
     tempDoc.getXmlFragment("tmp").push([clone]);
 
-    recipe(clone);
+    recipe(new MeiDraft(clone));
 
-    // If the recipe removed xml:id, assign a new one
-    if (!clone.getAttribute("xml:id") && !clone.getAttribute("id")) {
-      clone.setAttribute(
-        "xml:id",
-        this.idGenerator.generate(clone.nodeName.toLowerCase()),
-      );
-    }
+    this._assignMissingIds(clone);
 
     return new MeiElement(clone);
+  }
+
+  private _assignMissingIds(node: Y.XmlElement): void {
+    if (!node.getAttribute("xml:id") && !node.getAttribute("id")) {
+      node.setAttribute(
+        "xml:id",
+        this.idGenerator.generate(node.nodeName.toLowerCase()),
+      );
+    }
+    for (const child of node.toArray()) {
+      if (child instanceof Y.XmlElement) {
+        this._assignMissingIds(child);
+      }
+    }
   }
 
   /**

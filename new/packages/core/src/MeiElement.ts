@@ -11,35 +11,23 @@ import { ROOT_WRAPPER_TAG } from "./utils/XmlSerde.js";
  * **Constraint**: Every MeiElement retrieved from MeiFriend will have an `xml:id`.
  */
 export class MeiElement {
-  /**
-   * Pre-computed ID for elements not yet integrated into a Y.Doc.
-   * Yjs stores setAttribute writes before integration in _prelimAttrs (not readable
-   * via getAttribute until after integration). MeiFriend.createElement() passes
-   * the ID here so the constructor guarantee holds even before insertion into a doc.
-   */
-  private readonly _id?: string;
+  private readonly _id: string;
 
-  constructor(public readonly yNode: Y.XmlElement, id?: string) {
-    const resolvedId =
-      id ?? yNode.getAttribute("xml:id") ?? yNode.getAttribute("id");
+  constructor(public readonly yNode: Y.XmlElement) {
+    const resolvedId = yNode.getAttribute("xml:id") ?? yNode.getAttribute("id");
     if (!resolvedId) {
       throw new Error(
         `MeiElement: <${yNode.nodeName}> has no xml:id. All elements must have a unique xml:id.`,
       );
     }
-    this._id = id;
+    this._id = resolvedId;
   }
 
   /**
    * The xml:id or id of the element. Guaranteed non-empty by the constructor.
    */
   get id(): string {
-    // biome-ignore lint/style/noNonNullAssertion: guaranteed by constructor
-    return (
-      this._id ??
-      this.yNode.getAttribute("xml:id") ??
-      this.yNode.getAttribute("id")
-    )!;
+    return this._id;
   }
 
   /**
