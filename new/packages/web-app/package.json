@@ -14,9 +14,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@dnd-kit/collision": "^0.3.2",
     "@dnd-kit/react": "^0.3.2",
-    "@mei-friend/core": "*",
-    "@mei-friend/lib-codemirror": "*",
+    "@mei-friend/core": "workspace:*",
+    "@mei-friend/lib-codemirror": "workspace:*",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-dropzone": "^15.0.0",

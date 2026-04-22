@@ -20,7 +20,8 @@
     { "path": "./packages/example-cli" },
     { "path": "./packages/web-app" },
     { "path": "./packages/example-web-app-codemirror" },
-    { "path": "./packages/example-web-app-verovio" }
+    { "path": "./packages/example-web-app-verovio" },
+    { "path": "./packages/example-web-app-verovio-codemirror" }
   ],
   "exclude": ["node_modules", "**/dist"]
 }

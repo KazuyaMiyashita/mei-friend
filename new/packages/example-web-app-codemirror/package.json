@@ -14,8 +14,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@mei-friend/core": "*",
-    "@mei-friend/lib-codemirror": "*",
+    "@mei-friend/core": "workspace:*",
+    "@mei-friend/lib-codemirror": "workspace:*",
     "codemirror": "^6.0.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
