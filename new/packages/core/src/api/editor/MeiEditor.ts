@@ -128,130 +128,6 @@ function calcTargetStep(
   return { step: targetStep, octave: targetOctave };
 }
 
-function applyPitch(
-  element: MeiElement,
-  step: InternationalPitchStep,
-  alter: InternationalPitchAlter,
-  octave: number,
-): MeiElement {
-  const pname = step.name.toLowerCase();
-  const oct = String(octave);
-  const accidGes = alterToAccidGes(alter.value);
-
-  return element.produce((draft) => {
-    draft.setAttribute("pname", pname);
-    draft.setAttribute("oct", oct);
-    if (accidGes) {
-      draft.setAttribute("accid.ges", accidGes);
-    } else {
-      draft.removeAttribute("accid.ges");
-    }
-    // Remove any existing <accid> children — moved notes never carry printed accidentals
-    const children = draft.toArray();
-    for (let i = children.length - 1; i >= 0; i--) {
-      const child = children[i];
-      if (
-        "nodeName" in child &&
-        (child as { nodeName: string }).nodeName === "accid"
-      ) {
-        draft.delete(i, 1);
-      }
-    }
-  });
-}
-
-/**
- * Finds subsequent notes in the same measure and staff that need their
- * accidentals updated after the source note (which had a printed accidental)
- * has been moved away from (oldStep, oldOctave).
- *
- * Returns corrections in temporal order. Scanning stops when an independent
- * accidental is encountered (one whose alter differs from the key-signature
- * default), since it establishes a new accidental context for later notes.
- */
-function findContextualAccidUpdates(
-  oldStep: InternationalPitchStep,
-  oldOctave: number,
-  noteId: string,
-  getElementById: (id: string) => MeiElement | undefined,
-  getScoreModel: () => ScoreModel,
-  key: Key,
-): AccidentalCorrection[] {
-  const scoreModel = getScoreModel();
-  const pos = scoreModel.getPositionById(noteId);
-  if (!pos) return [];
-
-  const measure = scoreModel.getMeasure(pos.measureIndex);
-  if (!measure) return [];
-
-  const keyAlter = getKeyAlter(oldStep, key);
-
-  const candidates: Array<{ offset: Offset; id: string; el: MeiElement }> = [];
-
-  for (const [sN, staff] of measure.staves) {
-    if (sN !== pos.staffN) continue;
-    for (const [, layer] of staff.layers) {
-      for (const event of layer.events) {
-        if (event.offset.compareTo(pos.offset) <= 0) continue;
-        const el = getElementById(event.id);
-        if (!el) continue;
-        const note = MeiNote.create(el);
-        if (!note?.pitch) continue;
-        const intPitch = InternationalPitch.fromPitch(note.pitch);
-        if (intPitch.step !== oldStep || intPitch.octave.value !== oldOctave)
-          continue;
-        candidates.push({ offset: event.offset, id: event.id, el });
-      }
-    }
-  }
-
-  candidates.sort((a, b) => a.offset.compareTo(b.offset));
-
-  const corrections: AccidentalCorrection[] = [];
-  for (const { id, el } of candidates) {
-    const hasAccidChild = !!el.getChildElement("accid");
-    if (!hasAccidChild) {
-      // Was relying on carry-over from the moved note → revert to key sig
-      const accidGes = alterToAccidGes(keyAlter.value);
-      const corrected = el.produce((draft) => {
-        if (accidGes) draft.setAttribute("accid.ges", accidGes);
-        else draft.removeAttribute("accid.ges");
-      });
-      corrections.push({ id, element: corrected });
-    } else {
-      // Has printed accidental — check if it's a cancellation of the moved note's effect
-      const note = MeiNote.create(el);
-      if (!note?.pitch) break;
-      const intPitch = InternationalPitch.fromPitch(note.pitch);
-      if (intPitch.alter.value === keyAlter.value) {
-        // Cancellation accidental — now redundant, remove it
-        const accidGes = alterToAccidGes(keyAlter.value);
-        const corrected = el.produce((draft) => {
-          const children = draft.toArray();
-          for (let i = children.length - 1; i >= 0; i--) {
-            const child = children[i];
-            if (
-              "nodeName" in child &&
-              (child as { nodeName: string }).nodeName === "accid"
-            ) {
-              draft.delete(i, 1);
-            }
-          }
-          if (accidGes) draft.setAttribute("accid.ges", accidGes);
-          else draft.removeAttribute("accid.ges");
-        });
-        corrections.push({ id, element: corrected });
-        break;
-      } else {
-        // Independent accidental — establishes its own context, stop scanning
-        break;
-      }
-    }
-  }
-
-  return corrections;
-}
-
 /**
  * Provides pitch-editing operations for `<note>` elements.
  *
@@ -259,14 +135,136 @@ function findContextualAccidUpdates(
  * Apply the result with:
  * ```ts
  * const result = editor.pitchUp(noteId);
- * meiFriend.update(noteId, result.note.toXmlString());
- * for (const c of result.accidentalCorrections) {
- *   meiFriend.update(c.id, c.element.toXmlString());
- * }
+ * meiFriend.updateBatch([result.note, ...result.accidentalCorrections.map(c => c.element)]);
  * ```
  */
 export class MeiEditor {
   constructor(private readonly meiFriend: MeiFriend) {}
+
+  private applyPitch(
+    element: MeiElement,
+    step: InternationalPitchStep,
+    alter: InternationalPitchAlter,
+    octave: number,
+  ): MeiElement {
+    const pname = step.name.toLowerCase();
+    const oct = String(octave);
+    const accidGes = alterToAccidGes(alter.value);
+
+    return this.meiFriend.produceElement(element, (draft) => {
+      draft.setAttribute("pname", pname);
+      draft.setAttribute("oct", oct);
+      if (accidGes) {
+        draft.setAttribute("accid.ges", accidGes);
+      } else {
+        draft.removeAttribute("accid.ges");
+      }
+      // Remove any existing <accid> children — moved notes never carry printed accidentals
+      const children = draft.toArray();
+      for (let i = children.length - 1; i >= 0; i--) {
+        const child = children[i];
+        if (
+          "nodeName" in child &&
+          (child as { nodeName: string }).nodeName === "accid"
+        ) {
+          draft.delete(i, 1);
+        }
+      }
+    });
+  }
+
+  /**
+   * Finds subsequent notes in the same measure and staff that need their
+   * accidentals updated after the source note (which had a printed accidental)
+   * has been moved away from (oldStep, oldOctave).
+   *
+   * Returns corrections in temporal order. Scanning stops when an independent
+   * accidental is encountered (one whose alter differs from the key-signature
+   * default), since it establishes a new accidental context for later notes.
+   */
+  private findContextualAccidUpdates(
+    oldStep: InternationalPitchStep,
+    oldOctave: number,
+    noteId: string,
+    getElementById: (id: string) => MeiElement | undefined,
+    getScoreModel: () => ScoreModel,
+    key: Key,
+  ): AccidentalCorrection[] {
+    const scoreModel = getScoreModel();
+    const pos = scoreModel.getPositionById(noteId);
+    if (!pos) return [];
+
+    const measure = scoreModel.getMeasure(pos.measureIndex);
+    if (!measure) return [];
+
+    const keyAlter = getKeyAlter(oldStep, key);
+
+    const candidates: Array<{ offset: Offset; id: string; el: MeiElement }> =
+      [];
+
+    for (const [sN, staff] of measure.staves) {
+      if (sN !== pos.staffN) continue;
+      for (const [, layer] of staff.layers) {
+        for (const event of layer.events) {
+          if (event.offset.compareTo(pos.offset) <= 0) continue;
+          const el = getElementById(event.id);
+          if (!el) continue;
+          const note = MeiNote.create(el);
+          if (!note?.pitch) continue;
+          const intPitch = InternationalPitch.fromPitch(note.pitch);
+          if (intPitch.step !== oldStep || intPitch.octave.value !== oldOctave)
+            continue;
+          candidates.push({ offset: event.offset, id: event.id, el });
+        }
+      }
+    }
+
+    candidates.sort((a, b) => a.offset.compareTo(b.offset));
+
+    const corrections: AccidentalCorrection[] = [];
+    for (const { id, el } of candidates) {
+      const hasAccidChild = !!el.getChildElement("accid");
+      if (!hasAccidChild) {
+        // Was relying on carry-over from the moved note → revert to key sig
+        const accidGes = alterToAccidGes(keyAlter.value);
+        const corrected = this.meiFriend.produceElement(el, (draft) => {
+          if (accidGes) draft.setAttribute("accid.ges", accidGes);
+          else draft.removeAttribute("accid.ges");
+        });
+        corrections.push({ id, element: corrected });
+      } else {
+        // Has printed accidental — check if it's a cancellation of the moved note's effect
+        const note = MeiNote.create(el);
+        if (!note?.pitch) break;
+        const intPitch = InternationalPitch.fromPitch(note.pitch);
+        if (intPitch.alter.value === keyAlter.value) {
+          // Cancellation accidental — now redundant, remove it
+          const accidGes = alterToAccidGes(keyAlter.value);
+          const corrected = this.meiFriend.produceElement(el, (draft) => {
+            const children = draft.toArray();
+            for (let i = children.length - 1; i >= 0; i--) {
+              const child = children[i];
+              if (
+                "nodeName" in child &&
+                (child as { nodeName: string }).nodeName === "accid"
+              ) {
+                draft.delete(i, 1);
+              }
+            }
+            if (accidGes) draft.setAttribute("accid.ges", accidGes);
+            else draft.removeAttribute("accid.ges");
+          });
+          corrections.push({ id, element: corrected });
+          break;
+        } else {
+          // Independent accidental — establishes its own context, stop scanning
+          break;
+        }
+      }
+    }
+
+    return corrections;
+  }
 
   private transpose(noteId: string, direction: 1 | -1): PitchMoveResult {
     const getElementById = (id: string) => this.meiFriend.getElementById(id);
@@ -303,10 +301,15 @@ export class MeiEditor {
         getScoreModel,
       ) ?? defaultAlter;
 
-    const updatedNote = applyPitch(element, targetStep, alter, targetOctave);
+    const updatedNote = this.applyPitch(
+      element,
+      targetStep,
+      alter,
+      targetOctave,
+    );
 
     const accidentalCorrections = hadPrintedAccid
-      ? findContextualAccidUpdates(
+      ? this.findContextualAccidUpdates(
           intPitch.step,
           intPitch.octave.value,
           noteId,
@@ -358,11 +361,6 @@ export class MeiEditor {
    *   (a cancellation that is now redundant) has its `<accid>` child removed.
    * - Scanning stops at the first note with an independent accidental (one
    *   whose alter differs from the key-signature default).
-   *
-   * TODO: Regarding the pitch of the subsequent notes, it might be possible to maintain the initially applied pitch, but what should be done?
-   * TODO: The return value contains multiple Elements, and the user would need to perform several
-   *       `meiFriend.update` calls on each of them. We want to consolidate this into a single `update` call.
-   *       In that case, the return value would be `MeiStaff`.
    *
    * @param noteId - The `xml:id` of the `<note>` element to move.
    * @returns A `PitchMoveResult` with the updated note and any contextual corrections.

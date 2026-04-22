@@ -380,7 +380,11 @@ export class CodeMirrorPlugin {
 
       this._applyInProgress = true;
       try {
-        this.meiFriend.update(dirty.xmlId, dirtyText, this.options.origin);
+        this.meiFriend.updateXmlString(
+          dirty.xmlId,
+          dirtyText,
+          this.options.origin,
+        );
       } finally {
         this._applyInProgress = false;
       }

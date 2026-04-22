@@ -8,7 +8,6 @@ import { MeiEditor } from "./editor/MeiEditor.js";
 
 /**
  * Helper to get a child element by tag name from a Y.XmlElement.
- * TODO; ヘルパー無くても書けるようにならないか？
  */
 function getChildYElement(
   node: Y.XmlElement,
@@ -50,66 +49,50 @@ export class MeiApi {
   }
 
   /**
-   * Appends or updates the title in the MEI document.
+   * Returns a modified clone of the MEI root with the title set.
    * If the necessary wrapper elements (meiHead, fileDesc, titleStmt, title) do not exist,
    * they are created.
    *
+   * Apply the result with `meiFriend.updateElement(meiFriend.api.withTitle("My Work"))`.
+   *
    * @param title The title to set.
-   * @returns A new MeiElement with the updated title.
-   * TODO: withTitle() に。ロジック自体はmeiかmeiHeadあたりに書いた方が良いか？
+   * @returns A new MeiElement (the modified root) with the updated title.
    */
-  public titleAppended(title = "Untitled"): MeiElement {
+  public withTitle(title = "Untitled"): MeiElement {
     const root = this.meiFriend.getRootElement();
     if (!root)
-      throw new Error(
-        "Cannot append title to a document without a root element",
-      );
+      throw new Error("Cannot set title on a document without a root element");
 
-    return root.produce((draft) => {
+    const mf = this.meiFriend;
+
+    return mf.produceElement(root, (draft) => {
       let meiHead = getChildYElement(draft, "meiHead");
       if (!meiHead) {
-        meiHead = new Y.XmlElement("meiHead");
-        meiHead.setAttribute(
-          "xml:id",
-          this.meiFriend.idGenerator.generate("meiHead"),
-        );
+        meiHead = mf.createElement("meiHead").yNode;
         draft.insert(0, [meiHead]);
       }
 
       let fileDesc = getChildYElement(meiHead, "fileDesc");
       if (!fileDesc) {
-        fileDesc = new Y.XmlElement("fileDesc");
-        fileDesc.setAttribute(
-          "xml:id",
-          this.meiFriend.idGenerator.generate("fileDesc"),
-        );
+        fileDesc = mf.createElement("fileDesc").yNode;
         meiHead.insert(0, [fileDesc]);
       }
 
       let titleStmt = getChildYElement(fileDesc, "titleStmt");
       if (!titleStmt) {
-        titleStmt = new Y.XmlElement("titleStmt");
-        titleStmt.setAttribute(
-          "xml:id",
-          this.meiFriend.idGenerator.generate("titleStmt"),
-        );
+        titleStmt = mf.createElement("titleStmt").yNode;
         fileDesc.insert(0, [titleStmt]);
       }
 
       let titleEl = getChildYElement(titleStmt, "title");
       if (!titleEl) {
-        titleEl = new Y.XmlElement("title");
-        titleEl.setAttribute(
-          "xml:id",
-          this.meiFriend.idGenerator.generate("title"),
-        );
+        titleEl = mf.createElement("title").yNode;
         titleStmt.insert(0, [titleEl]);
       }
 
       // Clear existing content and set the new title text
       titleEl.delete(0, titleEl.length);
-      const textNode = new Y.XmlText(title);
-      titleEl.insert(0, [textNode]);
+      titleEl.insert(0, [new Y.XmlText(title)]);
     });
   }
 

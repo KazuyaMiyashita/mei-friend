@@ -39,7 +39,7 @@ describe("MeiHead API", () => {
     const meiFriend = MeiFriend.fromXmlString(xml);
 
     // Perform update
-    meiFriend.update("t1", '<title xml:id="t1">Updated Title</title>');
+    meiFriend.updateXmlString("t1", '<title xml:id="t1">Updated Title</title>');
 
     expect(meiFriend.api.mei!.meiHead!.getTitle()).toBe("Updated Title");
   });
@@ -63,13 +63,13 @@ describe("MeiHead API", () => {
     </fileDesc>
   </meiHead>
 </mei>`;
-    meiFriend.update("m1", newMeiXml);
+    meiFriend.updateXmlString("m1", newMeiXml);
 
     expect(meiFriend.api.mei!.meiHead!.getTitle()).toBe("Transacted Title");
     expect(meiFriend.canUndo).toBe(true);
 
     // 2. Perform another update
-    meiFriend.update("t1", '<title xml:id="t1">Updated Title</title>');
+    meiFriend.updateXmlString("t1", '<title xml:id="t1">Updated Title</title>');
     expect(meiFriend.api.mei!.meiHead!.getTitle()).toBe("Updated Title");
 
     // Undo 2nd update
@@ -87,7 +87,7 @@ describe("MeiHead API", () => {
     const xml = `<mei xmlns="http://www.music-encoding.org/ns/mei" xml:id="m1"><meiHead xml:id="h1"/></mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
     expect(() =>
-      meiFriend.update("h1", '<fileDesc xml:id="h1"/>'),
+      meiFriend.updateXmlString("h1", '<fileDesc xml:id="h1"/>'),
     ).toThrowError(/Tag name mismatch/);
   });
 
@@ -95,7 +95,7 @@ describe("MeiHead API", () => {
     const xml = `<mei xmlns="http://www.music-encoding.org/ns/mei" xml:id="m1"><meiHead xml:id="h1"/></mei>`;
     const meiFriend = MeiFriend.fromXmlString(xml);
     expect(() =>
-      meiFriend.update("h1", '<meiHead xml:id="wrong-id"/>'),
+      meiFriend.updateXmlString("h1", '<meiHead xml:id="wrong-id"/>'),
     ).toThrowError(/ID mismatch/);
   });
 });

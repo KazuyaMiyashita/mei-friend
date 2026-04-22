@@ -181,7 +181,7 @@ describe("CodeMirrorPlugin State Machine", () => {
     expect(plugin.isDirty).toBe(true);
 
     // External update: change pname to "f"
-    meiFriend.update(
+    meiFriend.updateXmlString(
       "n-1",
       '<note xml:id="n-1" pname="f" oct="4" dur="4" />',
       "external",
@@ -206,7 +206,7 @@ describe("CodeMirrorPlugin State Machine", () => {
     expect(plugin.state.status).toBe("invalid");
 
     // External: change pname to "f"
-    meiFriend.update(
+    meiFriend.updateXmlString(
       "n-1",
       '<note xml:id="n-1" pname="f" oct="4" dur="4" />',
       "external",
@@ -231,7 +231,7 @@ describe("CodeMirrorPlugin State Machine", () => {
     expect(plugin.isDirty).toBe(true);
 
     // External: update the parent measure (which contains n-1 as descendant)
-    meiFriend.update(
+    meiFriend.updateXmlString(
       "ms-1",
       '<measure xml:id="ms-1" n="1"><staff xml:id="st-1"><layer xml:id="l-1"><note xml:id="n-1" dur="4" oct="4" pname="c"/></layer></staff></measure>',
       "external",
@@ -279,7 +279,7 @@ describe("CodeMirrorPlugin State Machine", () => {
     expect(localPlugin.isDirty).toBe(true);
 
     // External update to sibling n-2 only
-    meiFriendWithSibling.update(
+    meiFriendWithSibling.updateXmlString(
       "n-2",
       '<note xml:id="n-2" dur="8" oct="5" pname="f"/>',
       "external",

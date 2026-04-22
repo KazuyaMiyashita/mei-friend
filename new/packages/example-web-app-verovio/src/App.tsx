@@ -103,10 +103,10 @@ export default function App() {
             if (selectedId) {
               try {
                 const result = meiFriend.api.editor.pitchUp(selectedId);
-                meiFriend.update(selectedId, result.note.toXmlString());
-                for (const c of result.accidentalCorrections) {
-                  meiFriend.update(c.id, c.element.toXmlString());
-                }
+                meiFriend.updateBatch([
+                  result.note,
+                  ...result.accidentalCorrections.map((c) => c.element),
+                ]);
               } catch {
                 // non-note elements are ignored
               }
@@ -124,10 +124,10 @@ export default function App() {
             if (selectedId) {
               try {
                 const result = meiFriend.api.editor.pitchDown(selectedId);
-                meiFriend.update(selectedId, result.note.toXmlString());
-                for (const c of result.accidentalCorrections) {
-                  meiFriend.update(c.id, c.element.toXmlString());
-                }
+                meiFriend.updateBatch([
+                  result.note,
+                  ...result.accidentalCorrections.map((c) => c.element),
+                ]);
               } catch {
                 // non-note elements are ignored
               }
@@ -158,7 +158,7 @@ export default function App() {
     if (meiFriend && titleEl) {
       // Create a new XML string for the title element, preserving its ID
       const safeTitle = escapeXml(draftTitle);
-      meiFriend.update(
+      meiFriend.updateXmlString(
         titleEl.id,
         `<title xml:id="${titleEl.id}">${safeTitle}</title>`,
       );
@@ -287,10 +287,10 @@ export function ScoreViewer({ initialXml }) {
 const title = meiFriend.api.getTitle();
 
 // Update the title (assuming the <title> element exists and has an ID "title-1")
-meiFriend.update("title-1", '<title xml:id="title-1">My New Masterpiece</title>');
+meiFriend.updateXmlString("title-1", '<title xml:id="title-1">My New Masterpiece</title>');
 
 // Directly update other XML information
-meiFriend.update(
+meiFriend.updateXmlString(
   "note-123",
   '<note xml:id="note-123" pname="c" oct="4" dur="4"/>'
 );`}

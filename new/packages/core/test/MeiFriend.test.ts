@@ -86,7 +86,10 @@ describe("MeiFriend", () => {
 
       // We can't change ID via update("n1", ...) because update checks for ID mismatch.
       // But we can change it via update("m1", ...) which replaces the whole child structure.
-      meiFriend.update("m1", '<mei xml:id="m1"><note xml:id="n-new"/></mei>');
+      meiFriend.updateXmlString(
+        "m1",
+        '<mei xml:id="m1"><note xml:id="n-new"/></mei>',
+      );
 
       expect(meiFriend.getElementById("n-new")).toBeDefined();
       expect(meiFriend.getElementById("n1")).toBeUndefined();
@@ -97,7 +100,10 @@ describe("MeiFriend", () => {
         '<mei xml:id="m1"><note xml:id="n1"/><note xml:id="n2"/></mei>',
       );
       // Remove n1 by updating parent m1
-      meiFriend.update("m1", '<mei xml:id="m1"><note xml:id="n2"/></mei>');
+      meiFriend.updateXmlString(
+        "m1",
+        '<mei xml:id="m1"><note xml:id="n2"/></mei>',
+      );
 
       expect(meiFriend.getElementsByTagName("note").length).toBe(1);
       expect(meiFriend.getElementsByTagName("note")[0].id).toBe("n2");
@@ -115,7 +121,7 @@ describe("MeiFriend", () => {
     </layer>
   </layer>
 </mei>`;
-      meiFriend.update("m1", deepXml);
+      meiFriend.updateXmlString("m1", deepXml);
 
       expect(meiFriend.getElementById("deep-node")).toBeDefined();
       expect(meiFriend.getElementsByTagName("layer").length).toBe(2);
@@ -128,7 +134,11 @@ describe("MeiFriend", () => {
       const captured: MeiUpdateEvent[] = [];
       meiFriend.onUpdate((events) => captured.push(...events));
 
-      meiFriend.update("m1", '<mei xml:id="m1" pname="c"/>', "plugin-a");
+      meiFriend.updateXmlString(
+        "m1",
+        '<mei xml:id="m1" pname="c"/>',
+        "plugin-a",
+      );
 
       expect(captured.length).toBeGreaterThan(0);
       expect(captured[0].type).toBe("element-update");
@@ -146,7 +156,10 @@ describe("MeiFriend", () => {
       meiFriend.onUpdate((events) => captured.push(...events));
 
       // Structural change by adding child to n1
-      meiFriend.update("n1", '<note xml:id="n1"><accid xml:id="a1"/></note>');
+      meiFriend.updateXmlString(
+        "n1",
+        '<note xml:id="n1"><accid xml:id="a1"/></note>',
+      );
       expect(captured.some((e) => e.xmlId === "n1")).toBe(true);
       const n1Event = captured.find((e) => e.xmlId === "n1");
       expect(n1Event?.type).toBe("element-update");
@@ -155,7 +168,7 @@ describe("MeiFriend", () => {
       captured.length = 0;
 
       // Text change
-      meiFriend.update("a1", '<accid xml:id="a1">sharp</accid>');
+      meiFriend.updateXmlString("a1", '<accid xml:id="a1">sharp</accid>');
       expect(
         captured.some((e) => e.xmlId === "a1" && e.xmlString.includes("sharp")),
       ).toBe(true);
@@ -187,7 +200,7 @@ describe("MeiFriend", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
       const root = meiFriend.getElementById("m1")!;
 
-      meiFriend.update("m1", '<mei xml:id="m1" label="test"/>');
+      meiFriend.updateXmlString("m1", '<mei xml:id="m1" label="test"/>');
       expect(root.getAttribute("label")).toBe("test");
 
       meiFriend.undo();
@@ -200,7 +213,10 @@ describe("MeiFriend", () => {
     it("syncs indexes correctly after undo/redo", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
 
-      meiFriend.update("m1", '<mei xml:id="m1"><note xml:id="n1"/></mei>');
+      meiFriend.updateXmlString(
+        "m1",
+        '<mei xml:id="m1"><note xml:id="n1"/></mei>',
+      );
       expect(meiFriend.getElementById("n1")).toBeDefined();
 
       meiFriend.undo();
@@ -213,14 +229,14 @@ describe("MeiFriend", () => {
     it("should auto-assign root ID in update if missing", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
       // Should NOT throw, should use "m1" for root
-      meiFriend.update("m1", "<mei/>");
+      meiFriend.updateXmlString("m1", "<mei/>");
       expect(meiFriend.getElementById("m1")).toBeDefined();
     });
 
     it("should auto-assign child ID in update if missing", () => {
       const meiFriend = MeiFriend.fromXmlString('<mei xml:id="m1"/>');
       // Should NOT throw, should assign an ID to <note>
-      meiFriend.update("m1", '<mei xml:id="m1"><note/></mei>');
+      meiFriend.updateXmlString("m1", '<mei xml:id="m1"><note/></mei>');
       const root = meiFriend.getRootElement()!;
       expect(root.children.length).toBe(1);
       expect(root.children[0].id).toBeDefined();
@@ -232,7 +248,7 @@ describe("MeiFriend", () => {
 
       // This would fail without assignIds
       const newXml = generator.assignIds("<mei><note/></mei>", "m1");
-      meiFriend.update("m1", newXml);
+      meiFriend.updateXmlString("m1", newXml);
 
       const root = meiFriend.getRootElement()!;
       expect(root.children.length).toBe(1);

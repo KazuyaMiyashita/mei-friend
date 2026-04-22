@@ -1,37 +1,45 @@
 import * as Y from "yjs";
-import { IdGenerator } from "./utils/IdGenerator.js";
-import { ROOT_WRAPPER_TAG, XmlSerde } from "./utils/XmlSerde.js";
+import { ROOT_WRAPPER_TAG } from "./utils/XmlSerde.js";
 
 /**
  * MeiElement wraps a Y.XmlElement and provides a clean API for DOM operations
  * within a MeiFriend document.
  *
- * This class is a Read-only view of a Y.XmlElement. For all document modifications,
- * use `MeiFriend.update(xmlId, xmlString)`.
+ * This class is a read-only view of a Y.XmlElement. For all document modifications,
+ * use `MeiFriend.updateElement()`, `MeiFriend.updateXmlString()`, or `MeiFriend.produceElement()`.
  *
- * **Constraint**: Every MeiElement will have an `xml:id`. If the underlying
- * Y.XmlElement is missing an ID, this class will automatically generate and
- * assign one during instantiation.
+ * **Constraint**: Every MeiElement retrieved from MeiFriend will have an `xml:id`.
  */
 export class MeiElement {
   /**
-   * The xml:id or id of the element. Guaranteed to be present.
+   * Pre-computed ID for elements not yet integrated into a Y.Doc.
+   * Yjs stores setAttribute writes before integration in _prelimAttrs (not readable
+   * via getAttribute until after integration). MeiFriend.createElement() passes
+   * the ID here so the constructor guarantee holds even before insertion into a doc.
    */
-  public readonly id: string;
-  private readonly serde: XmlSerde;
+  private readonly _id?: string;
 
-  constructor(
-    public readonly yNode: Y.XmlElement,
-    private readonly idGenerator?: IdGenerator,
-  ) {
-    const gen = idGenerator ?? new IdGenerator();
-    let id = yNode.getAttribute("xml:id") || yNode.getAttribute("id");
-    if (!id) {
-      id = gen.generate(yNode.nodeName.toLowerCase());
-      yNode.setAttribute("xml:id", id);
+  constructor(public readonly yNode: Y.XmlElement, id?: string) {
+    const resolvedId =
+      id ?? yNode.getAttribute("xml:id") ?? yNode.getAttribute("id");
+    if (!resolvedId) {
+      throw new Error(
+        `MeiElement: <${yNode.nodeName}> has no xml:id. All elements must have a unique xml:id.`,
+      );
     }
-    this.id = id;
-    this.serde = new XmlSerde(gen);
+    this._id = id;
+  }
+
+  /**
+   * The xml:id or id of the element. Guaranteed non-empty by the constructor.
+   */
+  get id(): string {
+    // biome-ignore lint/style/noNonNullAssertion: guaranteed by constructor
+    return (
+      this._id ??
+      this.yNode.getAttribute("xml:id") ??
+      this.yNode.getAttribute("id")
+    )!;
   }
 
   /**
@@ -48,7 +56,7 @@ export class MeiElement {
     return this.yNode
       .toArray()
       .filter((child): child is Y.XmlElement => child instanceof Y.XmlElement)
-      .map((child) => new MeiElement(child, this.idGenerator));
+      .map((child) => new MeiElement(child));
   }
 
   /**
@@ -58,7 +66,7 @@ export class MeiElement {
     const parent = this.yNode.parent;
     if (parent instanceof Y.XmlElement) {
       if (parent.nodeName === ROOT_WRAPPER_TAG) return undefined;
-      return new MeiElement(parent, this.idGenerator);
+      return new MeiElement(parent);
     }
     return undefined;
   }
@@ -75,7 +83,7 @@ export class MeiElement {
         for (let i = index + 1; i < siblings.length; i++) {
           const sibling = siblings[i];
           if (sibling instanceof Y.XmlElement) {
-            return new MeiElement(sibling, this.idGenerator);
+            return new MeiElement(sibling);
           }
         }
       }
@@ -95,7 +103,7 @@ export class MeiElement {
         for (let i = index - 1; i >= 0; i--) {
           const sibling = siblings[i];
           if (sibling instanceof Y.XmlElement) {
-            return new MeiElement(sibling, this.idGenerator);
+            return new MeiElement(sibling);
           }
         }
       }
@@ -136,7 +144,7 @@ export class MeiElement {
         const child = node.get(i);
         if (child instanceof Y.XmlElement) {
           if (child.nodeName === tagName) {
-            result.push(new MeiElement(child, this.idGenerator));
+            result.push(new MeiElement(child));
           }
           traverse(child);
         }
@@ -176,43 +184,6 @@ export class MeiElement {
         (child): child is Y.XmlElement =>
           child instanceof Y.XmlElement && child.nodeName === tagName,
       );
-    return yChild ? new MeiElement(yChild, this.idGenerator) : undefined;
-  }
-
-  // --------------------------------------------------------------------------
-  // Immutable Mutation API
-  // --------------------------------------------------------------------------
-
-  /**
-   * Creates a clone of this element, applies the given recipe to the clone,
-   * and returns a new MeiElement wrapping the modified clone.
-   *
-   * The returned element is detached from the document and can be used to
-   * update the original via `MeiFriend.update(id, newElement.toXmlString())`.
-   *
-   * **Note**: If the recipe removes the `xml:id`, a new one will be auto-generated.
-   *
-   * @param recipe A function that modifies the cloned Y.XmlElement.
-   */
-  public produce(recipe: (draft: Y.XmlElement) => void): MeiElement {
-    const clone = this.yNode.clone();
-    // In Yjs, a cloned node must be attached to a Y.Doc before its attributes
-    // or children can be accessed. We use a temporary document for this purpose.
-    const tempDoc = new Y.Doc();
-    tempDoc.getXmlFragment("tmp").push([clone]);
-
-    recipe(clone);
-    return new MeiElement(clone, this.idGenerator);
-  }
-
-  // --------------------------------------------------------------------------
-  // Serialize
-  // --------------------------------------------------------------------------
-
-  /**
-   * Returns the XML string representation of this element.
-   */
-  toXmlString(): string {
-    return this.serde.serialize(this.yNode, 0);
+    return yChild ? new MeiElement(yChild) : undefined;
   }
 }

@@ -61,7 +61,7 @@ describe("MeiEditor.pitchUp", () => {
         makeMei("0", "major", `<note xml:id="n1" pname="c" oct="4" dur="4"/>`),
       );
       const result = mf.api.editor.pitchUp("n1");
-      mf.update("n1", result.note.toXmlString());
+      mf.updateElement(result.note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("D");
       expect(p.octave.value).toBe(4);
@@ -73,7 +73,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("0", "major", `<note xml:id="n1" pname="e" oct="4" dur="4"/>`),
       );
-      mf.update("n1", mf.api.editor.pitchUp("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchUp("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(0);
@@ -84,7 +84,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("0", "major", `<note xml:id="n1" pname="b" oct="4" dur="4"/>`),
       );
-      mf.update("n1", mf.api.editor.pitchUp("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchUp("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("C");
       expect(p.octave.value).toBe(5);
@@ -97,7 +97,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("1s", "major", `<note xml:id="n1" pname="d" oct="4" dur="4"/>`),
       );
-      mf.update("n1", mf.api.editor.pitchUp("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchUp("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("E");
       expect(p.alter.value).toBe(0);
@@ -108,7 +108,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("1s", "major", `<note xml:id="n1" pname="e" oct="4" dur="4"/>`),
       );
-      mf.update("n1", mf.api.editor.pitchUp("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchUp("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(1);
@@ -120,7 +120,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("1s", "major", `<note xml:id="n1" pname="b" oct="4" dur="4"/>`),
       );
-      mf.update("n1", mf.api.editor.pitchUp("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchUp("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("C");
       expect(p.octave.value).toBe(5);
@@ -133,7 +133,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("2s", "major", `<note xml:id="n1" pname="b" oct="4" dur="4"/>`),
       );
-      mf.update("n1", mf.api.editor.pitchUp("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchUp("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("C");
       expect(p.octave.value).toBe(5);
@@ -147,7 +147,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("2f", "major", `<note xml:id="n1" pname="d" oct="4" dur="4"/>`),
       );
-      mf.update("n1", mf.api.editor.pitchUp("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchUp("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("E");
       expect(p.alter.value).toBe(-1);
@@ -158,7 +158,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("2f", "major", `<note xml:id="n1" pname="c" oct="4" dur="4"/>`),
       );
-      mf.update("n1", mf.api.editor.pitchUp("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchUp("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("D");
       expect(p.alter.value).toBe(0);
@@ -179,7 +179,7 @@ describe("MeiEditor.pitchUp", () => {
            <note xml:id="n1" pname="e" oct="4" dur="4"/>`,
         ),
       );
-      mf.update("n1", mf.api.editor.pitchUp("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchUp("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(0);
@@ -197,7 +197,7 @@ describe("MeiEditor.pitchUp", () => {
            <note xml:id="n1" pname="e" oct="4" dur="4"/>`,
         ),
       );
-      mf.update("n1", mf.api.editor.pitchUp("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchUp("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(1);
@@ -220,7 +220,7 @@ describe("MeiEditor.pitchUp", () => {
            <note xml:id="n1" pname="e" oct="4" dur="4"/>`,
         ),
       );
-      mf.update("n1", mf.api.editor.pitchUp("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchUp("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(1);
@@ -239,7 +239,7 @@ describe("MeiEditor.pitchUp", () => {
            <note xml:id="n1" pname="e" oct="4" dur="4"/>`,
         ),
       );
-      mf.update("n1", mf.api.editor.pitchUp("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchUp("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(1);
@@ -283,7 +283,7 @@ describe("MeiEditor.pitchDown", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("0", "major", `<note xml:id="n1" pname="d" oct="4" dur="4"/>`),
       );
-      mf.update("n1", mf.api.editor.pitchDown("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchDown("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("C");
       expect(p.octave.value).toBe(4);
@@ -294,7 +294,7 @@ describe("MeiEditor.pitchDown", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("0", "major", `<note xml:id="n1" pname="c" oct="4" dur="4"/>`),
       );
-      mf.update("n1", mf.api.editor.pitchDown("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchDown("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("B");
       expect(p.octave.value).toBe(3);
@@ -307,7 +307,7 @@ describe("MeiEditor.pitchDown", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("1s", "major", `<note xml:id="n1" pname="g" oct="4" dur="4"/>`),
       );
-      mf.update("n1", mf.api.editor.pitchDown("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchDown("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(1);
@@ -320,7 +320,7 @@ describe("MeiEditor.pitchDown", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("2f", "major", `<note xml:id="n1" pname="c" oct="4" dur="4"/>`),
       );
-      mf.update("n1", mf.api.editor.pitchDown("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchDown("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("B");
       expect(p.octave.value).toBe(3);
@@ -343,7 +343,7 @@ describe("MeiEditor.pitchDown", () => {
            <note xml:id="n1" pname="g" oct="4" dur="4"/>`,
         ),
       );
-      mf.update("n1", mf.api.editor.pitchDown("n1").note.toXmlString());
+      mf.updateElement(mf.api.editor.pitchDown("n1").note);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(0);

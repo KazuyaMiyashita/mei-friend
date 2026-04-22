@@ -228,7 +228,7 @@ describe("Indentation and Cursor Tracking", () => {
   it("should track cursor in a new element without ID (non-zero child index)", async () => {
     const plugin = new CodeMirrorPlugin(meiFriend);
     // Add multiple notes to l1 initially
-    meiFriend.update(
+    meiFriend.updateXmlString(
       "l1",
       '<layer xml:id="l1"><note xml:id="n1"/><note xml:id="n2"/></layer>',
     );

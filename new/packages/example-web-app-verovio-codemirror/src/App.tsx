@@ -198,10 +198,10 @@ export default function App() {
             if (selectedId) {
               try {
                 const result = meiFriend.api.editor.pitchUp(selectedId);
-                meiFriend.update(selectedId, result.note.toXmlString());
-                for (const c of result.accidentalCorrections) {
-                  meiFriend.update(c.id, c.element.toXmlString());
-                }
+                meiFriend.updateBatch([
+                  result.note,
+                  ...result.accidentalCorrections.map((c) => c.element),
+                ]);
               } catch {
                 // non-note elements ignored
               }
@@ -219,10 +219,10 @@ export default function App() {
             if (selectedId) {
               try {
                 const result = meiFriend.api.editor.pitchDown(selectedId);
-                meiFriend.update(selectedId, result.note.toXmlString());
-                for (const c of result.accidentalCorrections) {
-                  meiFriend.update(c.id, c.element.toXmlString());
-                }
+                meiFriend.updateBatch([
+                  result.note,
+                  ...result.accidentalCorrections.map((c) => c.element),
+                ]);
               } catch {
                 // non-note elements ignored
               }

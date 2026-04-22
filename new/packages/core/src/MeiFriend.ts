@@ -21,7 +21,7 @@ import { ROOT_WRAPPER_TAG, XmlSerde } from "./utils/XmlSerde.js";
  * 1. **xml:id Enforcement**: To ensure reliable two-way synchronization between the model
  *    and external editors or renderers, this class enforces that **every** XML element
  *    must have a unique `xml:id`.
- *    - On initial load (`fromXmlString`) or element updates (`update`), any elements missing an ID will automatically receive a generated one.
+ *    - On initial load (`fromXmlString`) or element updates (`updateXmlString`), any elements missing an ID will automatically receive a generated one.
  *
  * 2. **Structural Focus**: MeiFriend handles only well-formed XML and manages internal state
  *    by focusing strictly on structural elements and attributes. XML comments (`<!-- ... -->`)
@@ -65,7 +65,7 @@ export class MeiFriend {
   /**
    * The underlying Yjs document.
    * This should only be used to connect synchronization providers
-   * (e.g., y-webrtc, y-indexeddb). For all editing operations, use `update()`.
+   * (e.g., y-webrtc, y-indexeddb). For all editing operations, use `updateElement()` or `updateXmlString()`.
    */
   public get yDoc(): Y.Doc {
     return this.doc;
@@ -106,6 +106,15 @@ export class MeiFriend {
       ? '<?xml version="1.0" encoding="UTF-8"?>\n'
       : "";
     return `${declaration}${serialized}\n`;
+  }
+
+  /**
+   * Serializes a single MeiElement to an XML string.
+   * @param elem The element to serialize.
+   * @returns The XML string for this element.
+   */
+  public elementToXmlString(elem: MeiElement): string {
+    return this.serde.serialize(elem.yNode, 0);
   }
 
   /**
@@ -161,20 +170,108 @@ export class MeiFriend {
   }
 
   /**
+   * Creates a new MeiElement with the given tag name and an auto-assigned xml:id.
+   * The returned element is detached from the document.
+   *
+   * @param tagName The tag name for the new element.
+   * @returns A new MeiElement with a unique xml:id.
+   */
+  public createElement(tagName: string): MeiElement {
+    const id = this.idGenerator.generate(tagName.toLowerCase());
+    const yEl = new Y.XmlElement(tagName);
+    yEl.setAttribute("xml:id", id);
+    return new MeiElement(yEl, id);
+  }
+
+  /**
+   * Creates a modified clone of `elem` by applying `recipe` to it.
+   * The returned element is detached from the document.
+   *
+   * To persist the change, pass the result to `updateElement()`.
+   *
+   * @param elem The element to clone and modify.
+   * @param recipe A function that mutates the cloned Y.XmlElement.
+   * @returns A new MeiElement wrapping the modified clone.
+   */
+  public produceElement(
+    elem: MeiElement,
+    recipe: (draft: Y.XmlElement) => void,
+  ): MeiElement {
+    const clone = elem.yNode.clone();
+    // A cloned node must be attached to a Y.Doc before its attributes or children
+    // can be accessed. We use a temporary document for this purpose.
+    const tempDoc = new Y.Doc();
+    tempDoc.getXmlFragment("tmp").push([clone]);
+
+    recipe(clone);
+
+    // If the recipe removed xml:id, assign a new one
+    if (!clone.getAttribute("xml:id") && !clone.getAttribute("id")) {
+      clone.setAttribute(
+        "xml:id",
+        this.idGenerator.generate(clone.nodeName.toLowerCase()),
+      );
+    }
+
+    return new MeiElement(clone);
+  }
+
+  /**
+   * Applies a MeiElement (typically produced via `produceElement`) back to the document.
+   * The target element is identified by `elem.id`.
+   *
+   * @param elem The element to apply. Its `id` must match an existing element in the document.
+   * @param origin The origin of the update (optional).
+   * @throws {Error} If no element with `elem.id` is found.
+   */
+  public updateElement(
+    elem: MeiElement,
+    // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
+    origin?: any,
+  ): void {
+    this.doc.transact(() => {
+      this._applyElement(elem);
+    }, origin);
+
+    this.undoManager.stopCapturing();
+  }
+
+  /**
+   * Applies multiple MeiElements in a single transaction.
+   * All changes are grouped into one undo step.
+   *
+   * @param elems The elements to apply.
+   * @param origin The origin of the update (optional).
+   */
+  public updateBatch(
+    elems: MeiElement[],
+    // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
+    origin?: any,
+  ): void {
+    this.doc.transact(() => {
+      for (const elem of elems) {
+        this._applyElement(elem);
+      }
+    }, origin);
+
+    this.undoManager.stopCapturing();
+  }
+
+  /**
    * Performs a single element replacement operation in a single transaction.
-   * This is the primary method for updating the document.
+   * Parses the provided XML string and replaces the target element.
    *
    * **Constraints**:
    * 1. The root element of `xmlString` must have an `xml:id` (or `id`) that exactly matches `targetId`.
    * 2. Every single child element within `xmlString` must also have an `xml:id` (auto-assigned if missing).
    * 3. The tag name of the root element in `xmlString` must match the existing element.
    *
-   * @param targetId The xml:id of the existing element to replace. If null or undefined, replaces the entire document.
+   * @param targetId The xml:id of the existing element to replace.
    * @param xmlString The new MEI XML string for this element.
    * @param origin The origin of the update (optional).
    * @throws {Error} If validation fails or target is not found.
    */
-  public update(
+  public updateXmlString(
     targetId: string,
     xmlString: string,
     // biome-ignore lint/suspicious/noExplicitAny: origin is any type, via the yjs interface.
@@ -263,7 +360,7 @@ export class MeiFriend {
       this.elementToIdMap.delete(yNode);
       return undefined;
     }
-    return yNode ? new MeiElement(yNode, this.idGenerator) : undefined;
+    return yNode ? new MeiElement(yNode) : undefined;
   }
 
   /**
@@ -278,7 +375,7 @@ export class MeiFriend {
     const result: MeiElement[] = [];
     for (const node of nodes) {
       if (node.doc) {
-        result.push(new MeiElement(node, this.idGenerator));
+        result.push(new MeiElement(node));
       } else {
         nodes.delete(node);
         this.elementToIdMap.delete(node);
@@ -330,7 +427,7 @@ export class MeiFriend {
                 documentReplaceEvent = {
                   type: "document-replace",
                   xmlId: rootMei.id,
-                  xmlString: rootMei.toXmlString(),
+                  xmlString: this.elementToXmlString(rootMei),
                   origin: transaction.origin,
                   isLocal: transaction.local,
                 };
@@ -415,6 +512,49 @@ export class MeiFriend {
         (child): child is Y.XmlElement =>
           child instanceof Y.XmlElement && child.nodeName === ROOT_WRAPPER_TAG,
       );
+  }
+
+  /**
+   * Internal: applies a MeiElement's attributes and children to the live document node.
+   * Must be called inside a doc.transact() block.
+   */
+  private _applyElement(elem: MeiElement): void {
+    const target = this.idMap.get(elem.id);
+    if (!target?.doc) {
+      throw new Error(`Element with ID "${elem.id}" not found for update.`);
+    }
+
+    if (elem.tagName !== target.nodeName) {
+      throw new Error(
+        `Update failed: Tag name mismatch. Expected <${target.nodeName}>, got <${elem.tagName}>`,
+      );
+    }
+
+    // Replace attributes (preserve xml:id)
+    const currentAttrs = target.getAttributes();
+    for (const key in currentAttrs) {
+      if (key !== "xml:id" && key !== "id") {
+        target.removeAttribute(key);
+      }
+    }
+    const newAttrs = elem.yNode.getAttributes();
+    for (const key in newAttrs) {
+      const val = newAttrs[key];
+      if (key !== "xml:id" && key !== "id" && val !== undefined) {
+        target.setAttribute(key, val);
+      }
+    }
+
+    // Replace children
+    const length = target.length;
+    if (length > 0) target.delete(0, length);
+    for (const child of elem.yNode.toArray()) {
+      if (child instanceof Y.XmlElement || child instanceof Y.XmlText) {
+        target.push([child.clone()]);
+      }
+    }
+
+    this.buildIndex(target);
   }
 
   /** Sets up observers to maintain the idMap and tagMap. */
