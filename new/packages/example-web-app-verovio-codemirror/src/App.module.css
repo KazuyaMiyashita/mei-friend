@@ -78,14 +78,28 @@
 
 .panelHeader {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 0.75rem;
-  height: 34px;
+  flex-direction: column;
   box-sizing: border-box;
   background-color: #e8e8e8;
   border-bottom: 1px solid #c8c8c8;
   flex-shrink: 0;
+}
+
+.panelHeaderRow1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.75rem;
+  height: 34px;
+}
+
+.panelHeaderRow2 {
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  height: 28px;
+  border-top: 1px solid #d4d4d4;
+  gap: 0.5rem;
 }
 
 .panelHeader h3 {
@@ -94,9 +108,9 @@
   font-weight: 600;
 }
 
-/* Verovio header: page nav absolutely centered */
+/* Verovio header row 1: page nav absolutely centered */
 
-.verovioHeader {
+.verovioHeaderRow1 {
   position: relative;
 }
 
@@ -107,6 +121,59 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* ID input + checkbox controls in panel header row 2 */
+
+.headerIdInput {
+  font-size: 0.75rem;
+  font-family: monospace;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid #c8c8c8;
+  border-radius: 3px;
+  width: 140px;
+  background-color: #fff;
+}
+
+.headerIdInput:disabled {
+  background-color: #f5f5f5;
+  color: #bbb;
+}
+
+.goBtn {
+  padding: 0.1rem 0.45rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  background-color: #fff;
+  border: 1px solid #c8c8c8;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.goBtn:hover:not(:disabled) {
+  background-color: #d8d8d8;
+}
+
+.goBtn:disabled {
+  color: #bbb;
+  cursor: not-allowed;
+  background-color: #f5f5f5;
+}
+
+.headerCheckboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.headerCheckboxLabel input[type="checkbox"] {
+  cursor: pointer;
+  margin: 0;
 }
 
 .pageCount {

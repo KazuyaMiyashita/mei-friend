@@ -183,6 +183,7 @@ export function renderOverlays(
   selectedId: string | null,
   cursor: Cursor | null,
   colors: VerovioCanvasColors,
+  highlightId: string | null = null,
 ) {
   const rootSvg = container.querySelector("svg") as SVGSVGElement | null;
   if (!rootSvg) {
@@ -215,6 +216,25 @@ export function renderOverlays(
     ) as SVGGraphicsElement | null;
     if (el) {
       el.classList.add("selected");
+    }
+  }
+
+  // Yellow highlight: directly color the target SVG element.
+  // fill covers filled glyphs (noteheads, rests); color sets currentColor
+  // which is used by stroke:currentColor (stems, barlines, etc.).
+  container.querySelectorAll("g.mf-highlighted").forEach((el) => {
+    el.classList.remove("mf-highlighted");
+    (el as SVGGraphicsElement).style.fill = "";
+    (el as SVGGraphicsElement).style.color = "";
+  });
+  if (highlightId) {
+    const el = container.querySelector(
+      `g#${CSS.escape(highlightId)}`,
+    ) as SVGGraphicsElement | null;
+    if (el) {
+      el.classList.add("mf-highlighted");
+      el.style.fill = "gold";
+      el.style.color = "gold";
     }
   }
 

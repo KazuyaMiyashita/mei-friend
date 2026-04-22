@@ -47,7 +47,17 @@ export const XmlIdIndexField = StateField.define<XmlIdMap>({
 
 function buildIndex(state: EditorState): XmlIdMap {
   const map: XmlIdMap = new Map();
-  const tree = syntaxTree(state);
+  // ensureSyntaxTree forces a complete synchronous parse. Without this,
+  // syntaxTree() returns only the lazily-parsed fragment available so far,
+  // which is empty on initial load and makes xml:id lookups fail until an
+  // edit triggers further parsing.
+  const tree =
+    ensureSyntaxTree(state, state.doc.length, 5000) ?? syntaxTree(state);
+  // TODO: This rebuilds the full index on every document change, which
+  // includes a synchronous full-document parse via ensureSyntaxTree.
+  // For large MEI files this may become a performance bottleneck.
+  // Consider an incremental approach that only re-scans the changed range
+  // and patches the existing map rather than rebuilding from scratch.
 
   tree.iterate({
     enter: (node) => {

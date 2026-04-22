@@ -24,6 +24,7 @@ export interface VerovioCanvasProps {
   currentPage?: number;
   fitMode?: "off" | "width" | "height";
   selectedId?: string | null;
+  highlightId?: string | null;
   cursor?: Cursor | null;
   debugFilters?: DebugFilters;
   colors?: VerovioCanvasColors;
@@ -34,6 +35,12 @@ export interface VerovioCanvasProps {
 
 export interface VerovioCanvasHandle {
   getToolkit: () => Promise<Remote<VerovioToolkit> | null>;
+  /**
+   * Scrolls the score container so the element with the given xml:id is
+   * centered in the viewport. Does nothing if the element is already fully
+   * visible. Returns true if the element was found, false otherwise.
+   */
+  scrollToElement: (xmlId: string) => boolean;
 }
 
 const DEFAULT_OPTIONS: VerovioOptions = { scale: 50, breaks: "auto" };
@@ -48,6 +55,7 @@ export const VerovioCanvas = forwardRef<
     currentPage = 1,
     fitMode = "off",
     selectedId = null,
+    highlightId = null,
     cursor = null,
     debugFilters = {},
     colors = {},
@@ -76,6 +84,40 @@ export const VerovioCanvas = forwardRef<
 
   useImperativeHandle(ref, () => ({
     getToolkit: async () => tk,
+    scrollToElement: (xmlId: string): boolean => {
+      const container = svgContainerRef.current;
+      if (!container) return false;
+
+      // TODO: This only scrolls within the currently rendered page. If the
+      // target element is on a different page, querySelector returns null and
+      // this returns false without any navigation. To support cross-page
+      // navigation, use the Verovio toolkit's getPageWithElement() (or
+      // equivalent) to resolve the page number, call setCurrentPage(), and
+      // then scroll after the new SVG has been rendered.
+      const el = container.querySelector(
+        `g#${CSS.escape(xmlId)}`,
+      ) as SVGGraphicsElement | null;
+      if (!el) return false;
+
+      const elRect = el.getBoundingClientRect();
+      const cRect = container.getBoundingClientRect();
+
+      const fullyVisible =
+        elRect.left >= cRect.left &&
+        elRect.right <= cRect.right &&
+        elRect.top >= cRect.top &&
+        elRect.bottom <= cRect.bottom;
+
+      if (!fullyVisible) {
+        const deltaX =
+          (elRect.left + elRect.right) / 2 - (cRect.left + cRect.right) / 2;
+        const deltaY =
+          (elRect.top + elRect.bottom) / 2 - (cRect.top + cRect.bottom) / 2;
+        container.scrollBy({ left: deltaX, top: deltaY, behavior: "smooth" });
+      }
+
+      return true;
+    },
   }));
 
   // Initialize Verovio Worker
@@ -208,8 +250,17 @@ export const VerovioCanvas = forwardRef<
       selectedId,
       cursor,
       colors,
+      highlightId,
     );
-  }, [currentSvg, scoreModel, debugFilters, selectedId, cursor, colors]);
+  }, [
+    currentSvg,
+    scoreModel,
+    debugFilters,
+    selectedId,
+    cursor,
+    colors,
+    highlightId,
+  ]);
 
   const handleClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;

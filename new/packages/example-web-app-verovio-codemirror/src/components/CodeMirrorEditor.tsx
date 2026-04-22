@@ -74,6 +74,8 @@ interface Props {
 export interface CodeMirrorEditorRef {
   refresh: () => void;
   apply: () => boolean;
+  navigateTo: (xmlId: string) => boolean;
+  highlightElement: (xmlId: string | null) => boolean;
   get isDirty(): boolean;
 }
 
@@ -94,6 +96,9 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, Props>(
         pluginRef.current?.refresh();
       },
       apply: () => pluginRef.current?.apply() ?? false,
+      navigateTo: (xmlId) => pluginRef.current?.scrollToElement(xmlId) ?? false,
+      highlightElement: (xmlId) =>
+        pluginRef.current?.highlightElement(xmlId) ?? false,
       get isDirty() {
         return pluginRef.current?.isDirty ?? false;
       },

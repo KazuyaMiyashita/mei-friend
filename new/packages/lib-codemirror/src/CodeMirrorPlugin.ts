@@ -18,6 +18,7 @@ import {
 } from "@codemirror/state";
 import {
   Decoration,
+  type DecorationSet,
   EditorView,
   keymap,
   ViewPlugin,
@@ -145,6 +146,36 @@ export const DirtyStateField = StateField.define<DirtyStateValue>({
   },
 });
 
+// ── Highlight Effect & Field ─────────────────────────────────────────────────
+
+export const HighlightEffect = StateEffect.define<{
+  from: number;
+  to: number;
+} | null>();
+
+const highlightMark = Decoration.mark({ class: "cm-mei-highlight" });
+
+const HighlightField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none;
+  },
+  update(decos, tr) {
+    decos = decos.map(tr.changes);
+    for (const effect of tr.effects) {
+      if (effect.is(HighlightEffect)) {
+        if (effect.value === null) {
+          decos = Decoration.none;
+        } else {
+          const { from, to } = effect.value;
+          decos = Decoration.set([highlightMark.range(from, to)]);
+        }
+      }
+    }
+    return decos;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
 // ── Decorations & Theme ──────────────────────────────────────────────────────
 
 const errorMark = Decoration.mark({
@@ -181,6 +212,9 @@ const customTheme = EditorView.theme({
   },
   ".cm-selectionMatch": {
     backgroundColor: "transparent !important",
+  },
+  ".cm-mei-highlight": {
+    backgroundColor: "#fff176",
   },
 });
 
@@ -244,6 +278,7 @@ export class CodeMirrorPlugin {
       xml({ autoCloseTags: false }),
       XmlIdIndexField,
       DirtyStateField,
+      HighlightField,
       errorHighlighter,
       customTheme,
       indentUnit.of("  "),
@@ -409,6 +444,7 @@ export class CodeMirrorPlugin {
 
   /**
    * Selects and scrolls to the element with the given xml:id.
+   * Updates the cursor/selection, which will fire onCursorChange.
    */
   public jumpToElement(xmlId: string): boolean {
     if (!this.view) return false;
@@ -417,6 +453,46 @@ export class CodeMirrorPlugin {
     if (pos) {
       this.view.dispatch({
         selection: { anchor: pos.from, head: pos.to },
+        scrollIntoView: true,
+      });
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Scrolls to the element with the given xml:id WITHOUT moving the cursor.
+   * Unlike jumpToElement, this does NOT fire onCursorChange — safe for
+   * programmatic cross-panel navigation that must not create feedback loops.
+   */
+  public scrollToElement(xmlId: string): boolean {
+    if (!this.view) return false;
+    const idMap = this.view.state.field(XmlIdIndexField);
+    const pos = idMap.get(xmlId);
+    if (pos) {
+      this.view.dispatch({
+        effects: EditorView.scrollIntoView(pos.from, { y: "center" }),
+      });
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Highlights the element with the given xml:id in yellow.
+   * Pass null to clear the highlight.
+   */
+  public highlightElement(xmlId: string | null): boolean {
+    if (!this.view) return false;
+    if (!xmlId) {
+      this.view.dispatch({ effects: [HighlightEffect.of(null)] });
+      return true;
+    }
+    const idMap = this.view.state.field(XmlIdIndexField);
+    const pos = idMap.get(xmlId);
+    if (pos) {
+      this.view.dispatch({
+        effects: [HighlightEffect.of({ from: pos.from, to: pos.to })],
         scrollIntoView: true,
       });
       return true;
@@ -745,12 +821,6 @@ export class CodeMirrorPlugin {
           if (child.name === "Element") {
             if (count === ctx.childIndex) {
               elementRange = { from: child.from, to: child.to };
-              console.log(
-                "Restored New Element Range:",
-                elementRange,
-                "count=",
-                count,
-              );
               break;
             }
             count++;

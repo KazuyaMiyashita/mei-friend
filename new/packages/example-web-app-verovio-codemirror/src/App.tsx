@@ -1,6 +1,9 @@
 import { Cursor, MeiFriend } from "@mei-friend/core";
 import type { EditorCursorInfo, SyncState } from "@mei-friend/lib-codemirror";
-import { VerovioCanvas } from "@mei-friend/lib-verovio-react";
+import {
+  VerovioCanvas,
+  type VerovioCanvasHandle,
+} from "@mei-friend/lib-verovio-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Panel,
@@ -31,7 +34,7 @@ export default function App() {
 
   const [vrvOptions] = useState<VerovioOptions>({
     scale: 50,
-    breaks: "auto",
+    breaks: "none",
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -42,6 +45,48 @@ export default function App() {
   const [editorCursorInfo, setEditorCursorInfo] =
     useState<EditorCursorInfo | null>(null);
   const editorRef = useRef<CodeMirrorEditorRef>(null);
+  const verovioCanvasRef = useRef<VerovioCanvasHandle>(null);
+
+  // Verovio panel: ID input + highlight/navigate checkboxes
+  const [verovioInputId, setVerovioInputId] = useState("");
+  const [verovioHighlightId, setVerovioHighlightId] = useState<string | null>(
+    null,
+  );
+  const [verovioHighlight, setVerovioHighlight] = useState(false);
+  const [verovioNavigate, setVerovioNavigate] = useState(false);
+
+  // CodeMirror panel: ID input + highlight/navigate checkboxes
+  const [cmInputId, setCmInputId] = useState("");
+  const [cmHighlight, setCmHighlight] = useState(false);
+  const [cmNavigate, setCmNavigate] = useState(false);
+
+  // ── Action refs ──────────────────────────────────────────────────────────
+  // Updated on every render so event handlers always call the latest closure
+  // without needing them in dependency arrays (avoids stale state & re-renders).
+
+  const applyCmActionsRef = useRef<(id: string) => void>(() => {});
+  applyCmActionsRef.current = (id: string) => {
+    if (!id) {
+      editorRef.current?.highlightElement(null);
+      return;
+    }
+    if (cmHighlight) editorRef.current?.highlightElement(id);
+    if (cmNavigate) editorRef.current?.navigateTo(id);
+  };
+
+  const applyVerovioActionsRef = useRef<(id: string) => void>(() => {});
+  applyVerovioActionsRef.current = (id: string) => {
+    if (!id) {
+      setVerovioHighlightId(null);
+      return;
+    }
+    if (verovioHighlight) setVerovioHighlightId(id);
+    if (verovioNavigate) verovioCanvasRef.current?.scrollToElement(id);
+  };
+
+  // Tracks the last xmlId propagated from CM to Verovio, to skip redundant
+  // cross-panel updates when the cursor stays within the same element.
+  const prevCmXmlIdRef = useRef<string | undefined>(undefined);
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
@@ -71,6 +116,11 @@ export default function App() {
         const newCursor = Cursor.fromId(meiFriend.getScoreModel(), id);
         if (newCursor) setCursor(newCursor);
       }
+      // Cross-panel: propagate Verovio selection → CodeMirror
+      if (id) {
+        setCmInputId(id);
+        applyCmActionsRef.current(id);
+      }
     },
     [meiFriend],
   );
@@ -89,6 +139,11 @@ export default function App() {
         setCursor(null);
         setLogs([]);
         setSelectedLogId(null);
+        // Reset cross-panel state
+        setCmInputId("");
+        setVerovioInputId("");
+        setVerovioHighlightId(null);
+        prevCmXmlIdRef.current = undefined;
       }
     },
     [],
@@ -205,6 +260,30 @@ export default function App() {
     );
   };
 
+  // Go button / Enter handlers delegate to the action refs so they always
+  // use the latest checkbox state without needing it in their dep arrays.
+  const handleCmApply = useCallback(() => {
+    applyCmActionsRef.current(cmInputId);
+  }, [cmInputId]);
+
+  const handleVerovioApply = useCallback(() => {
+    applyVerovioActionsRef.current(verovioInputId);
+  }, [verovioInputId]);
+
+  // Cross-panel: CM cursor change → Verovio.
+  // Only propagates when the enclosing xml:id actually changes to a new value,
+  // preventing redundant updates while the cursor stays within the same element.
+  // navigateTo() uses scroll-only (no cursor move), so this handler is never
+  // triggered by programmatic cross-panel navigation — no feedback loop.
+  const handleEditorCursorChange = useCallback((info: EditorCursorInfo) => {
+    setEditorCursorInfo(info);
+    if (info.xmlId && info.xmlId !== prevCmXmlIdRef.current) {
+      prevCmXmlIdRef.current = info.xmlId;
+      setVerovioInputId(info.xmlId);
+      applyVerovioActionsRef.current(info.xmlId);
+    }
+  }, []);
+
   const handleClearLogs = useCallback(() => {
     setLogs([]);
     setSelectedLogId(null);
@@ -244,43 +323,88 @@ export default function App() {
                 aria-label="Verovio score viewer"
                 className={styles.verovioPanel}
               >
-                <div
-                  className={`${styles.panelHeader} ${styles.verovioHeader}`}
-                >
-                  <h3>Verovio</h3>
-                  <div className={styles.pageNavCenter}>
+                <div className={styles.panelHeader}>
+                  <div
+                    className={`${styles.panelHeaderRow1} ${styles.verovioHeaderRow1}`}
+                  >
+                    <h3>Verovio</h3>
+                    <div className={styles.pageNavCenter}>
+                      <button
+                        type="button"
+                        className={styles.pageBtn}
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
+                        disabled={!meiFriend || currentPage <= 1}
+                      >
+                        &lt;
+                      </button>
+                      <span className={styles.pageCount}>
+                        {meiFriend ? `${currentPage} / ${totalPages}` : "- / -"}
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.pageBtn}
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(totalPages, p + 1))
+                        }
+                        disabled={!meiFriend || currentPage >= totalPages}
+                      >
+                        &gt;
+                      </button>
+                    </div>
+                  </div>
+                  <div className={styles.panelHeaderRow2}>
+                    <input
+                      type="text"
+                      placeholder="xml:id"
+                      value={verovioInputId}
+                      onChange={(e) => setVerovioInputId(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleVerovioApply();
+                      }}
+                      className={styles.headerIdInput}
+                      disabled={!meiFriend}
+                    />
                     <button
                       type="button"
-                      className={styles.pageBtn}
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={!meiFriend || currentPage <= 1}
+                      className={styles.goBtn}
+                      onClick={handleVerovioApply}
+                      disabled={!meiFriend}
                     >
-                      &lt;
+                      Go
                     </button>
-                    <span className={styles.pageCount}>
-                      {meiFriend ? `${currentPage} / ${totalPages}` : "- / -"}
-                    </span>
-                    <button
-                      type="button"
-                      className={styles.pageBtn}
-                      onClick={() =>
-                        setCurrentPage((p) => Math.min(totalPages, p + 1))
-                      }
-                      disabled={!meiFriend || currentPage >= totalPages}
-                    >
-                      &gt;
-                    </button>
+                    <label className={styles.headerCheckboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={verovioHighlight}
+                        onChange={(e) => setVerovioHighlight(e.target.checked)}
+                        disabled={!meiFriend}
+                      />
+                      Highlight
+                    </label>
+                    <label className={styles.headerCheckboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={verovioNavigate}
+                        onChange={(e) => setVerovioNavigate(e.target.checked)}
+                        disabled={!meiFriend}
+                      />
+                      Navigate
+                    </label>
                   </div>
                 </div>
 
                 <div className={styles.verovioCanvasWrapper}>
                   {meiFriend ? (
                     <VerovioCanvas
+                      ref={verovioCanvasRef}
                       meiFriend={meiFriend}
                       options={vrvOptions}
                       currentPage={currentPage}
-                      fitMode="width"
+                      fitMode="height"
                       selectedId={selectedId}
+                      highlightId={verovioHighlightId}
                       cursor={cursor}
                       debugFilters={{ staff: false, note: false, caret: false }}
                       onSelectionChange={handleSelectionChange}
@@ -307,31 +431,72 @@ export default function App() {
             <Panel defaultSize="50%" minSize="20%">
               <div className={styles.codeMirrorPanel}>
                 <div className={styles.panelHeader}>
-                  <div className={styles.panelHeaderLeft}>
-                    <h3>CodeMirror</h3>
-                    {renderStatusIndicator(syncState)}
+                  <div className={styles.panelHeaderRow1}>
+                    <div className={styles.panelHeaderLeft}>
+                      <h3>CodeMirror</h3>
+                      {renderStatusIndicator(syncState)}
+                    </div>
+                    <div className={styles.panelHeaderRight}>
+                      <button
+                        className={styles.applyBtn}
+                        onClick={() => editorRef.current?.apply()}
+                        title="Apply changes to model (Cmd+Enter)"
+                        type="button"
+                        disabled={!meiFriend || syncState.status !== "dirty"}
+                      >
+                        Apply
+                      </button>
+                      <span className={styles.applyShortcut}>⌘↵</span>
+                      <span className={styles.headerDivider} />
+                      <button
+                        className={styles.refreshBtn}
+                        onClick={() => editorRef.current?.refresh()}
+                        title="Overwrite from MeiFriend Model"
+                        type="button"
+                        disabled={!meiFriend || syncState.status === "idle"}
+                      >
+                        Refresh
+                      </button>
+                    </div>
                   </div>
-                  <div className={styles.panelHeaderRight}>
+                  <div className={styles.panelHeaderRow2}>
+                    <input
+                      type="text"
+                      placeholder="xml:id"
+                      value={cmInputId}
+                      onChange={(e) => setCmInputId(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleCmApply();
+                      }}
+                      className={styles.headerIdInput}
+                      disabled={!meiFriend}
+                    />
                     <button
-                      className={styles.applyBtn}
-                      onClick={() => editorRef.current?.apply()}
-                      title="Apply changes to model (Cmd+Enter)"
                       type="button"
-                      disabled={!meiFriend || syncState.status !== "dirty"}
+                      className={styles.goBtn}
+                      onClick={handleCmApply}
+                      disabled={!meiFriend}
                     >
-                      Apply
+                      Go
                     </button>
-                    <span className={styles.applyShortcut}>⌘↵</span>
-                    <span className={styles.headerDivider} />
-                    <button
-                      className={styles.refreshBtn}
-                      onClick={() => editorRef.current?.refresh()}
-                      title="Overwrite from MeiFriend Model"
-                      type="button"
-                      disabled={!meiFriend || syncState.status === "idle"}
-                    >
-                      Refresh
-                    </button>
+                    <label className={styles.headerCheckboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={cmHighlight}
+                        onChange={(e) => setCmHighlight(e.target.checked)}
+                        disabled={!meiFriend}
+                      />
+                      Highlight
+                    </label>
+                    <label className={styles.headerCheckboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={cmNavigate}
+                        onChange={(e) => setCmNavigate(e.target.checked)}
+                        disabled={!meiFriend}
+                      />
+                      Navigate
+                    </label>
                   </div>
                 </div>
 
@@ -342,7 +507,7 @@ export default function App() {
                       meiFriend={meiFriend}
                       origin="codemirror"
                       onStateChange={setSyncState}
-                      onCursorChange={setEditorCursorInfo}
+                      onCursorChange={handleEditorCursorChange}
                     />
                   ) : (
                     <div className={styles.editorPlaceholder}>
