@@ -48,6 +48,8 @@ function collectEvents(
 
 /**
  * Builds a ScoreModel from the root MEI element.
+ *
+ * // TODO テストがないぞ？？？
  */
 export function buildScoreModel(root: MeiElement): ScoreModel {
   let currentMeter = getGlobalMeter(root);

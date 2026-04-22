@@ -1,20 +1,14 @@
 import * as Y from "yjs";
 import type { MeiElement } from "../MeiElement.js";
 import type { MeiFriend } from "../MeiFriend.js";
-import { MeiTempo } from "../mei/events/MeiTempo.js";
-import { MeiTie } from "../mei/events/MeiTie.js";
 import type { Mei } from "../mei/Mei.js";
-import { MeiStaffDef } from "../mei/score-def/MeiStaffDef.js";
-import { getGlobalMeter } from "../mei/score-def/meter.js";
-import { buildScore } from "../mei/structure/buildScore.js";
 import { buildScoreModel } from "../mei/structure/buildScoreModel.js";
-import { MeiMeasure } from "../mei/structure/MeiMeasure.js";
-import type { Score } from "../models/containers.js";
-import type { Meter, NoteInfo, ScoreModel } from "../models/score.js";
+import type { ScoreModel } from "../models/score.js";
 import { MeiEditor } from "./editor/MeiEditor.js";
 
 /**
  * Helper to get a child element by tag name from a Y.XmlElement.
+ * TODO; ヘルパー無くても書けるようにならないか？
  */
 function getChildYElement(
   node: Y.XmlElement,
@@ -62,6 +56,7 @@ export class MeiApi {
    *
    * @param title The title to set.
    * @returns A new MeiElement with the updated title.
+   * TODO: withTitle() に。ロジック自体はmeiかmeiHeadあたりに書いた方が良いか？
    */
   public titleAppended(title = "Untitled"): MeiElement {
     const root = this.meiFriend.getRootElement();
@@ -116,62 +111,6 @@ export class MeiApi {
       const textNode = new Y.XmlText(title);
       titleEl.insert(0, [textNode]);
     });
-  }
-
-  /** Returns all <tempo> elements as wrappers. */
-  get tempos(): MeiTempo[] {
-    const root = this.meiFriend.getRootElement();
-    if (!root) return [];
-    return root
-      .getElementsByTagName("tempo")
-      .map((t) => MeiTempo.create(t))
-      .filter((t): t is MeiTempo => !!t);
-  }
-
-  /** Returns all <staffDef> elements as wrappers. */
-  get staffDefs(): MeiStaffDef[] {
-    const root = this.meiFriend.getRootElement();
-    if (!root) return [];
-    return root
-      .getElementsByTagName("staffDef")
-      .map((s) => MeiStaffDef.create(s))
-      .filter((s): s is MeiStaffDef => !!s);
-  }
-
-  /** Returns all <measure> elements as wrappers. */
-  get measures(): MeiMeasure[] {
-    const root = this.meiFriend.getRootElement();
-    if (!root) return [];
-    return root
-      .getElementsByTagName("measure")
-      .map((m) => MeiMeasure.create(m))
-      .filter((m): m is MeiMeasure => !!m);
-  }
-
-  /** Returns all <tie> elements as wrappers. */
-  get ties(): MeiTie[] {
-    const root = this.meiFriend.getRootElement();
-    if (!root) return [];
-    return root
-      .getElementsByTagName("tie")
-      .map((t) => MeiTie.create(t))
-      .filter((t): t is MeiTie => !!t);
-  }
-
-  /** Returns the global meter information. */
-  get meter(): Meter | undefined {
-    const root = this.meiFriend.getRootElement();
-    if (!root) return undefined;
-    return getGlobalMeter(root);
-  }
-
-  /**
-   * Converts the MEI structure into a logical Score model.
-   */
-  public toScore(): Score<NoteInfo> {
-    const root = this.meiFriend.getRootElement();
-    if (!root) throw new Error("No root element to convert to Score");
-    return buildScore(root);
   }
 
   /**
