@@ -30,23 +30,23 @@ export class PitchNoteName {
    * Returns the international pitch notation components for this note name.
    */
   public internationalPitchNotation(): {
-    step: InternationalPitchStep;
-    alter: InternationalPitchAlter;
+    step: IPNStep;
+    alter: IPNAlter;
   } {
-    return InternationalPitch.fromNoteName(this);
+    return IPN.fromNoteName(this);
   }
 
   public toString(): string {
     const { step, alter } = this.internationalPitchNotation();
-    return InternationalPitch.stepAlterName(step, alter);
+    return IPN.stepAlterName(step, alter);
   }
 
   /**
    * Parses a note name string (e.g., "C", "F#", "Bb").
    */
   public static parse(name: string): PitchNoteName {
-    const { step, alter } = InternationalPitch.parseStepAlter(name);
-    return InternationalPitch.toNoteName(step, alter);
+    const { step, alter } = IPN.parseStepAlter(name);
+    return IPN.toNoteName(step, alter);
   }
 }
 
@@ -102,8 +102,17 @@ export class Pitch {
   /**
    * Converts to international pitch notation representation.
    */
-  public internationalPitchNotation(): InternationalPitch {
-    return InternationalPitch.fromPitch(this);
+  public internationalPitchNotation(): IPN {
+    return IPN.fromPitch(this);
+  }
+
+  /**
+   * Reinterprets this pitch as an interval from Middle C (C4).
+   * Since Pitch and Interval share the same internal representation,
+   * this is a zero-cost conversion that enables interval arithmetic from C4.
+   */
+  public asInterval(): Interval {
+    return new Interval(this.octave.value, this.noteName.value);
   }
 
   /**
@@ -121,7 +130,7 @@ export class Pitch {
    * Parses a pitch string (e.g., "C4", "A#3", "Eb5").
    */
   public static parse(name: string): Pitch {
-    return InternationalPitch.parse(name).toPitch();
+    return IPN.parse(name).toPitch();
   }
 
   /**
@@ -153,43 +162,43 @@ export class PitchNumber {
   }
 }
 
-// --- International Pitch Components ---
+// --- International Pitch Notation (IPN) Components ---
 
 /**
  * Represents the step part of an international pitch (C, D, E, F, G, A, B).
  */
-export class InternationalPitchStep {
+export class IPNStep {
   private constructor(
     public readonly name: string,
     public readonly basePitch: Pitch,
     public readonly ordinal: number,
   ) {}
 
-  static readonly C = new InternationalPitchStep("C", Pitch.of(0, 0), 0);
-  static readonly D = new InternationalPitchStep("D", Pitch.of(-1, 2), 1);
-  static readonly E = new InternationalPitchStep("E", Pitch.of(-2, 4), 2);
-  static readonly F = new InternationalPitchStep("F", Pitch.of(1, -1), 3);
-  static readonly G = new InternationalPitchStep("G", Pitch.of(0, 1), 4);
-  static readonly A = new InternationalPitchStep("A", Pitch.of(-1, 3), 5);
-  static readonly B = new InternationalPitchStep("B", Pitch.of(-2, 5), 6);
+  static readonly C = new IPNStep("C", Pitch.of(0, 0), 0);
+  static readonly D = new IPNStep("D", Pitch.of(-1, 2), 1);
+  static readonly E = new IPNStep("E", Pitch.of(-2, 4), 2);
+  static readonly F = new IPNStep("F", Pitch.of(1, -1), 3);
+  static readonly G = new IPNStep("G", Pitch.of(0, 1), 4);
+  static readonly A = new IPNStep("A", Pitch.of(-1, 3), 5);
+  static readonly B = new IPNStep("B", Pitch.of(-2, 5), 6);
 
-  static values(): InternationalPitchStep[] {
+  static values(): IPNStep[] {
     return [
-      InternationalPitchStep.C,
-      InternationalPitchStep.D,
-      InternationalPitchStep.E,
-      InternationalPitchStep.F,
-      InternationalPitchStep.G,
-      InternationalPitchStep.A,
-      InternationalPitchStep.B,
+      IPNStep.C,
+      IPNStep.D,
+      IPNStep.E,
+      IPNStep.F,
+      IPNStep.G,
+      IPNStep.A,
+      IPNStep.B,
     ];
   }
 
   /**
    * Finds the step corresponding to a base note name.
    */
-  static fromBaseNoteName(baseNoteName: PitchNoteName): InternationalPitchStep {
-    const found = InternationalPitchStep.values().find(
+  static fromBaseNoteName(baseNoteName: PitchNoteName): IPNStep {
+    const found = IPNStep.values().find(
       (s) => s.basePitch.noteName.value === baseNoteName.value,
     );
     if (!found) throw new Error("Unreachable");
@@ -199,35 +208,35 @@ export class InternationalPitchStep {
   /**
    * Finds the step by its name (e.g., "C").
    */
-  static valueOf(name: string): InternationalPitchStep {
-    const found = InternationalPitchStep.values().find((s) => s.name === name);
+  static valueOf(name: string): IPNStep {
+    const found = IPNStep.values().find((s) => s.name === name);
     if (!found) throw new Error(`Invalid step name: ${name}`);
     return found;
   }
 }
 
 /** Represents the alteration of a pitch (number of sharps (#) or flats (b)). */
-export class InternationalPitchAlter {
+export class IPNAlter {
   constructor(public readonly value: number) {}
 }
 
 /** Represents the octave in international pitch notation. */
-export class InternationalPitchOctave {
+export class IPNOctave {
   constructor(public readonly value: number) {}
 }
 
-// --- InternationalPitch ---
+// --- International Pitch Notation (IPN) ---
 
 /**
  * International pitch notation (e.g., C#4).
  * Handles the triplet of step, alter, and octave information.
  * Used for parsing and stringifying Pitch and NoteName.
  */
-export class InternationalPitch {
+export class IPN {
   constructor(
-    public readonly step: InternationalPitchStep,
-    public readonly alter: InternationalPitchAlter,
-    public readonly octave: InternationalPitchOctave,
+    public readonly step: IPNStep,
+    public readonly alter: IPNAlter,
+    public readonly octave: IPNOctave,
   ) {}
 
   public toString(): string {
@@ -242,7 +251,7 @@ export class InternationalPitch {
    * Converts to a Pitch instance.
    */
   public toPitch(): Pitch {
-    const noteName = InternationalPitch.toNoteName(this.step, this.alter);
+    const noteName = IPN.toNoteName(this.step, this.alter);
     const baseOctave = this.step.basePitch.octave.value;
     const octaveVal =
       baseOctave + this.alter.value * -4 + this.octave.value - 4;
@@ -253,8 +262,8 @@ export class InternationalPitch {
    * Decomposes a note name into a step and an alteration.
    */
   public static fromNoteName(noteName: PitchNoteName): {
-    step: InternationalPitchStep;
-    alter: InternationalPitchAlter;
+    step: IPNStep;
+    alter: IPNAlter;
   } {
     // F(-1) to B(5) are the base note names
     const bases = [-1, 0, 1, 2, 3, 4, 5].map((v) => new PitchNoteName(v));
@@ -263,8 +272,8 @@ export class InternationalPitch {
     );
     if (baseNoteName) {
       const alter = (noteName.value - baseNoteName.value) / 7;
-      const step = InternationalPitchStep.fromBaseNoteName(baseNoteName);
-      return { step, alter: new InternationalPitchAlter(alter) };
+      const step = IPNStep.fromBaseNoteName(baseNoteName);
+      return { step, alter: new IPNAlter(alter) };
     }
     throw new Error("Unreachable");
   }
@@ -272,10 +281,7 @@ export class InternationalPitch {
   /**
    * Combines a step and an alteration into a note name.
    */
-  public static toNoteName(
-    step: InternationalPitchStep,
-    alter: InternationalPitchAlter,
-  ): PitchNoteName {
+  public static toNoteName(step: IPNStep, alter: IPNAlter): PitchNoteName {
     const baseNoteName = step.basePitch.noteName;
     return new PitchNoteName(baseNoteName.value + alter.value * 7);
   }
@@ -283,10 +289,7 @@ export class InternationalPitch {
   /**
    * Returns a string representation of the step and alteration (e.g., "F#").
    */
-  public static stepAlterName(
-    step: InternationalPitchStep,
-    alter: InternationalPitchAlter,
-  ): string {
+  public static stepAlterName(step: IPNStep, alter: IPNAlter): string {
     const accidental =
       alter.value > 0 ? "#".repeat(alter.value) : "b".repeat(-alter.value);
     return `${step.name}${accidental}`;
@@ -295,15 +298,11 @@ export class InternationalPitch {
   /**
    * Converts a Pitch instance into InternationalPitch.
    */
-  public static fromPitch(pitch: Pitch): InternationalPitch {
-    const { step, alter } = InternationalPitch.fromNoteName(pitch.noteName);
+  public static fromPitch(pitch: Pitch): IPN {
+    const { step, alter } = IPN.fromNoteName(pitch.noteName);
     const baseOctave = step.basePitch.octave.value;
     const octaveVal = pitch.octave.value - baseOctave + 4 * alter.value + 4;
-    return new InternationalPitch(
-      step,
-      alter,
-      new InternationalPitchOctave(octaveVal),
-    );
+    return new IPN(step, alter, new IPNOctave(octaveVal));
   }
 
   private static readonly stepAlterRegex = /^([A-G])([#b]*)$/;
@@ -312,18 +311,18 @@ export class InternationalPitch {
    * Parses the step and alteration from a string (e.g., "C#").
    */
   public static parseStepAlter(name: string): {
-    step: InternationalPitchStep;
-    alter: InternationalPitchAlter;
+    step: IPNStep;
+    alter: IPNAlter;
   } {
-    const match = name.match(InternationalPitch.stepAlterRegex);
+    const match = name.match(IPN.stepAlterRegex);
     if (match) {
       const [_, stepStr, accidentalStr] = match;
       const alterVal =
         (accidentalStr.match(/#/g) || []).length -
         (accidentalStr.match(/b/g) || []).length;
       return {
-        step: InternationalPitchStep.valueOf(stepStr),
-        alter: new InternationalPitchAlter(alterVal),
+        step: IPNStep.valueOf(stepStr),
+        alter: new IPNAlter(alterVal),
       };
     }
     throw new Error(`Invalid note name: ${name}`);
@@ -334,17 +333,13 @@ export class InternationalPitch {
   /**
    * Parses an international pitch notation string (e.g., "C#4").
    */
-  public static parse(name: string): InternationalPitch {
-    const match = name.match(InternationalPitch.regex);
+  public static parse(name: string): IPN {
+    const match = name.match(IPN.regex);
     if (match) {
       const [_, noteNameStr, octaveStr] = match;
-      const { step, alter } = InternationalPitch.parseStepAlter(noteNameStr);
+      const { step, alter } = IPN.parseStepAlter(noteNameStr);
       const octaveNum = parseInt(octaveStr, 10);
-      return new InternationalPitch(
-        step,
-        alter,
-        new InternationalPitchOctave(octaveNum),
-      );
+      return new IPN(step, alter, new IPNOctave(octaveNum));
     }
     throw new Error(`Invalid pitch name: ${name}`);
   }
@@ -831,7 +826,7 @@ export class Degree {
    * Converts the degree back to a NoteName within the specified key.
    */
   public noteName(key: Key): PitchNoteName {
-    const { step: rootStep } = InternationalPitch.fromNoteName(key.tonic);
+    const { step: rootStep } = IPN.fromNoteName(key.tonic);
     const { fifth: diatonicVal } = Key.calculateScalePitch(
       key.tonic.value,
       key.mode.offset,
@@ -850,8 +845,8 @@ export class Degree {
    * Determines the degree of a note name relative to a key.
    */
   public static fromNoteNameKey(noteName: PitchNoteName, key: Key): Degree {
-    const { step: nStep } = InternationalPitch.fromNoteName(noteName);
-    const { step: tStep } = InternationalPitch.fromNoteName(key.tonic);
+    const { step: nStep } = IPN.fromNoteName(noteName);
+    const { step: tStep } = IPN.fromNoteName(key.tonic);
 
     const stepDiff = mod(nStep.ordinal - tStep.ordinal, 7);
     const degreeStep = new DegreeStep(stepDiff);

@@ -4,6 +4,18 @@ import { Rational } from "../../models/math.js";
 import { MeiTuplet } from "./MeiTuplet.js";
 
 /**
+ * Converts an IPN alter value to the MEI `accid.ges` / `accid` attribute string.
+ * Returns `undefined` for natural (alter = 0).
+ */
+export function alterToAccidGes(alter: number): string | undefined {
+  if (alter === 1) return "s";
+  if (alter === -1) return "f";
+  if (alter === 2) return "ss";
+  if (alter === -2) return "ff";
+  return undefined;
+}
+
+/**
  * Utility to calculate duration from MEI attributes.
  */
 function getDurationFromAttributes(

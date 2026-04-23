@@ -1,5 +1,5 @@
 import type { MeiElement } from "../../MeiElement.js";
-import { Duration, Offset } from "../../models/elements.js";
+import { Duration, type Key, Offset } from "../../models/elements.js";
 import {
   type EventModel,
   type LayerModel,
@@ -7,13 +7,34 @@ import {
   ScoreModel,
   type StaffModel,
 } from "../../models/score.js";
+import { MeiNote } from "../events/MeiNote.js";
 import { getDuration } from "../events/utils.js";
+import { MeiKeySig } from "../score-def/MeiKeySig.js";
 import { MeiMeterSig } from "../score-def/MeiMeterSig.js";
 import { MeiScoreDef } from "../score-def/MeiScoreDef.js";
 import { getGlobalMeter } from "../score-def/meter.js";
 
 const EVENT_TAGS = new Set(["note", "rest", "chord", "space", "mRest"]);
 const CONTAINER_TAGS = new Set(["beam", "tuplet", "ftrem", "btrem"]);
+
+/**
+ * Collects the key signature in effect for each staff by scanning all
+ * `<staffDef>` elements in the document.  When a staff has multiple
+ * `<staffDef>` entries (e.g. a mid-piece key change), the first one in
+ * document order is used — full per-measure key tracking is a TODO.
+ */
+function buildStaffKeys(root: MeiElement): ReadonlyMap<number, Key> {
+  const map = new Map<number, Key>();
+  for (const sd of root.getElementsByTagName("staffDef")) {
+    const n = Number.parseInt(sd.getAttribute("n") ?? "0", 10);
+    if (!n || map.has(n)) continue;
+    const keySigEl = sd.getChildElement("keySig");
+    if (!keySigEl) continue;
+    const key = MeiKeySig.create(keySigEl)?.toKey();
+    if (key) map.set(n, key);
+  }
+  return map;
+}
 
 /**
  * Recursively collects musical events from a layer element,
@@ -32,7 +53,17 @@ function collectEvents(
 
     if (EVENT_TAGS.has(tag)) {
       const dur = getDuration(child) ?? Duration.of(0);
-      events.push({ id, offset, duration: dur, isNavigable: navigable });
+      // Staff position: diatonic line/space as an IntervalStep from C4
+      // (C4=0, D4=1, …, B4=6, C5=7, B3=−1). Two notes share a staff position
+      // when their values are equal, regardless of accidentals.
+      const staffPosition = MeiNote.create(child)?.pitch?.asInterval().step();
+      events.push({
+        id,
+        offset,
+        duration: dur,
+        isNavigable: navigable,
+        staffPosition,
+      });
 
       if (tag === "chord") {
         collectEvents(child, offset, events, false);
@@ -52,6 +83,7 @@ function collectEvents(
  * // TODO テストがないぞ？？？
  */
 export function buildScoreModel(root: MeiElement): ScoreModel {
+  const staffKeys = buildStaffKeys(root);
   let currentMeter = getGlobalMeter(root);
 
   const measures = root.getElementsByTagName("measure");
@@ -140,5 +172,5 @@ export function buildScoreModel(root: MeiElement): ScoreModel {
     });
   }
 
-  return new ScoreModel(measureModels);
+  return new ScoreModel(measureModels, staffKeys);
 }

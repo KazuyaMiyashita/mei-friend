@@ -100,4 +100,19 @@ export class MeiDraft {
   delete(index: number, length: number): void {
     this.yNode.delete(index, length);
   }
+
+  /**
+   * Removes all direct child elements whose tag name matches `tagName`.
+   * Iterates in reverse so deletions don't shift unvisited indices.
+   */
+  removeChildrenByTag(tagName: string): this {
+    const arr = this.yNode.toArray();
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const c = arr[i];
+      if (c instanceof Y.XmlElement && c.nodeName === tagName) {
+        this.yNode.delete(i, 1);
+      }
+    }
+    return this;
+  }
 }

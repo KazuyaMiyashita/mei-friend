@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { MeiFriend } from "../../../src/MeiFriend.js";
 import { MeiNote } from "../../../src/mei/events/MeiNote.js";
-import { InternationalPitch } from "../../../src/models/elements.js";
+import { IPN } from "../../../src/models/elements.js";
 
 // ------------------------------------------------------------------ helpers
 
 /** Returns the InternationalPitch of the note at the given ID after loading XML. */
-function getPitch(mf: MeiFriend, id: string): InternationalPitch {
+function getPitch(mf: MeiFriend, id: string): IPN {
   const el = mf.getElementById(id)!;
-  return InternationalPitch.fromPitch(MeiNote.create(el)!.pitch!);
+  return IPN.fromPitch(MeiNote.create(el)!.pitch!);
 }
 
 /** Returns the accid.ges attribute value of the note element (or undefined). */

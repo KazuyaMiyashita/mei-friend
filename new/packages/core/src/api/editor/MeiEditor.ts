@@ -1,15 +1,14 @@
 import type { MeiElement } from "../../MeiElement.js";
 import type { MeiFriend } from "../../MeiFriend.js";
 import { MeiNote } from "../../mei/events/MeiNote.js";
-import { MeiKeySig } from "../../mei/score-def/MeiKeySig.js";
+import { alterToAccidGes } from "../../mei/events/utils.js";
 import {
-  InternationalPitch,
-  InternationalPitchAlter,
-  InternationalPitchStep,
-  Key,
+  IntervalStep,
+  IPN,
+  type IPNAlter,
+  type Key,
   type Offset,
 } from "../../models/elements.js";
-import type { ScoreModel } from "../../models/score.js";
 
 export interface AccidentalCorrection {
   readonly id: string;
@@ -19,113 +18,6 @@ export interface AccidentalCorrection {
 export interface PitchMoveResult {
   readonly note: MeiElement;
   readonly accidentalCorrections: ReadonlyArray<AccidentalCorrection>;
-}
-
-function alterToAccidGes(alter: number): string | undefined {
-  if (alter === 1) return "s";
-  if (alter === -1) return "f";
-  if (alter === 2) return "ss";
-  if (alter === -2) return "ff";
-  return undefined;
-}
-
-function getKeyAlter(
-  targetStep: InternationalPitchStep,
-  key: Key,
-): InternationalPitchAlter {
-  const SHARPS = ["F", "C", "G", "D", "A", "E", "B"];
-  const FLATS = ["B", "E", "A", "D", "G", "C", "F"];
-  const sigNum = key.signatureNum();
-  if (sigNum > 0 && SHARPS.slice(0, sigNum).includes(targetStep.name)) {
-    return new InternationalPitchAlter(1);
-  }
-  if (sigNum < 0 && FLATS.slice(0, -sigNum).includes(targetStep.name)) {
-    return new InternationalPitchAlter(-1);
-  }
-  return new InternationalPitchAlter(0);
-}
-
-function getKeyForStaff(
-  staffN: number,
-  getElementsByTagName: (tag: string) => MeiElement[],
-): Key {
-  const staffDefs = getElementsByTagName("staffDef");
-  for (const sd of staffDefs) {
-    if (sd.getAttribute("n") !== String(staffN)) continue;
-    const keySigEl = sd.getChildElement("keySig");
-    if (keySigEl) {
-      const key = MeiKeySig.create(keySigEl)?.toKey();
-      if (key) return key;
-    }
-  }
-  return Key.parse("C Major");
-}
-
-function findPrecedingAccid(
-  targetStep: InternationalPitchStep,
-  targetOctave: number,
-  noteId: string,
-  getElementById: (id: string) => MeiElement | undefined,
-  getScoreModel: () => ScoreModel,
-): InternationalPitchAlter | undefined {
-  const scoreModel = getScoreModel();
-  const pos = scoreModel.getPositionById(noteId);
-  if (!pos) return undefined;
-
-  const measure = scoreModel.getMeasure(pos.measureIndex);
-  if (!measure) return undefined;
-
-  let lastAlter: InternationalPitchAlter | undefined;
-  let lastOffset: Offset | undefined;
-
-  for (const [sN, staff] of measure.staves) {
-    if (sN !== pos.staffN) continue;
-    for (const [, layer] of staff.layers) {
-      for (const event of layer.events) {
-        if (event.offset.compareTo(pos.offset) >= 0) continue;
-        const el = getElementById(event.id);
-        if (!el) continue;
-        // <accid> 子要素を持つもの（印刷された臨時記号）のみ対象
-        if (!el.getChildElement("accid")) continue;
-        const note = MeiNote.create(el);
-        if (!note?.pitch) continue;
-        const intPitch = InternationalPitch.fromPitch(note.pitch);
-        if (
-          intPitch.step !== targetStep ||
-          intPitch.octave.value !== targetOctave
-        )
-          continue;
-        if (!lastOffset || event.offset.compareTo(lastOffset) > 0) {
-          lastAlter = intPitch.alter;
-          lastOffset = event.offset;
-        }
-      }
-    }
-  }
-  return lastAlter;
-}
-
-function calcTargetStep(
-  intPitch: InternationalPitch,
-  direction: 1 | -1,
-): { step: InternationalPitchStep; octave: number } {
-  const steps = InternationalPitchStep.values();
-  if (direction === 1) {
-    const targetStep = steps[(intPitch.step.ordinal + 1) % 7];
-    // B (ordinal 6) → C crosses the octave boundary
-    const targetOctave =
-      intPitch.step.ordinal === 6
-        ? intPitch.octave.value + 1
-        : intPitch.octave.value;
-    return { step: targetStep, octave: targetOctave };
-  }
-  const targetStep = steps[(intPitch.step.ordinal + 6) % 7]; // -1 mod 7
-  // C (ordinal 0) → B crosses the octave boundary downward
-  const targetOctave =
-    intPitch.step.ordinal === 0
-      ? intPitch.octave.value - 1
-      : intPitch.octave.value;
-  return { step: targetStep, octave: targetOctave };
 }
 
 /**
@@ -141,116 +33,107 @@ function calcTargetStep(
 export class MeiEditor {
   constructor(private readonly meiFriend: MeiFriend) {}
 
-  private applyPitch(
-    element: MeiElement,
-    step: InternationalPitchStep,
-    alter: InternationalPitchAlter,
-    octave: number,
-  ): MeiElement {
-    const pname = step.name.toLowerCase();
-    const oct = String(octave);
-    const accidGes = alterToAccidGes(alter.value);
+  /**
+   * Among notes *before* `noteId` in the same measure and staff that carry a
+   * printed `<accid>` at `targetPos`, returns the alter of the most recent one.
+   * Returns `undefined` when no such note exists.
+   *
+   * @param targetPos - The target staff position (IntervalStep from C4).
+   * @param noteId    - The `xml:id` of the reference note.
+   */
+  private findPrecedingAccid(
+    targetPos: IntervalStep,
+    noteId: string,
+  ): IPNAlter | undefined {
+    const scoreModel = this.meiFriend.getScoreModel();
+    const pos = scoreModel.getPositionById(noteId);
+    if (!pos) return undefined;
 
-    return this.meiFriend.produceElement(element, (draft) => {
-      draft.setAttribute("pname", pname);
-      draft.setAttribute("oct", oct);
-      if (accidGes) {
-        draft.setAttribute("accid.ges", accidGes);
-      } else {
-        draft.removeAttribute("accid.ges");
+    const candidates = scoreModel.eventsAtStaffPosition(
+      pos.measureIndex,
+      pos.staffN,
+      targetPos,
+    );
+
+    let lastAlter: IPNAlter | undefined;
+    let lastOffset: Offset | undefined;
+
+    for (const event of candidates) {
+      if (event.offset.compareTo(pos.offset) >= 0) continue;
+      const el = this.meiFriend.getElementById(event.id);
+      if (!el) continue;
+      const note = MeiNote.create(el);
+      if (!note?.hasPrintedAccidental) continue;
+      const pitch = note.pitch;
+      if (!pitch) continue;
+      if (!lastOffset || event.offset.compareTo(lastOffset) > 0) {
+        lastAlter = IPN.fromPitch(pitch).alter;
+        lastOffset = event.offset;
       }
-      // Remove any existing <accid> children — moved notes never carry printed accidentals
-      const children = draft.children;
-      for (let i = children.length - 1; i >= 0; i--) {
-        if (children[i].tagName === "accid") {
-          draft.delete(i, 1);
-        }
-      }
-    });
+    }
+    return lastAlter;
   }
 
   /**
    * Finds subsequent notes in the same measure and staff that need their
    * accidentals updated after the source note (which had a printed accidental)
-   * has been moved away from (oldStep, oldOctave).
+   * has been moved away from `oldPos`.
    *
-   * Returns corrections in temporal order. Scanning stops when an independent
-   * accidental is encountered (one whose alter differs from the key-signature
-   * default), since it establishes a new accidental context for later notes.
+   * Returns corrections in temporal order.  Scanning stops as soon as an
+   * independent accidental is encountered — one whose alter differs from the
+   * key-signature default — because that note establishes a new accidental
+   * context for later notes.
+   *
+   * @param oldPos - The staff position the source note is leaving (IntervalStep from C4).
+   * @param noteId - The `xml:id` of the note being moved.
+   * @param key    - The key signature in effect for the source note's staff.
    */
   private findContextualAccidUpdates(
-    oldStep: InternationalPitchStep,
-    oldOctave: number,
+    oldPos: IntervalStep,
     noteId: string,
-    getElementById: (id: string) => MeiElement | undefined,
-    getScoreModel: () => ScoreModel,
     key: Key,
   ): AccidentalCorrection[] {
-    const scoreModel = getScoreModel();
+    const scoreModel = this.meiFriend.getScoreModel();
     const pos = scoreModel.getPositionById(noteId);
     if (!pos) return [];
 
-    const measure = scoreModel.getMeasure(pos.measureIndex);
-    if (!measure) return [];
+    const keyAlter = key
+      .diatonicScalePitch(oldPos)
+      .internationalPitchNotation().alter;
 
-    const keyAlter = getKeyAlter(oldStep, key);
-
-    const candidates: Array<{ offset: Offset; id: string; el: MeiElement }> =
-      [];
-
-    for (const [sN, staff] of measure.staves) {
-      if (sN !== pos.staffN) continue;
-      for (const [, layer] of staff.layers) {
-        for (const event of layer.events) {
-          if (event.offset.compareTo(pos.offset) <= 0) continue;
-          const el = getElementById(event.id);
-          if (!el) continue;
-          const note = MeiNote.create(el);
-          if (!note?.pitch) continue;
-          const intPitch = InternationalPitch.fromPitch(note.pitch);
-          if (intPitch.step !== oldStep || intPitch.octave.value !== oldOctave)
-            continue;
-          candidates.push({ offset: event.offset, id: event.id, el });
-        }
-      }
-    }
-
-    candidates.sort((a, b) => a.offset.compareTo(b.offset));
+    const candidates = scoreModel
+      .eventsAtStaffPosition(pos.measureIndex, pos.staffN, oldPos)
+      .filter((e) => e.offset.compareTo(pos.offset) > 0);
 
     const corrections: AccidentalCorrection[] = [];
-    for (const { id, el } of candidates) {
-      const hasAccidChild = !!el.getChildElement("accid");
-      if (!hasAccidChild) {
+    for (const event of candidates) {
+      const el = this.meiFriend.getElementById(event.id);
+      if (!el) continue;
+      const note = MeiNote.create(el);
+      if (!note) continue;
+
+      if (!note.hasPrintedAccidental) {
         // Was relying on carry-over from the moved note → revert to key sig
-        const accidGes = alterToAccidGes(keyAlter.value);
         const corrected = this.meiFriend.produceElement(el, (draft) => {
+          const accidGes = alterToAccidGes(keyAlter.value);
           if (accidGes) draft.setAttribute("accid.ges", accidGes);
           else draft.removeAttribute("accid.ges");
         });
-        corrections.push({ id, element: corrected });
+        corrections.push({ id: event.id, element: corrected });
       } else {
-        // Has printed accidental — check if it's a cancellation of the moved note's effect
-        const note = MeiNote.create(el);
-        if (!note?.pitch) break;
-        const intPitch = InternationalPitch.fromPitch(note.pitch);
+        // Has printed accidental — check if it cancels the moved note's effect
+        const pitch = note.pitch;
+        if (!pitch) break;
+        const intPitch = IPN.fromPitch(pitch);
         if (intPitch.alter.value === keyAlter.value) {
           // Cancellation accidental — now redundant, remove it
-          const accidGes = alterToAccidGes(keyAlter.value);
           const corrected = this.meiFriend.produceElement(el, (draft) => {
-            const children = draft.toArray();
-            for (let i = children.length - 1; i >= 0; i--) {
-              const child = children[i];
-              if (
-                "nodeName" in child &&
-                (child as { nodeName: string }).nodeName === "accid"
-              ) {
-                draft.delete(i, 1);
-              }
-            }
+            draft.removeChildrenByTag("accid");
+            const accidGes = alterToAccidGes(keyAlter.value);
             if (accidGes) draft.setAttribute("accid.ges", accidGes);
             else draft.removeAttribute("accid.ges");
           });
-          corrections.push({ id, element: corrected });
+          corrections.push({ id: event.id, element: corrected });
           break;
         } else {
           // Independent accidental — establishes its own context, stop scanning
@@ -262,58 +145,42 @@ export class MeiEditor {
     return corrections;
   }
 
-  private transpose(noteId: string, direction: 1 | -1): PitchMoveResult {
-    const getElementById = (id: string) => this.meiFriend.getElementById(id);
-    const getElementsByTagName = (tag: string) =>
-      this.meiFriend.getElementsByTagName(tag);
-    const getScoreModel = () => this.meiFriend.getScoreModel();
-
-    const element = getElementById(noteId);
+  private transpose(noteId: string, step: IntervalStep): PitchMoveResult {
+    const element = this.meiFriend.getElementById(noteId);
     if (!element) throw new Error(`Element "${noteId}" not found`);
     const note = MeiNote.create(element);
     if (!note) throw new Error(`Element "${noteId}" is not a <note>`);
     const currentPitch = note.pitch;
     if (!currentPitch) throw new Error(`Note "${noteId}" has no pitch`);
 
-    const intPitch = InternationalPitch.fromPitch(currentPitch);
-    const hadPrintedAccid = !!element.getChildElement("accid");
+    // Staff positions: IntervalStep from C4 (C4=0, D4=1, …, B4=6, C5=7, B3=−1).
+    // Incrementing by 1 moves up one diatonic step on the staff.
+    const sourcePos = currentPitch.asInterval().step();
+    const targetPos = new IntervalStep(sourcePos.value + step.value);
 
-    const { step: targetStep, octave: targetOctave } = calcTargetStep(
-      intPitch,
-      direction,
+    const scoreModel = this.meiFriend.getScoreModel();
+    const staffN = scoreModel.getPositionById(noteId)?.staffN ?? 1;
+    const key = scoreModel.getKeyForStaff(staffN);
+
+    const ip = key.diatonicScalePitch(targetPos).internationalPitchNotation();
+    const alteredIp = new IPN(
+      ip.step,
+      this.findPrecedingAccid(targetPos, noteId) ?? ip.alter,
+      ip.octave,
     );
 
-    const pos = getScoreModel().getPositionById(noteId);
-    const staffN = pos?.staffN ?? 1;
-
-    const key = getKeyForStaff(staffN, getElementsByTagName);
-    const defaultAlter = getKeyAlter(targetStep, key);
-    const alter =
-      findPrecedingAccid(
-        targetStep,
-        targetOctave,
-        noteId,
-        getElementById,
-        getScoreModel,
-      ) ?? defaultAlter;
-
-    const updatedNote = this.applyPitch(
-      element,
-      targetStep,
-      alter,
-      targetOctave,
+    const updatedNote = this.meiFriend.produceElement(
+      note,
+      MeiNote.applyPitchRecipe(alteredIp),
     );
 
-    const accidentalCorrections = hadPrintedAccid
-      ? this.findContextualAccidUpdates(
-          intPitch.step,
-          intPitch.octave.value,
-          noteId,
-          getElementById,
-          getScoreModel,
-          key,
-        )
+    // If the moving note had a printed accidental, subsequent notes in the
+    // measure may have been relying on its carry-over effect.
+    const accidentalCorrections = note.hasPrintedAccidental
+      ? this.findContextualAccidUpdates(sourcePos, noteId, key)
       : [];
+
+    // TODO: If a note is tied to the next note, that note also moves.
 
     return { note: updatedNote, accidentalCorrections };
   }
@@ -363,7 +230,7 @@ export class MeiEditor {
    * @throws If the element is not found or is not a `<note>` with a pitch.
    */
   pitchUp(noteId: string): PitchMoveResult {
-    return this.transpose(noteId, 1);
+    return this.transpose(noteId, new IntervalStep(1));
   }
 
   /**
@@ -376,6 +243,6 @@ export class MeiEditor {
    * @throws If the element is not found or is not a `<note>` with a pitch.
    */
   pitchDown(noteId: string): PitchMoveResult {
-    return this.transpose(noteId, -1);
+    return this.transpose(noteId, new IntervalStep(-1));
   }
 }

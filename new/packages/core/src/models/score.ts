@@ -1,4 +1,4 @@
-import { type Duration, Offset } from "./elements.js";
+import { type Duration, type IntervalStep, Key, Offset } from "./elements.js";
 import { Rational } from "./math.js";
 
 // ---------------------------------------------------------------------------
@@ -15,6 +15,16 @@ export interface EventModel {
    * but not treated as navigation steps.
    */
   readonly isNavigable: boolean;
+  /**
+   * The diatonic staff position of this event, encoded as an `IntervalStep`
+   * from C4 (C4 = 0, D4 = 1, …, B4 = 6, C5 = 7, B3 = −1, C3 = −7).
+   * Defined only for pitched events (`<note>`); `undefined` for rests,
+   * spaces, chords, and other non-pitched elements.
+   *
+   * Two events share a staff line or space when their `staffPosition` values
+   * are equal, regardless of accidentals.
+   */
+  readonly staffPosition?: IntervalStep;
 }
 
 export interface LayerModel {
@@ -60,7 +70,10 @@ export interface Position {
 // ---------------------------------------------------------------------------
 
 export class ScoreModel {
-  constructor(readonly measures: ReadonlyArray<MeasureModel>) {}
+  constructor(
+    readonly measures: ReadonlyArray<MeasureModel>,
+    private readonly staffKeys: ReadonlyMap<number, Key> = new Map(),
+  ) {}
 
   getMeasure(index: number): MeasureModel | undefined {
     return this.measures[index];
@@ -68,6 +81,50 @@ export class ScoreModel {
 
   get length(): number {
     return this.measures.length;
+  }
+
+  /**
+   * Returns the key signature in effect for the given staff number.
+   * Falls back to C Major when no key signature is defined for the staff.
+   *
+   * @param staffN - Staff number (1-based).
+   */
+  getKeyForStaff(staffN: number): Key {
+    return this.staffKeys.get(staffN) ?? Key.parse("C Major");
+  }
+
+  /**
+   * Returns all events in the specified measure and staff whose diatonic
+   * staff position equals `staffPos`, sorted by temporal offset ascending.
+   *
+   * Only events that carry a `staffPosition` (i.e., pitched `<note>` elements)
+   * are returned.  Rests, spaces, chords, and other non-pitched events are
+   * excluded.  All layers of the staff are searched.
+   *
+   * @param measureIndex - Zero-based measure index.
+   * @param staffN - Staff number (1-based).
+   * @param staffPos - Target staff position as an `IntervalStep` from C4.
+   * @returns Events sorted by offset ascending, or an empty array if the
+   *   measure or staff does not exist or has no matching events.
+   */
+  eventsAtStaffPosition(
+    measureIndex: number,
+    staffN: number,
+    staffPos: IntervalStep,
+  ): ReadonlyArray<EventModel> {
+    const staff = this.getMeasure(measureIndex)?.staves.get(staffN);
+    if (!staff) return [];
+
+    const result: EventModel[] = [];
+    for (const layer of staff.layers.values()) {
+      for (const event of layer.events) {
+        if (event.staffPosition?.value === staffPos.value) {
+          result.push(event);
+        }
+      }
+    }
+    result.sort((a, b) => a.offset.compareTo(b.offset));
+    return result;
   }
 
   /**

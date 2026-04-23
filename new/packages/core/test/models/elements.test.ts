@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   Degree,
-  InternationalPitch,
-  InternationalPitchStep,
   Interval,
   IntervalStep,
+  IPN,
+  IPNStep,
   Key,
   Mode,
   Pitch,
@@ -36,8 +36,8 @@ describe("Pitch and PitchNoteName", () => {
 
   it("should handle InternationalPitch round trip", () => {
     const p = Pitch.parse("C4");
-    const ip = InternationalPitch.fromPitch(p);
-    expect(ip.step).toBe(InternationalPitchStep.C);
+    const ip = IPN.fromPitch(p);
+    expect(ip.step).toBe(IPNStep.C);
     expect(ip.octave.value).toBe(4);
     expect(ip.alter.value).toBe(0);
 
