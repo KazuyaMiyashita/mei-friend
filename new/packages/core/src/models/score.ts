@@ -1,43 +1,5 @@
-import type { Pitch, Rest } from "./elements.js";
 import { type Duration, Offset } from "./elements.js";
 import { Rational } from "./math.js";
-
-// NOTE: NoteInfo and TiesIndex (used by Mei.ts for Score<NoteInfo> building)
-export interface NoteInfo {
-  value: Pitch | Rest;
-  id: string;
-  isTieStarted: boolean;
-  isTieEnded: boolean;
-}
-
-export class TiesIndex {
-  private startNoteToTie = new Map<string, string>();
-  private endNoteToTie = new Map<string, string>();
-
-  constructor(ties: { id?: string; startId?: string; endId?: string }[]) {
-    for (const t of ties) {
-      const tieId = t.id ?? "";
-      if (t.startId) this.startNoteToTie.set(t.startId, tieId);
-      if (t.endId) this.endNoteToTie.set(t.endId, tieId);
-    }
-  }
-
-  hasStartId(noteId: string): boolean {
-    return this.startNoteToTie.has(noteId);
-  }
-
-  hasEndId(noteId: string): boolean {
-    return this.endNoteToTie.has(noteId);
-  }
-
-  getTieIdByStartId(noteId: string): string | undefined {
-    return this.startNoteToTie.get(noteId);
-  }
-
-  getTieIdByEndId(noteId: string): string | undefined {
-    return this.endNoteToTie.get(noteId);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // ScoreModel data types
