@@ -7,7 +7,7 @@ import type {
   ElementUpdateEvent,
   MeiUpdateEvent,
 } from "./MeiUpdateEvent.js";
-import { Mei } from "./mei/Mei.js";
+import { Mei } from "./mei/elements/Mei.js";
 import type { ScoreModel } from "./models/score.js";
 import { IdGenerator } from "./utils/IdGenerator.js";
 import { ROOT_WRAPPER_TAG, XmlSerde } from "./utils/XmlSerde.js";

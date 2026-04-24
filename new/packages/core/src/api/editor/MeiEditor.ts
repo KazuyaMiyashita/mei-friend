@@ -1,7 +1,7 @@
 import type { MeiElement } from "../../MeiElement.js";
 import type { MeiFriend } from "../../MeiFriend.js";
-import { MeiNote } from "../../mei/events/MeiNote.js";
-import { alterToAccidGes } from "../../mei/events/utils.js";
+import { MeiNote } from "../../mei/elements/events/MeiNote.js";
+import { alterToAccidGes } from "../../mei/utils/duration.js";
 import {
   IntervalStep,
   IPN,

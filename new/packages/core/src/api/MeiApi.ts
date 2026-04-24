@@ -1,7 +1,7 @@
 import type { MeiElement } from "../MeiElement.js";
 import type { MeiFriend } from "../MeiFriend.js";
-import type { Mei } from "../mei/Mei.js";
-import { buildScoreModel } from "../mei/structure/buildScoreModel.js";
+import type { Mei } from "../mei/elements/Mei.js";
+import { buildScoreModel } from "../mei/utils/buildScoreModel.js";
 import type { ScoreModel } from "../models/score.js";
 import { MeiEditor } from "./editor/MeiEditor.js";
 
