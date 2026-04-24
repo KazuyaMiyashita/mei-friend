@@ -9,7 +9,7 @@ import {
   type Pitch,
 } from "../../models/index.js";
 import { MeiAccid } from "./MeiAccid.js";
-import { alterToAccidGes, getDuration } from "./utils.js";
+import { getDuration } from "./utils.js";
 
 /**
  * Wrapper for `<note>` element.
@@ -44,7 +44,7 @@ export class MeiNote extends MeiElement {
     return (draft) => {
       draft.setAttribute("pname", ipn.step.name.toLowerCase());
       draft.setAttribute("oct", String(ipn.octave.value));
-      const accidGes = alterToAccidGes(ipn.alter.value);
+      const accidGes = MeiAccid.alterToAccidGes(ipn.alter.value);
       if (accidGes) draft.setAttribute("accid.ges", accidGes);
       else draft.removeAttribute("accid.ges");
       draft.removeChildrenByTag("accid");
@@ -71,32 +71,12 @@ export class MeiNote extends MeiElement {
     const step = stepMap[pname];
     if (!step) return undefined;
 
-    // Accid handling: accid.ges or <accid> child
-    let alterVal = 0;
+    // Accid priority: accid.ges attribute, then <accid> child's accid attribute.
     const accidGes = attrs["accid.ges"];
     const accidChild = this.findChild(MeiAccid);
-    const accid = accidGes || accidChild?.accid;
-
-    if (accid) {
-      switch (accid) {
-        case "s":
-          alterVal = 1;
-          break;
-        case "x":
-        case "ss":
-          alterVal = 2;
-          break;
-        case "f":
-          alterVal = -1;
-          break;
-        case "ff":
-          alterVal = -2;
-          break;
-        case "n":
-          alterVal = 0;
-          break;
-      }
-    }
+    const accid = accidGes ?? accidChild?.accid;
+    const alterVal =
+      accid !== undefined ? (MeiAccid.valueToAlter[accid] ?? 0) : 0;
 
     return new IPN(step, new IPNAlter(alterVal), new IPNOctave(oct)).toPitch();
   }

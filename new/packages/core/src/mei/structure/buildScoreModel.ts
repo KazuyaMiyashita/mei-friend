@@ -13,6 +13,9 @@ import { MeiKeySig } from "../score-def/MeiKeySig.js";
 import { MeiMeterSig } from "../score-def/MeiMeterSig.js";
 import { MeiScoreDef } from "../score-def/MeiScoreDef.js";
 import { getGlobalMeter } from "../score-def/meter.js";
+import { MeiLayer } from "./MeiLayer.js";
+import { MeiMeasure } from "./MeiMeasure.js";
+import { MeiStaff } from "./MeiStaff.js";
 
 const EVENT_TAGS = new Set(["note", "rest", "chord", "space", "mRest"]);
 const CONTAINER_TAGS = new Set(["beam", "tuplet", "ftrem", "btrem"]);
@@ -102,32 +105,26 @@ export function buildScoreModel(root: MeiElement): ScoreModel {
     } else {
       const scoreDefEl = mEl.getElementsByTagName("scoreDef")[0];
       if (scoreDefEl && scoreDefEl.parentElement?.id === mEl.id) {
-        const sd = MeiScoreDef.create(scoreDefEl);
-        if (sd) {
-          const count = sd.meterCount;
-          const unit = sd.meterUnit;
-          if (count !== undefined && unit !== undefined) {
-            currentMeter = { beats: count, beatType: Duration.of(4, unit) };
-          }
-        }
+        const meter = MeiScoreDef.create(scoreDefEl)?.getMeter();
+        if (meter) currentMeter = meter;
       }
     }
 
-    const measureN = mEl.getAttribute("n");
+    const measureN = MeiMeasure.create(mEl)?.n;
     const staffModels = new Map<number, StaffModel>();
 
     const staves = mEl.getElementsByTagName("staff");
     for (const sEl of staves) {
       if (sEl.parentElement?.id !== mEl.id) continue;
 
-      const staffN = Number.parseInt(sEl.getAttribute("n") ?? "1", 10);
+      const staffN = MeiStaff.create(sEl)?.n ?? 1;
       const layerModels = new Map<number, LayerModel>();
 
       const layers = sEl.getElementsByTagName("layer");
       for (const lEl of layers) {
         if (lEl.parentElement?.id !== sEl.id) continue;
 
-        const layerN = Number.parseInt(lEl.getAttribute("n") ?? "1", 10);
+        const layerN = MeiLayer.create(lEl)?.n ?? 1;
         const events: EventModel[] = [];
         collectEvents(lEl, Offset.of(0), events, true);
 

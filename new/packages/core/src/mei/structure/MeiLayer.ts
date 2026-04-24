@@ -13,7 +13,8 @@ export class MeiLayer extends MeiElement {
     return undefined;
   }
 
-  get n(): string | undefined {
-    return this.getAttribute("n");
+  /** The `n` attribute as a 1-based integer. Defaults to 1 if absent. */
+  get n(): number {
+    return parseInt(this.getAttribute("n") ?? "1", 10);
   }
 }

@@ -1,18 +1,15 @@
 import type { MeiElement } from "../../MeiElement.js";
 import { Duration } from "../../models/index.js";
 import { Rational } from "../../models/math.js";
+import { MeiAccid } from "./MeiAccid.js";
 import { MeiTuplet } from "./MeiTuplet.js";
 
 /**
- * Converts an IPN alter value to the MEI `accid.ges` / `accid` attribute string.
- * Returns `undefined` for natural (alter = 0).
+ * Converts an IPN alter value to the MEI `accid.ges` attribute string.
+ * Delegates to `MeiAccid.alterToAccidGes`.
  */
 export function alterToAccidGes(alter: number): string | undefined {
-  if (alter === 1) return "s";
-  if (alter === -1) return "f";
-  if (alter === 2) return "ss";
-  if (alter === -2) return "ff";
-  return undefined;
+  return MeiAccid.alterToAccidGes(alter);
 }
 
 /**
