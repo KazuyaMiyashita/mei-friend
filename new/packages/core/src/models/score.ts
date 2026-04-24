@@ -6,13 +6,22 @@ import { Rational } from "./math.js";
 // ---------------------------------------------------------------------------
 
 export interface EventModel {
+  /** The `xml:id` of the corresponding element. Unique within the document. */
   readonly id: string;
   readonly offset: Offset;
+  /**
+   * The logical duration of this event.
+   * May be `Duration.of(0)` for grace notes or elements whose duration cannot
+   * be determined.
+   * TODO: Consider enforcing a constraint that zero-duration events are never
+   * stored in the model.
+   */
   readonly duration: Duration;
   /**
    * True for top-level musical events (note, rest, chord, space, mRest).
-   * False for notes inside a chord — kept for click-target ID resolution
-   * but not treated as navigation steps.
+   * False for notes inside a chord — kept so that `ScoreModel.getPositionById`
+   * can resolve a chord-internal note ID to its parent chord's position, but
+   * not treated as a navigation step by `Cursor`.
    */
   readonly isNavigable: boolean;
   /**
@@ -28,14 +37,28 @@ export interface EventModel {
 }
 
 export interface LayerModel {
+  /** The `xml:id` of the corresponding `<layer>` element. Unique within the document. */
   readonly id: string;
+  /** The value of the `n` attribute on the corresponding `<layer>` element. */
   readonly layerN: number;
+  /**
+   * Events in document order. Offsets are not guaranteed to be monotonically
+   * increasing — out-of-order offsets can arise from certain MEI constructs.
+   * TODO: Consider enforcing ascending offset order as a model invariant.
+   */
   readonly events: ReadonlyArray<EventModel>;
 }
 
 export interface StaffModel {
+  /** The `xml:id` of the corresponding `<staff>` element. Unique within the document. */
   readonly id: string;
+  /**
+   * The value of the `n` attribute on the corresponding `<staffDef>` / `<staff>`
+   * element, as defined in the score definition. Not necessarily a contiguous
+   * sequence — e.g. a score may define only n=1 and n=3.
+   */
   readonly staffN: number;
+  /** Keyed by `layerN`. */
   readonly layers: ReadonlyMap<number, LayerModel>;
 }
 
@@ -45,11 +68,23 @@ export interface Meter {
 }
 
 export interface MeasureModel {
+  /** The `xml:id` of the corresponding `<measure>` element. Unique within the document. */
   readonly id: string;
+  /**
+   * Zero-based index into `ScoreModel.measures`. Unique across the score.
+   * Use this for all programmatic position references.
+   */
   readonly measureIndex: number;
+  /**
+   * The value of the `n` attribute on the corresponding `<measure>` element —
+   * the number printed on the score. May be duplicated across measures (e.g.
+   * first and second endings share the same number) and may be `undefined`
+   * when the attribute is absent.
+   */
   readonly measureN: string | undefined;
   readonly meter: Meter;
   readonly totalDuration: Duration;
+  /** Keyed by `staffN`. */
   readonly staves: ReadonlyMap<number, StaffModel>;
 }
 
@@ -58,10 +93,18 @@ export interface MeasureModel {
 // ---------------------------------------------------------------------------
 
 export interface Position {
+  /** Zero-based index into `ScoreModel.measures`. */
   readonly measureIndex: number;
+  /** The `n` attribute value of the target `<staff>`. See `StaffModel.staffN`. */
   readonly staffN: number;
+  /** The `n` attribute value of the target `<layer>`. See `LayerModel.layerN`. */
   readonly layerN: number;
   readonly offset: Offset;
+  /**
+   * The `xml:id` of the measure element at this position.
+   * `undefined` for virtual beat positions that do not correspond to a
+   * specific measure in the document.
+   */
   readonly measureId?: string;
 }
 
