@@ -3,14 +3,14 @@ import { type Duration, Rest } from "../../models/index.js";
 import { getDuration } from "./utils.js";
 
 /**
- * Wrapper for `<rest>` element.
+ * Wrapper for `<mRest>` element.
  *
- * https://music-encoding.org/guidelines/v5/elements/rest.html
+ * https://music-encoding.org/guidelines/v5/elements/mRest.html
  */
-export class MeiRest extends MeiElement {
-  static create(element: MeiElement): MeiRest | undefined {
-    if (element.tagName === "rest") {
-      return new MeiRest(element.yNode);
+export class MeiMRest extends MeiElement {
+  static create(element: MeiElement): MeiMRest | undefined {
+    if (element.tagName === "mRest") {
+      return new MeiMRest(element.yNode);
     }
     return undefined;
   }

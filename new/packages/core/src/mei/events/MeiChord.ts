@@ -4,7 +4,9 @@ import { MeiNote } from "./MeiNote.js";
 import { getDuration } from "./utils.js";
 
 /**
- * Wrapper for <chord> element.
+ * Wrapper for `<chord>` element.
+ *
+ * https://music-encoding.org/guidelines/v5/elements/chord.html
  */
 export class MeiChord extends MeiElement {
   static create(element: MeiElement): MeiChord | undefined {
@@ -20,9 +22,7 @@ export class MeiChord extends MeiElement {
   }
 
   /** Returns the notes within the chord. */
-  get notes(): MeiNote[] {
-    return this.children
-      .map((c) => MeiNote.create(c))
-      .filter((n): n is MeiNote => !!n);
+  get notes(): ReadonlyArray<MeiNote> {
+    return this.findChildren(MeiNote);
   }
 }

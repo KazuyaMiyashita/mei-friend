@@ -41,22 +41,18 @@ export function getGlobalMeter(root: MeiElement): Meter | undefined {
     }
   }
 
-  const staffDefs = root.getElementsByTagName("staffDef");
-  for (const sd of staffDefs) {
-    const staffDef = MeiStaffDef.create(sd);
-    if (
-      staffDef &&
-      staffDef.meterCount !== undefined &&
-      staffDef.meterUnit !== undefined
-    ) {
+  const staffDefs = root.findDescendants(MeiStaffDef);
+  for (const staffDef of staffDefs) {
+    if (staffDef.meterCount !== undefined && staffDef.meterUnit !== undefined) {
       return createMeter(staffDef.meterCount, staffDef.meterUnit);
     }
-    const meterSigEl = sd.getChildElement("meterSig");
-    if (meterSigEl) {
-      const ms = MeiMeterSig.create(meterSigEl);
-      if (ms && ms.count !== undefined && ms.unit !== undefined) {
-        return createMeter(ms.count, ms.unit);
-      }
+    const meterSig = staffDef.findChild(MeiMeterSig);
+    if (
+      meterSig &&
+      meterSig.count !== undefined &&
+      meterSig.unit !== undefined
+    ) {
+      return createMeter(meterSig.count, meterSig.unit);
     }
   }
 
@@ -69,11 +65,8 @@ export function getGlobalMeter(root: MeiElement): Meter | undefined {
  */
 export function getStaffMeters(root: MeiElement): Map<string, Meter> {
   const meters = new Map<string, Meter>();
-  const staffDefs = root.getElementsByTagName("staffDef");
-  for (const sd of staffDefs) {
-    const staffDef = MeiStaffDef.create(sd);
-    if (!staffDef?.id) continue;
-
+  const staffDefs = root.findDescendants(MeiStaffDef);
+  for (const staffDef of staffDefs) {
     if (staffDef.meterCount !== undefined && staffDef.meterUnit !== undefined) {
       meters.set(
         staffDef.id,
@@ -82,11 +75,14 @@ export function getStaffMeters(root: MeiElement): Map<string, Meter> {
       continue;
     }
 
-    const meterSigEl = sd.getChildElement("meterSig");
-    if (meterSigEl) {
-      const ms = MeiMeterSig.create(meterSigEl);
-      if (ms && ms.count !== undefined && ms.unit !== undefined) {
-        meters.set(staffDef.id, createMeter(ms.count, ms.unit));
+    const meterSig = staffDef.findChild(MeiMeterSig);
+    if (meterSig) {
+      if (
+        meterSig &&
+        meterSig.count !== undefined &&
+        meterSig.unit !== undefined
+      ) {
+        meters.set(staffDef.id, createMeter(meterSig.count, meterSig.unit));
       }
     }
   }

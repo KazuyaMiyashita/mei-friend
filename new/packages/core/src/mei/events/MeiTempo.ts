@@ -1,7 +1,9 @@
 import { MeiElement } from "../../MeiElement.js";
 
 /**
- * Wrapper for <tempo> element.
+ * Wrapper for `<tempo>` element.
+ *
+ * https://music-encoding.org/guidelines/v5/elements/tempo.html
  */
 export class MeiTempo extends MeiElement {
   static create(element: MeiElement): MeiTempo | undefined {
@@ -12,13 +14,11 @@ export class MeiTempo extends MeiElement {
   }
 
   /**
-   * Returns the BPM value from @midi.bpm.
+   * Returns the BPM value from `@midi.bpm`.
    */
-  get bpm(): number | undefined {
+  get midiBpm(): number | undefined {
     const midiBpm = this.getAttribute("midi.bpm");
     if (midiBpm) return parseInt(midiBpm, 10);
-    const mm = this.getAttribute("mm");
-    if (mm) return parseInt(mm, 10);
     return undefined;
   }
 }

@@ -2,7 +2,9 @@ import { MeiElement } from "../../MeiElement.js";
 import { MeiFileDesc } from "./MeiFileDesc.js";
 
 /**
- * Wrapper for <meiHead> element.
+ * Wrapper for `<meiHead>` element.
+ *
+ * https://music-encoding.org/guidelines/v5/elements/meiHead.html
  */
 export class MeiHead extends MeiElement {
   static create(element: MeiElement): MeiHead | undefined {
@@ -16,8 +18,7 @@ export class MeiHead extends MeiElement {
    * Returns the file description element.
    */
   get fileDesc(): MeiFileDesc | undefined {
-    const el = this.getChildElement("fileDesc");
-    return el ? new MeiFileDesc(el.yNode) : undefined;
+    return this.findChild(MeiFileDesc);
   }
 
   /**

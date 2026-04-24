@@ -19,7 +19,7 @@ export class MeiApi {
   }
 
   /**
-   * Returns the root <mei> element wrapped in a Mei wrapper.
+   * Returns the root `<mei>` element wrapped in a Mei wrapper.
    */
   public get mei(): Mei | undefined {
     return this.meiFriend.getRootElement();

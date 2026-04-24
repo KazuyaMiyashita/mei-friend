@@ -4,7 +4,9 @@ import { MeiKeySig } from "./MeiKeySig.js";
 import { MeiMeterSig } from "./MeiMeterSig.js";
 
 /**
- * Wrapper for <staffDef> element.
+ * Wrapper for `<staffDef>` element.
+ *
+ * https://music-encoding.org/guidelines/v5/elements/staffDef.html
  */
 export class MeiStaffDef extends MeiElement {
   static create(element: MeiElement): MeiStaffDef | undefined {
@@ -19,13 +21,11 @@ export class MeiStaffDef extends MeiElement {
   }
 
   get keySig(): MeiKeySig | undefined {
-    const el = this.getChildElement("keySig");
-    return el ? new MeiKeySig(el.yNode) : undefined;
+    return this.findChild(MeiKeySig);
   }
 
   get meterSig(): MeiMeterSig | undefined {
-    const el = this.getChildElement("meterSig");
-    return el ? new MeiMeterSig(el.yNode) : undefined;
+    return this.findChild(MeiMeterSig);
   }
 
   get meterCount(): number | undefined {

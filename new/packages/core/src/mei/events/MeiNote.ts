@@ -8,10 +8,13 @@ import {
   IPNStep,
   type Pitch,
 } from "../../models/index.js";
+import { MeiAccid } from "./MeiAccid.js";
 import { alterToAccidGes, getDuration } from "./utils.js";
 
 /**
- * Wrapper for <note> element.
+ * Wrapper for `<note>` element.
+ *
+ * https://music-encoding.org/guidelines/v5/elements/note.html
  */
 export class MeiNote extends MeiElement {
   static create(element: MeiElement): MeiNote | undefined {
@@ -28,7 +31,7 @@ export class MeiNote extends MeiElement {
 
   /** True if a printed accidental is expressed as an `<accid>` child element. */
   get hasPrintedAccidental(): boolean {
-    return !!this.getChildElement("accid");
+    return !!this.findChild(MeiAccid);
   }
 
   /**
@@ -71,8 +74,8 @@ export class MeiNote extends MeiElement {
     // Accid handling: accid.ges or <accid> child
     let alterVal = 0;
     const accidGes = attrs["accid.ges"];
-    const accidChild = this.children.find((c) => c.tagName === "accid");
-    const accid = accidGes || accidChild?.getAttribute("accid");
+    const accidChild = this.findChild(MeiAccid);
+    const accid = accidGes || accidChild?.accid;
 
     if (accid) {
       switch (accid) {

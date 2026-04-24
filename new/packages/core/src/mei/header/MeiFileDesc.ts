@@ -2,14 +2,18 @@ import { MeiElement } from "../../MeiElement.js";
 import { MeiTitleStmt } from "./MeiTitleStmt.js";
 
 /**
- * Wrapper for <fileDesc> element.
+ * Wrapper for `<fileDesc>` element.
+ *
+ * https://music-encoding.org/guidelines/v5/elements/fileDesc.html
  */
 export class MeiFileDesc extends MeiElement {
-  /**
-   * Returns the title statement element.
-   */
+  static create(element: MeiElement): MeiFileDesc | undefined {
+    if (element.tagName === "fileDesc") return new MeiFileDesc(element.yNode);
+    return undefined;
+  }
+
+  /** Returns the `<titleStmt>` statement element. */
   get titleStmt(): MeiTitleStmt | undefined {
-    const el = this.getChildElement("titleStmt");
-    return el ? new MeiTitleStmt(el.yNode) : undefined;
+    return this.findChild(MeiTitleStmt);
   }
 }

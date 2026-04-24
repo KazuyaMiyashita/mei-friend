@@ -1,7 +1,9 @@
 import { MeiElement } from "../../MeiElement.js";
 
 /**
- * Wrapper for <meterSig> element.
+ * Wrapper for `<meterSig>` element.
+ *
+ * https://music-encoding.org/guidelines/v5/elements/meterSig.html
  */
 export class MeiMeterSig extends MeiElement {
   static create(element: MeiElement): MeiMeterSig | undefined {

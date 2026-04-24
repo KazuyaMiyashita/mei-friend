@@ -2,7 +2,9 @@ import { MeiElement } from "../../MeiElement.js";
 import { Key, Mode, NoteName } from "../../models/index.js";
 
 /**
- * Wrapper for <keySig> element.
+ * Wrapper for `<keySig>` element.
+ *
+ * https://music-encoding.org/guidelines/v5/elements/keySig.html
  */
 export class MeiKeySig extends MeiElement {
   static create(element: MeiElement): MeiKeySig | undefined {

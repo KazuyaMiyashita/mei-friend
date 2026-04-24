@@ -1,7 +1,9 @@
 import { MeiElement } from "../../MeiElement.js";
 
 /**
- * Wrapper for <tie> element.
+ * Wrapper for `<tie>` element.
+ *
+ * https://music-encoding.org/guidelines/v5/elements/tie.html
  */
 export class MeiTie extends MeiElement {
   static create(element: MeiElement): MeiTie | undefined {

@@ -2,7 +2,9 @@ import { MeiElement } from "../../MeiElement.js";
 import { Rational } from "../../models/math.js";
 
 /**
- * Wrapper for <tuplet> element.
+ * Wrapper for `<tuplet>` element.
+ *
+ * https://music-encoding.org/guidelines/v5/elements/tuplet.html
  */
 export class MeiTuplet extends MeiElement {
   static create(element: MeiElement): MeiTuplet | undefined {

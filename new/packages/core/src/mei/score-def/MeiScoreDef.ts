@@ -3,7 +3,9 @@ import { MeiMeterSig } from "./MeiMeterSig.js";
 import { MeiStaffDef } from "./MeiStaffDef.js";
 
 /**
- * Wrapper for <scoreDef> element.
+ * Wrapper for `<scoreDef>` element.
+ *
+ * https://music-encoding.org/guidelines/v5/elements/scoreDef.html
  */
 export class MeiScoreDef extends MeiElement {
   static create(element: MeiElement): MeiScoreDef | undefined {
@@ -14,14 +16,11 @@ export class MeiScoreDef extends MeiElement {
   }
 
   get staffDefs(): MeiStaffDef[] {
-    return this.getElementsByTagName("staffDef").map(
-      (el) => new MeiStaffDef(el.yNode),
-    );
+    return this.findDescendants(MeiStaffDef);
   }
 
   get meterSig(): MeiMeterSig | undefined {
-    const el = this.getChildElement("meterSig");
-    return el ? new MeiMeterSig(el.yNode) : undefined;
+    return this.findChild(MeiMeterSig);
   }
 
   get meterCount(): number | undefined {

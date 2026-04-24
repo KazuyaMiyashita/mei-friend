@@ -174,4 +174,89 @@ export class MeiElement {
       );
     return yChild ? new MeiElement(yChild) : undefined;
   }
+
+  /**
+   * Returns the first direct child matched by `Clazz.create()`, or `undefined`.
+   */
+  findChild<T extends MeiElement>(Clazz: {
+    create: (el: MeiElement) => T | undefined;
+  }): T | undefined {
+    for (const child of this.children) {
+      const instance = Clazz.create(child);
+      if (instance) return instance;
+    }
+    return undefined;
+  }
+
+  /**
+   * Returns all direct children matched by `Clazz.create()`.
+   */
+  findChildren<T extends MeiElement>(Clazz: {
+    create: (el: MeiElement) => T | undefined;
+  }): ReadonlyArray<T> {
+    const results: T[] = [];
+    for (const child of this.children) {
+      const instance = Clazz.create(child);
+      if (instance) {
+        results.push(instance);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Finds the first descendant element that matches the given class.
+   * @param Clazz A class with a static create method.
+   * @returns An instance of T, or undefined if not found.
+   */
+  findDescendant<T extends MeiElement>(Clazz: {
+    create: (el: MeiElement) => T | undefined;
+  }): T | undefined {
+    let found: T | undefined;
+
+    const traverse = (node: Y.XmlElement): boolean => {
+      const length = node.length;
+      for (let i = 0; i < length; i++) {
+        const child = node.get(i);
+        if (child instanceof Y.XmlElement) {
+          const instance = Clazz.create(new MeiElement(child));
+          if (instance) {
+            found = instance;
+            return true;
+          }
+          if (traverse(child)) return true;
+        }
+      }
+      return false;
+    };
+
+    traverse(this.yNode);
+    return found;
+  }
+
+  /**
+   * Finds all descendant elements that match the given class.
+   * @param Clazz A class with a static create method.
+   * @returns An array of instances of T.
+   */
+  findDescendants<T extends MeiElement>(Clazz: {
+    create: (el: MeiElement) => T | undefined;
+  }): T[] {
+    const result: T[] = [];
+
+    const traverse = (node: Y.XmlElement) => {
+      const length = node.length;
+      for (let i = 0; i < length; i++) {
+        const child = node.get(i);
+        if (child instanceof Y.XmlElement) {
+          const instance = Clazz.create(new MeiElement(child));
+          if (instance) result.push(instance);
+          traverse(child);
+        }
+      }
+    };
+
+    traverse(this.yNode);
+    return result;
+  }
 }
