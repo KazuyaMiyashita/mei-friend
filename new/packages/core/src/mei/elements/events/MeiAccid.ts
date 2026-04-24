@@ -1,6 +1,11 @@
 import type { MeiDraft } from "../../../MeiDraft.js";
 import { MeiElement } from "../../../MeiElement.js";
 import type { IPNAlter } from "../../../models/index.js";
+import {
+  alterToGesturalAccid,
+  alterToWrittenAccid,
+  writtenAccidToAlter,
+} from "../../attributes/accid.js";
 
 /**
  * Wrapper for `<accid>` element.
@@ -18,33 +23,30 @@ export class MeiAccid extends MeiElement {
     return undefined;
   }
 
-  /** MEI accid attribute value → IPN alter integer. */
-  static readonly valueToAlter: Readonly<Record<string, number>> = {
-    s: 1,
-    x: 2,
-    ss: 2,
-    f: -1,
-    ff: -2,
-    n: 0,
-  };
-
-  /** IPN alter integer → MEI accid attribute value for gestural accidentals. */
-  static readonly alterToValue: Readonly<Record<number, string>> = {
-    1: "s",
-    2: "ss",
-    [-1]: "f",
-    [-2]: "ff",
-  };
+  /**
+   * MEI written accid value → IPN alter integer.
+   * Delegates to `attributes/accid.writtenAccidToAlter`.
+   */
+  static readonly valueToAlter: Readonly<Record<string, number>> =
+    writtenAccidToAlter;
 
   /**
-   * Returns the MEI accid string for a given IPN alter value,
+   * IPN alter integer → MEI gestural accid.ges value.
+   * Natural (alter = 0) → undefined (attribute should be absent).
+   * Delegates to `attributes/accid.alterToGesturalAccid`.
+   */
+  static readonly alterToGesturalAccid: Readonly<Record<number, string>> =
+    alterToGesturalAccid;
+
+  /**
+   * Returns the MEI `accid.ges` string for a given IPN alter value,
    * or `undefined` for natural (alter = 0).
    */
   static alterToAccidGes(alter: number): string | undefined {
-    return MeiAccid.alterToValue[alter];
+    return alterToGesturalAccid[alter];
   }
 
-  /** The `accid` attribute value (printed accidental, e.g. `"s"`, `"f"`). */
+  /** The `accid` attribute value (printed accidental, e.g. `"s"`, `"f"`, `"n"`). */
   get accid(): string | undefined {
     return this.getAttribute("accid");
   }
@@ -60,20 +62,17 @@ export class MeiAccid extends MeiElement {
   }
 
   /**
-   * When `alter` is specified, the accidental is added. If `undefined` is used, the accidental is removed.
+   * Returns a recipe that sets the `accid` attribute to the written accidental
+   * value for `alter`, or removes the attribute when `alter` is `undefined`.
+   * Natural (alter = 0) sets `accid="n"`.
    */
   static applyAccidRecipe(
     alter: IPNAlter | undefined,
   ): (draft: MeiDraft) => void {
     return (draft) => {
-      if (alter) {
-        // TODO: Here, I want to specify n when it's 0, but `alterToValue` doesn't work. How can I make this common?
-        const accid = MeiAccid.alterToValue[alter.value];
-        if (accid) {
-          draft.setAttribute("accid", accid);
-        } else if (alter.value === 0) {
-          draft.setAttribute("accid", "n");
-        }
+      if (alter !== undefined) {
+        const value = alterToWrittenAccid[alter.value];
+        if (value !== undefined) draft.setAttribute("accid", value);
       } else {
         draft.removeAttribute("accid");
       }

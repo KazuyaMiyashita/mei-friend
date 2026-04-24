@@ -1,7 +1,6 @@
 import type { MeiElement } from "../../MeiElement.js";
 import type { MeiFriend } from "../../MeiFriend.js";
 import { MeiNote } from "../../mei/elements/events/MeiNote.js";
-import { alterToAccidGes } from "../../mei/utils/duration.js";
 import {
   IntervalStep,
   IPN,
@@ -114,11 +113,10 @@ export class MeiEditor {
 
       if (!note.hasPrintedAccidental) {
         // Was relying on carry-over from the moved note → revert to key sig
-        const corrected = this.meiFriend.produceElement(el, (draft) => {
-          const accidGes = alterToAccidGes(keyAlter.value);
-          if (accidGes) draft.setAttribute("accid.ges", accidGes);
-          else draft.removeAttribute("accid.ges");
-        });
+        const corrected = this.meiFriend.produceElement(
+          el,
+          MeiNote.applyGesturalAccidRecipe(keyAlter),
+        );
         corrections.push({ id: event.id, element: corrected });
       } else {
         // Has printed accidental — check if it cancels the moved note's effect
@@ -127,12 +125,10 @@ export class MeiEditor {
         const intPitch = IPN.fromPitch(pitch);
         if (intPitch.alter.value === keyAlter.value) {
           // Cancellation accidental — now redundant, remove it
-          const corrected = this.meiFriend.produceElement(el, (draft) => {
-            draft.removeChildrenByTag("accid");
-            const accidGes = alterToAccidGes(keyAlter.value);
-            if (accidGes) draft.setAttribute("accid.ges", accidGes);
-            else draft.removeAttribute("accid.ges");
-          });
+          const corrected = this.meiFriend.produceElement(
+            el,
+            MeiNote.applyKeyDefaultAccidRecipe(keyAlter),
+          );
           corrections.push({ id: event.id, element: corrected });
           break;
         } else {

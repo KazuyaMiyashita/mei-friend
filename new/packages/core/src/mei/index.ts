@@ -1,3 +1,4 @@
+export * from "./attributes/accid.js";
 export * from "./elements/events/MeiAccid.js";
 export * from "./elements/events/MeiChord.js";
 export * from "./elements/events/MeiMRest.js";

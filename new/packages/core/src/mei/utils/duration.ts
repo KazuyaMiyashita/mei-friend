@@ -1,16 +1,7 @@
 import type { MeiElement } from "../../MeiElement.js";
 import { Duration } from "../../models/index.js";
 import { Rational } from "../../models/math.js";
-import { MeiAccid } from "../elements/events/MeiAccid.js";
 import { MeiTuplet } from "../elements/events/MeiTuplet.js";
-
-/**
- * Converts an IPN alter value to the MEI `accid.ges` attribute string.
- * Delegates to `MeiAccid.alterToAccidGes`.
- */
-export function alterToAccidGes(alter: number): string | undefined {
-  return MeiAccid.alterToAccidGes(alter);
-}
 
 /**
  * Utility to calculate duration from MEI attributes.

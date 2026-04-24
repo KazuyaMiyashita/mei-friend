@@ -8,6 +8,7 @@ import {
   IPNStep,
   type Pitch,
 } from "../../../models/index.js";
+import { alterToGesturalAccid } from "../../attributes/accid.js";
 import { getDuration } from "../../utils/duration.js";
 import { MeiAccid } from "./MeiAccid.js";
 
@@ -36,27 +37,61 @@ export class MeiNote extends MeiElement {
 
   /**
    * Returns a `produceElement` recipe that rewrites the pitch-related attributes
-   * (`pname`, `oct`, `accid.ges`) to match `ipn` and strips any `<accid>` child.
+   * (`pname`, `oct`, `accid.ges`) to match `ipn`.
+   *
+   * When `printedAccidental` is provided, an `<accid>` child element is added
+   * with the corresponding written accidental value (including `"n"` for natural).
+   * When omitted, any existing `<accid>` child is removed.
+   *
    * All other children (articulations, verse, etc.) are left untouched because
    * `produceElement` starts from a full clone of the original element.
-   *
-   * TODO: In addition to specifying the pitch using ipn, I think there should be an option to specify whether or not to add accidentals.
    */
-  static applyPitchRecipe(ipn: IPN): (draft: MeiDraft) => void {
+  static applyPitchRecipe(
+    ipn: IPN,
+    printedAccidental?: IPNAlter,
+  ): (draft: MeiDraft) => void {
     return (draft) => {
       draft.setAttribute("pname", ipn.step.name.toLowerCase());
       draft.setAttribute("oct", String(ipn.octave.value));
-      const accidGes = MeiAccid.alterToAccidGes(ipn.alter.value);
+
+      const accidGes = alterToGesturalAccid[ipn.alter.value];
       if (accidGes) draft.setAttribute("accid.ges", accidGes);
       else draft.removeAttribute("accid.ges");
-      draft.removeChildrenByTag("accid");
 
-      // Here, we are trying to add an accidental symbol in all cases.
-      // The difference here is that the element name of the child element `<accid>` is specified here,
-      // which is different from MeiElement where you can specify it as this.findChild(MeiAccid);
-      //
-      // const child = draft.getOrInsertChild("accid")
-      // MeiAccid.applyAccidRecipe(ipn.alter)(child);
+      draft.removeChildrenByTag("accid");
+      if (printedAccidental !== undefined) {
+        MeiAccid.applyAccidRecipe(printedAccidental)(
+          draft.getOrInsertChild("accid"),
+        );
+      }
+    };
+  }
+
+  /**
+   * Returns a recipe that updates only the gestural accidental (`accid.ges`).
+   * Natural (alter = 0) removes the attribute; other values set it.
+   */
+  static applyGesturalAccidRecipe(alter: IPNAlter): (draft: MeiDraft) => void {
+    return (draft) => {
+      const accidGes = alterToGesturalAccid[alter.value];
+      if (accidGes) draft.setAttribute("accid.ges", accidGes);
+      else draft.removeAttribute("accid.ges");
+    };
+  }
+
+  /**
+   * Returns a recipe that removes any printed `<accid>` child and reverts the
+   * gestural accidental to the key-signature default represented by `keyAlter`.
+   * Used when a neighbouring note's accidental carry-over becomes redundant.
+   */
+  static applyKeyDefaultAccidRecipe(
+    keyAlter: IPNAlter,
+  ): (draft: MeiDraft) => void {
+    return (draft) => {
+      draft.removeChildrenByTag("accid");
+      const accidGes = alterToGesturalAccid[keyAlter.value];
+      if (accidGes) draft.setAttribute("accid.ges", accidGes);
+      else draft.removeAttribute("accid.ges");
     };
   }
 
