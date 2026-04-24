@@ -1,5 +1,5 @@
 import type { MeiElement } from "../../MeiElement.js";
-import { Duration } from "../../models/elements.js";
+import { Duration } from "../../models/index.js";
 import type { Meter } from "../../models/score.js";
 import { MeiMeterSig } from "./MeiMeterSig.js";
 import { MeiScoreDef } from "./MeiScoreDef.js";

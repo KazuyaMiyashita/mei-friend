@@ -1,5 +1,5 @@
 import type { MeiElement } from "../../MeiElement.js";
-import { Duration } from "../../models/elements.js";
+import { Duration } from "../../models/index.js";
 import { Rational } from "../../models/math.js";
 import { MeiTuplet } from "./MeiTuplet.js";
 

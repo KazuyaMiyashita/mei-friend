@@ -1,5 +1,5 @@
 import { MeiElement } from "../../MeiElement.js";
-import { type Duration, Rest } from "../../models/elements.js";
+import { type Duration, Rest } from "../../models/index.js";
 import { getDuration } from "./utils.js";
 
 /**

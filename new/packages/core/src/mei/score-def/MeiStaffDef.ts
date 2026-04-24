@@ -1,5 +1,5 @@
 import { MeiElement } from "../../MeiElement.js";
-import { Part } from "../../models/elements.js";
+import { Part } from "../../models/index.js";
 import { MeiKeySig } from "./MeiKeySig.js";
 import { MeiMeterSig } from "./MeiMeterSig.js";
 

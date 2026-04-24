@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MeiFriend } from "../../../src/MeiFriend.js";
 import { MeiKeySig } from "../../../src/mei/score-def/MeiKeySig.js";
-import { Mode } from "../../../src/models/elements.js";
+import { Mode } from "../../../src/models/index.js";
 
 function makeKeySig(sig: string, mode: string): MeiKeySig {
   const xml = `

@@ -1,5 +1,5 @@
 import type { MeiElement } from "../../MeiElement.js";
-import { Duration, type Key, Offset } from "../../models/elements.js";
+import { Duration, type Key, Offset } from "../../models/index.js";
 import {
   type EventModel,
   type LayerModel,

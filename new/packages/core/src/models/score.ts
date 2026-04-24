@@ -1,4 +1,4 @@
-import { type Duration, type IntervalStep, Key, Offset } from "./elements.js";
+import { type Duration, type IntervalStep, Key, Offset } from "./index.js";
 import { Rational } from "./math.js";
 
 // ---------------------------------------------------------------------------

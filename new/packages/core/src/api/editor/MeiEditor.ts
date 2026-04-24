@@ -8,7 +8,7 @@ import {
   type IPNAlter,
   type Key,
   type Offset,
-} from "../../models/elements.js";
+} from "../../models/index.js";
 
 export interface AccidentalCorrection {
   readonly id: string;

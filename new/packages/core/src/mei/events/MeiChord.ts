@@ -1,5 +1,5 @@
 import { MeiElement } from "../../MeiElement.js";
-import type { Duration } from "../../models/elements.js";
+import type { Duration } from "../../models/index.js";
 import { MeiNote } from "./MeiNote.js";
 import { getDuration } from "./utils.js";
 

@@ -7,7 +7,7 @@ import {
   IPNOctave,
   IPNStep,
   type Pitch,
-} from "../../models/elements.js";
+} from "../../models/index.js";
 import { alterToAccidGes, getDuration } from "./utils.js";
 
 /**

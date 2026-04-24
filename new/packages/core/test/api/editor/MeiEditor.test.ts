@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MeiFriend } from "../../../src/MeiFriend.js";
 import { MeiNote } from "../../../src/mei/events/MeiNote.js";
-import { IPN } from "../../../src/models/elements.js";
+import { IPN } from "../../../src/models/index.js";
 
 // ------------------------------------------------------------------ helpers
 

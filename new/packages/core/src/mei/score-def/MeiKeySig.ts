@@ -1,5 +1,5 @@
 import { MeiElement } from "../../MeiElement.js";
-import { Key, Mode, PitchNoteName } from "../../models/elements.js";
+import { Key, Mode, NoteName } from "../../models/index.js";
 
 /**
  * Wrapper for <keySig> element.
@@ -32,6 +32,6 @@ export class MeiKeySig extends MeiElement {
       sigNum = sig.endsWith("f") ? -n : n;
     }
     const modeObj = this.mode === "minor" ? Mode.Minor : Mode.Major;
-    return new Key(new PitchNoteName(sigNum - modeObj.offset), modeObj);
+    return new Key(new NoteName(sigNum - modeObj.offset), modeObj);
   }
 }
