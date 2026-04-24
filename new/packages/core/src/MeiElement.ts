@@ -1,5 +1,5 @@
 import * as Y from "yjs";
-import { ROOT_WRAPPER_TAG } from "./utils/XmlSerde.js";
+import { COMMENT_WRAPPER_TAG, ROOT_WRAPPER_TAG } from "./utils/XmlSerde.js";
 
 /**
  * MeiElement wraps a Y.XmlElement and provides a clean API for DOM operations
@@ -43,7 +43,11 @@ export class MeiElement {
   get children(): MeiElement[] {
     return this.yNode
       .toArray()
-      .filter((child): child is Y.XmlElement => child instanceof Y.XmlElement)
+      .filter(
+        (child): child is Y.XmlElement =>
+          child instanceof Y.XmlElement &&
+          child.nodeName !== COMMENT_WRAPPER_TAG,
+      )
       .map((child) => new MeiElement(child));
   }
 
@@ -131,6 +135,7 @@ export class MeiElement {
       for (let i = 0; i < length; i++) {
         const child = node.get(i);
         if (child instanceof Y.XmlElement) {
+          if (child.nodeName === COMMENT_WRAPPER_TAG) continue;
           if (child.nodeName === tagName) {
             result.push(new MeiElement(child));
           }
@@ -219,6 +224,7 @@ export class MeiElement {
       for (let i = 0; i < length; i++) {
         const child = node.get(i);
         if (child instanceof Y.XmlElement) {
+          if (child.nodeName === COMMENT_WRAPPER_TAG) continue;
           const instance = Clazz.create(new MeiElement(child));
           if (instance) {
             found = instance;
@@ -249,6 +255,7 @@ export class MeiElement {
       for (let i = 0; i < length; i++) {
         const child = node.get(i);
         if (child instanceof Y.XmlElement) {
+          if (child.nodeName === COMMENT_WRAPPER_TAG) continue;
           const instance = Clazz.create(new MeiElement(child));
           if (instance) result.push(instance);
           traverse(child);

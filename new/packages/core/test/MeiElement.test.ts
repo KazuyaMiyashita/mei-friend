@@ -88,6 +88,41 @@ describe("MeiElement", () => {
       expect(mei.getChildElement("music")?.tagName).toBe("music");
       expect(mei.getChildElement("body")).toBeUndefined();
     });
+
+    describe("XML comment nodes", () => {
+      it("children should not include comment nodes", () => {
+        const meiFriend = MeiFriend.fromXmlString(
+          "<mei><!-- a comment --><music/></mei>",
+        );
+        const mei = meiFriend.getRootElement()!;
+        expect(mei.children.length).toBe(1);
+        expect(mei.children[0].tagName).toBe("music");
+      });
+
+      it("getElementsByTagName should skip comment nodes and find real descendants", () => {
+        const meiFriend = MeiFriend.fromXmlString(
+          "<mei><!-- a comment --><music><note/></music></mei>",
+        );
+        const mei = meiFriend.getRootElement()!;
+        expect(mei.getElementsByTagName("note").length).toBe(1);
+      });
+
+      it("findDescendant should skip comment nodes", () => {
+        const meiFriend = MeiFriend.fromXmlString(
+          "<mei><!-- a comment --><music><note/></music></mei>",
+        );
+        const mei = meiFriend.getRootElement()!;
+        const note = mei.getElementsByTagName("note")[0];
+        expect(note).toBeDefined();
+        expect(note.tagName).toBe("note");
+      });
+
+      it("fromXmlString with top-level comment should not throw", () => {
+        expect(() =>
+          MeiFriend.fromXmlString("<!-- header --><mei><music/></mei>"),
+        ).not.toThrow();
+      });
+    });
   });
 
   describe("Mutations (via MeiFriend.update)", () => {
