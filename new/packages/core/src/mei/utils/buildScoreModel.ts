@@ -1,5 +1,5 @@
 import type { MeiElement } from "../../MeiElement.js";
-import { Duration, type Key, Offset } from "../../models/index.js";
+import { Duration, Offset } from "../../models/index.js";
 import {
   type EventModel,
   type LayerModel,
@@ -7,8 +7,6 @@ import {
   ScoreModel,
   type StaffModel,
 } from "../../models/score.js";
-import { MeiNote } from "../elements/events/MeiNote.js";
-import { MeiKeySig } from "../elements/score-def/MeiKeySig.js";
 import { MeiMeterSig } from "../elements/score-def/MeiMeterSig.js";
 import { MeiScoreDef } from "../elements/score-def/MeiScoreDef.js";
 import { MeiLayer } from "../elements/structure/MeiLayer.js";
@@ -19,25 +17,6 @@ import { getGlobalMeter } from "./meter.js";
 
 const EVENT_TAGS = new Set(["note", "rest", "chord", "space", "mRest"]);
 const CONTAINER_TAGS = new Set(["beam", "tuplet", "ftrem", "btrem"]);
-
-/**
- * Collects the key signature in effect for each staff by scanning all
- * `<staffDef>` elements in the document.  When a staff has multiple
- * `<staffDef>` entries (e.g. a mid-piece key change), the first one in
- * document order is used — full per-measure key tracking is a TODO.
- */
-function buildStaffKeys(root: MeiElement): ReadonlyMap<number, Key> {
-  const map = new Map<number, Key>();
-  for (const sd of root.getElementsByTagName("staffDef")) {
-    const n = Number.parseInt(sd.getAttribute("n") ?? "0", 10);
-    if (!n || map.has(n)) continue;
-    const keySigEl = sd.getChildElement("keySig");
-    if (!keySigEl) continue;
-    const key = MeiKeySig.create(keySigEl)?.toKey();
-    if (key) map.set(n, key);
-  }
-  return map;
-}
 
 /**
  * Recursively collects musical events from a layer element,
@@ -56,17 +35,7 @@ function collectEvents(
 
     if (EVENT_TAGS.has(tag)) {
       const dur = getDuration(child) ?? Duration.of(0);
-      // Staff position: diatonic line/space as an IntervalStep from C4
-      // (C4=0, D4=1, …, B4=6, C5=7, B3=−1). Two notes share a staff position
-      // when their values are equal, regardless of accidentals.
-      const staffPosition = MeiNote.create(child)?.pitch?.asInterval().step();
-      events.push({
-        id,
-        offset,
-        duration: dur,
-        isNavigable: navigable,
-        staffPosition,
-      });
+      events.push({ id, offset, duration: dur, isNavigable: navigable });
 
       if (tag === "chord") {
         collectEvents(child, offset, events, false);
@@ -82,11 +51,8 @@ function collectEvents(
 
 /**
  * Builds a ScoreModel from the root MEI element.
- *
- * // TODO テストがないぞ？？？
  */
 export function buildScoreModel(root: MeiElement): ScoreModel {
-  const staffKeys = buildStaffKeys(root);
   let currentMeter = getGlobalMeter(root);
 
   const measures = root.getElementsByTagName("measure");
@@ -95,7 +61,7 @@ export function buildScoreModel(root: MeiElement): ScoreModel {
   for (let measureIndex = 0; measureIndex < measures.length; measureIndex++) {
     const mEl = measures[measureIndex];
 
-    // Update meter if measure has a scoreDef or meterSig
+    // Update meter if measure has a meterSig or directly-parented scoreDef.
     const meterSigEl = mEl.getElementsByTagName("meterSig")[0];
     if (meterSigEl) {
       const ms = MeiMeterSig.create(meterSigEl);
@@ -153,7 +119,6 @@ export function buildScoreModel(root: MeiElement): ScoreModel {
       }
     }
 
-    // Determine final meter for this measure
     const measureMeter = currentMeter ?? {
       beats: totalDuration.value.toDouble(),
       beatType: Duration.of(1),
@@ -169,5 +134,5 @@ export function buildScoreModel(root: MeiElement): ScoreModel {
     });
   }
 
-  return new ScoreModel(measureModels, staffKeys);
+  return new ScoreModel(measureModels);
 }

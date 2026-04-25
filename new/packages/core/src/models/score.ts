@@ -1,4 +1,4 @@
-import { type Duration, type IntervalStep, Key, Offset } from "./index.js";
+import { type Duration, Offset } from "./index.js";
 import { Rational } from "./math.js";
 
 // ---------------------------------------------------------------------------
@@ -13,8 +13,6 @@ export interface EventModel {
    * The logical duration of this event.
    * May be `Duration.of(0)` for grace notes or elements whose duration cannot
    * be determined.
-   * TODO: Consider enforcing a constraint that zero-duration events are never
-   * stored in the model.
    */
   readonly duration: Duration;
   /**
@@ -24,16 +22,6 @@ export interface EventModel {
    * not treated as a navigation step by `Cursor`.
    */
   readonly isNavigable: boolean;
-  /**
-   * The diatonic staff position of this event, encoded as an `IntervalStep`
-   * from C4 (C4 = 0, D4 = 1, …, B4 = 6, C5 = 7, B3 = −1, C3 = −7).
-   * Defined only for pitched events (`<note>`); `undefined` for rests,
-   * spaces, chords, and other non-pitched elements.
-   *
-   * Two events share a staff line or space when their `staffPosition` values
-   * are equal, regardless of accidentals.
-   */
-  readonly staffPosition?: IntervalStep;
 }
 
 export interface LayerModel {
@@ -113,10 +101,7 @@ export interface Position {
 // ---------------------------------------------------------------------------
 
 export class ScoreModel {
-  constructor(
-    readonly measures: ReadonlyArray<MeasureModel>,
-    private readonly staffKeys: ReadonlyMap<number, Key> = new Map(),
-  ) {}
+  constructor(readonly measures: ReadonlyArray<MeasureModel>) {}
 
   getMeasure(index: number): MeasureModel | undefined {
     return this.measures[index];
@@ -124,50 +109,6 @@ export class ScoreModel {
 
   get length(): number {
     return this.measures.length;
-  }
-
-  /**
-   * Returns the key signature in effect for the given staff number.
-   * Falls back to C Major when no key signature is defined for the staff.
-   *
-   * @param staffN - Staff number (1-based).
-   */
-  getKeyForStaff(staffN: number): Key {
-    return this.staffKeys.get(staffN) ?? Key.parse("C Major");
-  }
-
-  /**
-   * Returns all events in the specified measure and staff whose diatonic
-   * staff position equals `staffPos`, sorted by temporal offset ascending.
-   *
-   * Only events that carry a `staffPosition` (i.e., pitched `<note>` elements)
-   * are returned.  Rests, spaces, chords, and other non-pitched events are
-   * excluded.  All layers of the staff are searched.
-   *
-   * @param measureIndex - Zero-based measure index.
-   * @param staffN - Staff number (1-based).
-   * @param staffPos - Target staff position as an `IntervalStep` from C4.
-   * @returns Events sorted by offset ascending, or an empty array if the
-   *   measure or staff does not exist or has no matching events.
-   */
-  eventsAtStaffPosition(
-    measureIndex: number,
-    staffN: number,
-    staffPos: IntervalStep,
-  ): ReadonlyArray<EventModel> {
-    const staff = this.getMeasure(measureIndex)?.staves.get(staffN);
-    if (!staff) return [];
-
-    const result: EventModel[] = [];
-    for (const layer of staff.layers.values()) {
-      for (const event of layer.events) {
-        if (event.staffPosition?.value === staffPos.value) {
-          result.push(event);
-        }
-      }
-    }
-    result.sort((a, b) => a.offset.compareTo(b.offset));
-    return result;
   }
 
   /**
@@ -243,6 +184,111 @@ export class ScoreModel {
     return this.getMeasure(pos.measureIndex)
       ?.staves.get(pos.staffN)
       ?.layers.get(pos.layerN);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ScorePositionIterator
+// ---------------------------------------------------------------------------
+
+export interface ScorePositionIteratorOptions {
+  /** Whether to include only the specific layer or all layers of the staff. */
+  readonly scope: "layer" | "staff";
+  /**
+   * `"backward"` yields events from `position.offset` descending to the
+   * beginning of the score.
+   * `"forward"` yields events from `position.offset` ascending to the end.
+   *
+   * In both directions the event at exactly `position.offset` is **included**.
+   */
+  readonly direction: "backward" | "forward";
+}
+
+/**
+ * Iterates over events in a score starting from a given `Position`.
+ *
+ * - `direction: "backward"` — from `position.offset` toward the start of the
+ *   score, yielding events in descending offset order, crossing measure
+ *   boundaries as needed.
+ * - `direction: "forward"` — from `position.offset` toward the end of the
+ *   score, yielding events in ascending offset order.
+ *
+ * The event at exactly `position.offset` is included in both directions.
+ *
+ * `scope: "layer"` restricts iteration to the layer identified by `layerN`.
+ * `scope: "staff"` includes all layers of the staff.
+ *
+ * @example
+ * ```ts
+ * // Find the most recent keySig before (and at) a position
+ * for (const event of new ScorePositionIterator(scoreModel, pos, {
+ *   scope: "staff",
+ *   direction: "backward",
+ * })) {
+ *   const el = meiFriend.getElementById(event.id);
+ *   if (MeiKeySig.create(el)) { ... }
+ * }
+ * ```
+ */
+export class ScorePositionIterator implements Iterable<EventModel> {
+  constructor(
+    readonly scoreModel: ScoreModel,
+    readonly position: Position,
+    readonly options: ScorePositionIteratorOptions,
+  ) {}
+
+  [Symbol.iterator](): Iterator<EventModel> {
+    const { scoreModel, position, options } = this;
+    const { measureIndex, staffN, layerN, offset } = position;
+    const { scope, direction } = options;
+
+    function getLayers(measure: MeasureModel): ReadonlyArray<LayerModel> {
+      const staff = measure.staves.get(staffN);
+      if (!staff) return [];
+      if (scope === "staff") return [...staff.layers.values()];
+      const layer = staff.layers.get(layerN);
+      return layer ? [layer] : [];
+    }
+
+    function* backward(): Generator<EventModel> {
+      for (let mi = measureIndex; mi >= 0; mi--) {
+        const measure = scoreModel.getMeasure(mi);
+        if (!measure) continue;
+
+        const collected: EventModel[] = [];
+        for (const layer of getLayers(measure)) {
+          for (const event of layer.events) {
+            if (mi === measureIndex && event.offset.compareTo(offset) > 0) {
+              continue; // skip events strictly after the reference offset
+            }
+            collected.push(event);
+          }
+        }
+        collected.sort((a, b) => b.offset.compareTo(a.offset));
+        yield* collected;
+      }
+    }
+
+    function* forward(): Generator<EventModel> {
+      for (let mi = measureIndex; mi < scoreModel.length; mi++) {
+        const measure = scoreModel.getMeasure(mi);
+        if (!measure) continue;
+
+        const collected: EventModel[] = [];
+        for (const layer of getLayers(measure)) {
+          for (const event of layer.events) {
+            if (mi === measureIndex && event.offset.compareTo(offset) < 0) {
+              continue; // skip events strictly before the reference offset
+            }
+            collected.push(event);
+          }
+        }
+        collected.sort((a, b) => a.offset.compareTo(b.offset));
+        yield* collected;
+      }
+    }
+
+    return direction === "backward" ? backward() : forward();
   }
 }
 

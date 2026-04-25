@@ -1,8 +1,12 @@
 import type { MeiElement } from "../MeiElement.js";
 import type { MeiFriend } from "../MeiFriend.js";
 import type { Mei } from "../mei/elements/Mei.js";
+import { MeiKeySig } from "../mei/elements/score-def/MeiKeySig.js";
+import { MeiStaffDef } from "../mei/elements/score-def/MeiStaffDef.js";
 import { buildScoreModel } from "../mei/utils/buildScoreModel.js";
-import type { ScoreModel } from "../models/score.js";
+import { Key } from "../models/index.js";
+import type { Position } from "../models/score.js";
+import { type ScoreModel, ScorePositionIterator } from "../models/score.js";
 import { MeiEditor } from "./editor/MeiEditor.js";
 
 /**
@@ -11,11 +15,11 @@ import { MeiEditor } from "./editor/MeiEditor.js";
  * and converting the MEI structure into logical models.
  */
 export class MeiApi {
-  constructor(private readonly meiFriend: MeiFriend) {}
+  constructor(readonly meiFriend: MeiFriend) {}
 
   /** Returns the note editor for pitch transposition and other note edits. */
   get editor(): MeiEditor {
-    return new MeiEditor(this.meiFriend);
+    return new MeiEditor(this.meiFriend, this);
   }
 
   /**
@@ -67,5 +71,50 @@ export class MeiApi {
     const root = this.meiFriend.getRootElement();
     if (!root) throw new Error("No root element to convert to ScoreModel");
     return buildScoreModel(root);
+  }
+
+  /**
+   * Returns the key signature defined for `staffN` in the initial `<scoreDef>`,
+   * i.e. the one that appears before the first measure.
+   * Returns `undefined` if no key signature is defined for that staff.
+   */
+  public getInitialKeyForStaff(staffN: number): Key | undefined {
+    const root = this.meiFriend.getRootElement();
+    if (!root) return undefined;
+
+    for (const staffDef of root.findDescendants(MeiStaffDef)) {
+      const n = staffDef.n;
+      if (n === undefined || parseInt(n, 10) !== staffN) continue;
+      const key = staffDef.keySig?.toKey();
+      if (key) return key;
+    }
+    return undefined;
+  }
+
+  /**
+   * Returns the key signature in effect at the given position.
+   *
+   * Scans backward from the position (staff scope) looking for a `<keySig>`
+   * element in the ScoreModel events. Falls back to the initial `<scoreDef>`
+   * key for the staff, and finally to C Major if none is found.
+   */
+  public getKeyAt(pos: Position): Key {
+    const scoreModel = this.meiFriend.getScoreModel();
+    const iter = new ScorePositionIterator(scoreModel, pos, {
+      scope: "staff",
+      direction: "backward",
+    });
+
+    for (const event of iter) {
+      const el = this.meiFriend.getElementById(event.id);
+      if (!el) continue;
+      const keySig = MeiKeySig.create(el);
+      if (keySig) {
+        const key = keySig.toKey();
+        if (key) return key;
+      }
+    }
+
+    return this.getInitialKeyForStaff(pos.staffN) ?? Key.parse("C Major");
   }
 }

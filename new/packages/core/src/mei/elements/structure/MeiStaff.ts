@@ -13,8 +13,8 @@ export class MeiStaff extends MeiElement {
     return undefined;
   }
 
-  /** The `n` attribute as a 1-based integer. Defaults to 1 if absent. */
-  get n(): number {
-    return parseInt(this.getAttribute("n") ?? "1", 10);
+  get n(): number | undefined {
+    const val = this.getAttribute("n");
+    return val !== undefined ? parseInt(val, 10) : undefined;
   }
 }

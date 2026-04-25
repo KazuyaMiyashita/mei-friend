@@ -1,5 +1,6 @@
 import { MeiElement } from "../../../MeiElement.js";
-import { Part } from "../../../models/index.js";
+import { Duration, Part } from "../../../models/index.js";
+import type { Meter } from "../../../models/score.js";
 import { MeiKeySig } from "./MeiKeySig.js";
 import { MeiMeterSig } from "./MeiMeterSig.js";
 
@@ -36,6 +37,20 @@ export class MeiStaffDef extends MeiElement {
   get meterUnit(): number | undefined {
     const val = this.getAttribute("meter.unit");
     return val ? parseInt(val, 10) : this.meterSig?.unit;
+  }
+
+  /**
+   * Returns the meter for this staff, resolving `meter.count`/`meter.unit`
+   * attributes first, then falling back to a `<meterSig>` child element.
+   * Returns `undefined` if neither is present.
+   */
+  getMeter(): Meter | undefined {
+    const count = this.meterCount;
+    const unit = this.meterUnit;
+    if (count !== undefined && unit !== undefined) {
+      return { beats: count, beatType: Duration.of(4, unit) };
+    }
+    return undefined;
   }
 
   public getPart(): Part {

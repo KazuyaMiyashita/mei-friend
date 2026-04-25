@@ -5,9 +5,11 @@ import {
   IntervalStep,
   IPN,
   type IPNAlter,
-  type Key,
+  Key,
   type Offset,
 } from "../../models/index.js";
+import type { EventModel } from "../../models/score.js";
+import type { MeiApi } from "../MeiApi.js";
 
 export interface AccidentalCorrection {
   readonly id: string;
@@ -30,7 +32,37 @@ export interface PitchMoveResult {
  * ```
  */
 export class MeiEditor {
-  constructor(private readonly meiFriend: MeiFriend) {}
+  constructor(
+    private readonly meiFriend: MeiFriend,
+    private readonly meiApi: MeiApi,
+  ) {}
+
+  /**
+   * Returns all events in the specified measure and staff whose diatonic staff
+   * position equals `targetPos`, sorted by offset ascending.
+   *
+   * Unlike the former `ScoreModel.eventsAtStaffPosition`, this method fetches
+   * the staff position from the live MEI document via `meiFriend.getElementById`
+   * on each event, keeping ScoreModel free of note-specific computed fields.
+   */
+  private eventsAtPosition(
+    measureIndex: number,
+    staffN: number,
+    targetPos: IntervalStep,
+  ): EventModel[] {
+    const measure = this.meiFriend.getScoreModel().getMeasure(measureIndex);
+    const result: EventModel[] = [];
+    for (const layer of measure?.staves.get(staffN)?.layers.values() ?? []) {
+      for (const event of layer.events) {
+        const el = this.meiFriend.getElementById(event.id);
+        if (!el) continue;
+        const pos = MeiNote.create(el)?.pitch?.asInterval().step();
+        if (pos?.value === targetPos.value) result.push(event);
+      }
+    }
+    result.sort((a, b) => a.offset.compareTo(b.offset));
+    return result;
+  }
 
   /**
    * Among notes *before* `noteId` in the same measure and staff that carry a
@@ -48,7 +80,7 @@ export class MeiEditor {
     const pos = scoreModel.getPositionById(noteId);
     if (!pos) return undefined;
 
-    const candidates = scoreModel.eventsAtStaffPosition(
+    const candidates = this.eventsAtPosition(
       pos.measureIndex,
       pos.staffN,
       targetPos,
@@ -84,25 +116,23 @@ export class MeiEditor {
    * context for later notes.
    *
    * @param oldPos - The staff position the source note is leaving (IntervalStep from C4).
-   * @param noteId - The `xml:id` of the note being moved.
    * @param key    - The key signature in effect for the source note's staff.
+   * @param pos    - The position of the note being moved.
    */
   private findContextualAccidUpdates(
     oldPos: IntervalStep,
-    noteId: string,
     key: Key,
+    pos: { measureIndex: number; staffN: number; offset: Offset },
   ): AccidentalCorrection[] {
-    const scoreModel = this.meiFriend.getScoreModel();
-    const pos = scoreModel.getPositionById(noteId);
-    if (!pos) return [];
-
     const keyAlter = key
       .diatonicScalePitch(oldPos)
       .internationalPitchNotation().alter;
 
-    const candidates = scoreModel
-      .eventsAtStaffPosition(pos.measureIndex, pos.staffN, oldPos)
-      .filter((e) => e.offset.compareTo(pos.offset) > 0);
+    const candidates = this.eventsAtPosition(
+      pos.measureIndex,
+      pos.staffN,
+      oldPos,
+    ).filter((e) => e.offset.compareTo(pos.offset) > 0);
 
     const corrections: AccidentalCorrection[] = [];
     for (const event of candidates) {
@@ -155,8 +185,10 @@ export class MeiEditor {
     const targetPos = new IntervalStep(sourcePos.value + step.value);
 
     const scoreModel = this.meiFriend.getScoreModel();
-    const staffN = scoreModel.getPositionById(noteId)?.staffN ?? 1;
-    const key = scoreModel.getKeyForStaff(staffN);
+    const pos = scoreModel.getPositionById(noteId);
+    const key = pos
+      ? this.meiApi.getKeyAt(pos)
+      : (this.meiApi.getInitialKeyForStaff(1) ?? Key.parse("C Major"));
 
     const ip = key.diatonicScalePitch(targetPos).internationalPitchNotation();
     const alteredIp = new IPN(
@@ -172,9 +204,10 @@ export class MeiEditor {
 
     // If the moving note had a printed accidental, subsequent notes in the
     // measure may have been relying on its carry-over effect.
-    const accidentalCorrections = note.hasPrintedAccidental
-      ? this.findContextualAccidUpdates(sourcePos, noteId, key)
-      : [];
+    const accidentalCorrections =
+      note.hasPrintedAccidental && pos
+        ? this.findContextualAccidUpdates(sourcePos, key, pos)
+        : [];
 
     // TODO: If a note is tied to the next note, that note also moves.
 
