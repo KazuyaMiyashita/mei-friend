@@ -43,11 +43,22 @@ function collectEvents(
       }
       offset = offset.add(dur);
     } else {
-      // For other elements, recurse to collect children, then advance offset by this element's duration.
+      // For other elements, recurse to collect children, then advance offset.
+      // Container elements (beam, tuplet, etc.) have no dur of their own: advance by the
+      // total consumed by children.  Elements with their own dur (note with artic, etc.)
+      // advance by that dur instead.
       if (child.children.length > 0) {
-        collectEvents(child, offset, events, layerPos, idIndex);
+        const endOffset = collectEvents(
+          child,
+          offset,
+          events,
+          layerPos,
+          idIndex,
+        );
+        offset = dur.value.n === 0 ? endOffset : offset.add(dur);
+      } else {
+        offset = offset.add(dur);
       }
-      offset = offset.add(dur);
     }
   }
   return offset;
