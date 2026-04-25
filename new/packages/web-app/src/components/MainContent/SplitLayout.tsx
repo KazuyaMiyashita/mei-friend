@@ -13,6 +13,7 @@ export interface LayoutCallbacks {
   onClose: (panelId: string, containerId: string) => void;
   onFocusContainer: (containerId: string) => void;
   onNewPanel: (containerId: string) => void;
+  onOpenCodeMirror: (panelId: string, containerId: string) => void;
   onFileDrop: (file: File, containerId: string | null) => void;
 }
 
@@ -48,6 +49,7 @@ export default function SplitLayout({
         onClose={callbacks.onClose}
         onFocusContainer={callbacks.onFocusContainer}
         onNewPanel={callbacks.onNewPanel}
+        onOpenCodeMirror={callbacks.onOpenCodeMirror}
         onFileDrop={(file) => callbacks.onFileDrop(file, node.id)}
       />
     );

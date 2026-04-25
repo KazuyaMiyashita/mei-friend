@@ -6,9 +6,12 @@
   --headerBackgroundColor: white;
   --controlMenuBackgroundColor: lightgray;
   --navbarBackgroundColor: lightgray;
+  --panelHeaderColor: whitesmoke;
+  --panelFooterColor: whitesmoke;
   --keyboardShortCutColor: navy;
   --dropdownHeadingColor: lightsteelblue;
   --dropdownBackgroundColor: #edf2f7;
+  --dropdownBackgroundHighlightColor: #c5d8f0;
   --dropdownBorderColor: darkgray;
   --overlayBackgroundColor: cornflowerblue;
   --overlayTextColor: white;

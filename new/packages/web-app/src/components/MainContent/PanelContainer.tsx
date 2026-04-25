@@ -5,7 +5,8 @@ import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import ContextMenu, { type ContextMenuItem } from "../ui/ContextMenu";
 import styles from "./PanelContainer.module.css";
-import DummyPanel from "./panels/DummyPanel";
+import CodeMirrorPanel from "./panels/CodeMirrorPanel";
+import VerovioPanel from "./panels/VerovioPanel";
 import type { Panel, PanelContainerNode } from "./types";
 
 export type Zone = "top" | "bottom" | "left" | "right" | "center";
@@ -13,18 +14,38 @@ export type Zone = "top" | "bottom" | "left" | "right" | "center";
 // ── panel content renderer ─────────────────────────────────────────────────
 
 function renderPanelContent(panel: Panel) {
-  return <DummyPanel title={`${panel.type} Panel (${panel.id})`} />;
+  if (panel.type === "notation") {
+    return <VerovioPanel meiFriendId={panel.meiFriendId} />;
+  }
+  if (panel.type === "xmlcode") {
+    return <CodeMirrorPanel meiFriendId={panel.meiFriendId} />;
+  }
+  // Placeholder for other panel types
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%",
+        height: "100%",
+        color: "var(--dropdownBorderColor)",
+      }}
+    >
+      {panel.type} — {panel.meiFriendId ?? "no file"}
+    </div>
+  );
 }
 
 // ── PanelTabLabel ─────────────────────────────────────────────────────────
 
 function PanelTabLabel({ panel }: { panel: Panel }) {
-  const fileName = panel.meiFriendId ?? "—";
+  const fileName = panel.meiFriendId?.split("/").pop() ?? "—";
 
   if (panel.type === "notation")
     return (
       <>
-        <span className={styles.tabTypeIcon}>𝄞</span>
+        <span className={styles.tabTypeIcon}>🎼</span>
         {fileName}
       </>
     );
@@ -187,6 +208,7 @@ interface PanelContainerProps {
   onClose: (panelId: string, containerId: string) => void;
   onFocusContainer: (containerId: string) => void;
   onNewPanel: (containerId: string) => void;
+  onOpenCodeMirror: (panelId: string, containerId: string) => void;
   onFileDrop: (file: File, containerId: string) => void;
 }
 
@@ -199,6 +221,7 @@ export default function PanelContainer({
   onClose,
   onFocusContainer,
   onNewPanel,
+  onOpenCodeMirror,
   onFileDrop,
 }: PanelContainerProps) {
   const { id: containerId, tabs, activeTab } = node;
@@ -232,7 +255,8 @@ export default function PanelContainer({
 
   const contextMenuItems = useCallback((): ContextMenuItem[] => {
     if (!contextMenu) return [];
-    return [
+    const panel = panels[contextMenu.panelId];
+    const items: ContextMenuItem[] = [
       {
         label: "New Tab",
         onClick: () => onNewPanel(containerId),
@@ -242,7 +266,16 @@ export default function PanelContainer({
         onClick: () => onClose(contextMenu.panelId, containerId),
       },
     ];
-  }, [contextMenu, containerId, onClose, onNewPanel]);
+
+    if (panel?.type === "notation" && panel.meiFriendId) {
+      items.splice(1, 0, {
+        label: "Open in CodeMirror",
+        onClick: () => onOpenCodeMirror(contextMenu.panelId, containerId),
+      });
+    }
+
+    return items;
+  }, [contextMenu, containerId, onClose, onNewPanel, onOpenCodeMirror, panels]);
 
   const isSameContainer = draggingInfo?.sourceContainerId === containerId;
   const centerDisabled = isSameContainer ?? false;

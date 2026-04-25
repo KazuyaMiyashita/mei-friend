@@ -1,5 +1,6 @@
 import { DragDropProvider } from "@dnd-kit/react";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useAppState } from "../../context/AppStateContext";
 import styles from "./MainContent.module.css";
 import SplitLayout from "./SplitLayout";
 import type { LayoutState } from "./types";
@@ -8,19 +9,19 @@ import { usePanelDnD } from "./usePanelDnD";
 import WelcomeScreen from "./WelcomeScreen";
 
 const INITIAL_STATE: LayoutState = {
-  layout: {
-    type: "container",
-    id: "container-1",
-    tabs: ["panel-1"],
-    activeTab: "panel-1",
-  },
-  panels: {
-    "panel-1": { id: "panel-1", type: "notation", meiFriendId: "sample.mei" },
-  },
-  focusedPanelId: "panel-1",
+  layout: null,
+  panels: {},
+  focusedPanelId: null,
 };
 
 export default function MainContent() {
+  const {
+    registerPanelOpener,
+    setActiveMeiFriendPath,
+    setActiveSelectedId,
+    addFilesFromFileList,
+  } = useAppState();
+
   const {
     layoutState,
     setActivePanel,
@@ -29,7 +30,18 @@ export default function MainContent() {
     movePanelToContainer,
     splitContainer,
     addNewPanelToContainer,
+    openOrActivateFile,
+    openCodeMirrorForPanel,
   } = useLayout(INITIAL_STATE);
+
+  // Register the panel opener so WorkspacePanel can trigger it via context
+  useEffect(() => {
+    const unregister = registerPanelOpener((path) => {
+      openOrActivateFile(path);
+      setActiveMeiFriendPath(path);
+    });
+    return () => unregister();
+  }, [registerPanelOpener, openOrActivateFile, setActiveMeiFriendPath]);
 
   // Synchronously update on render to prevent stale closures in DnD handlers
   const layoutStateRef = useRef(layoutState);
@@ -47,25 +59,58 @@ export default function MainContent() {
   // ── File Drop ──────────────────────────────────────────────────────
 
   const handleFileDrop = useCallback(
-    async (_file: File, _containerId: string | null) => {
-      // Logic for actual file drop omitted as requested
+    async (file: File, _containerId: string | null) => {
+      await addFilesFromFileList([file]);
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      if (ext === "mei" || ext === "xml" || ext === "musicxml") {
+        openOrActivateFile(file.name);
+        setActiveMeiFriendPath(file.name);
+        setActiveSelectedId(null);
+      }
     },
-    [],
+    [
+      addFilesFromFileList,
+      openOrActivateFile,
+      setActiveMeiFriendPath,
+      setActiveSelectedId,
+    ],
+  );
+
+  // ── Panel activation ─────────────────────────────────────────────────────
+
+  const handleActivate = useCallback(
+    (panelId: string, containerId: string) => {
+      setActivePanel(panelId, containerId);
+      const panel = layoutState.panels[panelId];
+      setActiveMeiFriendPath(panel?.meiFriendId ?? null);
+      setActiveSelectedId(null);
+    },
+    [
+      setActivePanel,
+      layoutState.panels,
+      setActiveMeiFriendPath,
+      setActiveSelectedId,
+    ],
   );
 
   // ── Callbacks ────────────────────────────────────────────────────────
 
   const callbacks = useMemo(
     () => ({
-      onActivate: setActivePanel,
+      onActivate: handleActivate,
       onClose: closePanel,
-      onFocusContainer: (_containerId: string) => {
-        /* Not strictly needed for prototype */
-      },
+      onFocusContainer: (_containerId: string) => {},
       onNewPanel: addNewPanelToContainer,
+      onOpenCodeMirror: openCodeMirrorForPanel,
       onFileDrop: handleFileDrop,
     }),
-    [setActivePanel, closePanel, addNewPanelToContainer, handleFileDrop],
+    [
+      handleActivate,
+      closePanel,
+      addNewPanelToContainer,
+      openCodeMirrorForPanel,
+      handleFileDrop,
+    ],
   );
 
   return (

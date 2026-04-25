@@ -1,0 +1,151 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  height: 34px;
+  background-color: var(--panelHeaderColor);
+  border-bottom: 1px solid var(--dropdownBorderColor);
+  flex-shrink: 0;
+  position: relative;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+/* Hide scrollbar for a cleaner look */
+.header::-webkit-scrollbar {
+  display: none;
+}
+.header {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* For elements aligned to left, right, or center */
+.left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.center {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.space-between {
+  justify-content: space-between;
+  width: 100%;
+}
+
+/* Buttons */
+.button {
+  background: none;
+  border: 1px solid var(--dropdownBorderColor);
+  border-radius: 3px;
+  color: var(--textColor);
+  cursor: pointer;
+  padding: 2px 8px;
+  transition: all 0.1s;
+}
+
+.button:hover:not(:disabled) {
+  background-color: var(--dropdownHeadingColor);
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.textBtn {
+  font-size: 0.75rem;
+}
+
+.iconBtn {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.applyBtnActive {
+  background-color: var(--highlightColor);
+  color: white;
+  border-color: var(--highlightColor);
+}
+
+.applyBtnActive:hover:not(:disabled) {
+  background-color: var(--highlightColor);
+}
+
+/* Other UI Elements */
+.shortcut {
+  font-size: 0.7rem;
+  color: var(--textColor);
+  opacity: 0.6;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.headerDivider {
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  background-color: var(--dropdownBorderColor);
+  margin: 0 2px;
+}
+
+.invalidBadge {
+  font-size: 0.7rem;
+  font-family: monospace;
+  color: #dc2626;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pageInfo {
+  font-size: 12px;
+  color: var(--textColor);
+  min-width: 60px;
+  text-align: center;
+}
+
+/* Form Controls */
+.ctrlLabel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--textColor);
+  white-space: nowrap;
+}
+
+.ctrlLabelText {
+  opacity: 0.8;
+}
+
+.select,
+.input {
+  font-size: 0.75rem;
+  padding: 1px 4px;
+  border: 1px solid var(--dropdownBorderColor);
+  border-radius: 3px;
+  background-color: var(--headerBackgroundColor);
+  color: var(--textColor);
+}
+
+.range {
+  width: 60px;
+  margin: 0;
+}

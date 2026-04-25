@@ -245,6 +245,27 @@ importers:
 
   packages/web-app:
     dependencies:
+      '@codemirror/autocomplete':
+        specifier: ^6.20.1
+        version: 6.20.1
+      '@codemirror/commands':
+        specifier: ^6.10.3
+        version: 6.10.3
+      '@codemirror/language':
+        specifier: ^6.12.3
+        version: 6.12.3
+      '@codemirror/lint':
+        specifier: ^6.9.5
+        version: 6.9.5
+      '@codemirror/search':
+        specifier: ^6.6.0
+        version: 6.6.0
+      '@codemirror/state':
+        specifier: ^6.6.0
+        version: 6.6.0
+      '@codemirror/view':
+        specifier: ^6.41.0
+        version: 6.41.0
       '@dnd-kit/collision':
         specifier: ^0.3.2
         version: 0.3.2
@@ -257,6 +278,15 @@ importers:
       '@mei-friend/lib-codemirror':
         specifier: workspace:*
         version: link:../lib-codemirror
+      '@mei-friend/lib-verovio-react':
+        specifier: workspace:*
+        version: link:../lib-verovio-react
+      codemirror:
+        specifier: ^6.0.1
+        version: 6.0.2
+      comlink:
+        specifier: ^4.4.2
+        version: 4.4.2
       react:
         specifier: ^19.2.4
         version: 19.2.5

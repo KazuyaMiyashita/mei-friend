@@ -7,16 +7,10 @@ import type {
   SplitLayoutNode,
 } from "./types";
 
-/**
- * Unique ID generator for containers and panels
- */
 export function uniqueId(prefix = "container"): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/**
- * Recursively walks the tree and transforms each PanelContainerNode.
- */
 function mapLayout(
   node: LayoutNode,
   fn: (n: PanelContainerNode) => LayoutNode | null,
@@ -34,9 +28,6 @@ function mapLayout(
   return { ...node, children: newChildren };
 }
 
-/**
- * Removes empty PanelContainerNodes and collapses single-child SplitLayoutNodes.
- */
 function pruneEmptyContainers(node: LayoutNode): LayoutNode | null {
   if (node.type === "container") {
     return node.tabs.length === 0 ? null : node;
@@ -51,12 +42,8 @@ function pruneEmptyContainers(node: LayoutNode): LayoutNode | null {
   return { ...node, children: newChildren };
 }
 
-/**
- * Recursively flattens same-direction split nodes.
- */
 function flattenLayout(node: LayoutNode): LayoutNode {
   if (node.type === "container") return node;
-
   const flattenedChildren: LayoutNode[] = [];
   for (const child of node.children) {
     const processedChild = flattenLayout(child);
@@ -69,7 +56,6 @@ function flattenLayout(node: LayoutNode): LayoutNode {
       flattenedChildren.push(processedChild);
     }
   }
-
   return { ...node, children: flattenedChildren };
 }
 
@@ -83,6 +69,26 @@ export function findContainerById(
     if (found) return found;
   }
   return null;
+}
+
+function findContainerForPanel(
+  node: LayoutNode,
+  panelId: string,
+): string | null {
+  if (node.type === "container") {
+    return node.tabs.includes(panelId) ? node.id : null;
+  }
+  for (const child of node.children) {
+    const found = findContainerForPanel(child, panelId);
+    if (found) return found;
+  }
+  return null;
+}
+
+function getFirstContainerId(node: LayoutNode): string | null {
+  if (node.type === "container") return node.id;
+  if (node.children.length === 0) return null;
+  return getFirstContainerId(node.children[0]);
 }
 
 export function useLayout(initialState: LayoutState) {
@@ -119,9 +125,7 @@ export function useLayout(initialState: LayoutState) {
       delete panels[panelId];
 
       let focusedPanelId = state.focusedPanelId;
-      if (focusedPanelId === panelId) {
-        focusedPanelId = null;
-      }
+      if (focusedPanelId === panelId) focusedPanelId = null;
 
       const finalLayout = pruned ? flattenLayout(pruned) : null;
       return { panels, layout: finalLayout, focusedPanelId };
@@ -184,7 +188,6 @@ export function useLayout(initialState: LayoutState) {
       setLayoutState((state) => {
         if (!state.layout) return state;
 
-        // 1. Remove panel from source container
         let updatedLayout = mapLayout(state.layout, (c) => {
           if (c.id !== sourceContainerId) return c;
           const tabs = c.tabs.filter((t) => t !== panelId);
@@ -198,7 +201,6 @@ export function useLayout(initialState: LayoutState) {
           : null;
         if (!updatedLayout) return state;
 
-        // 2. Create new container for the panel
         const newContainer: PanelContainerNode = {
           type: "container",
           id: uniqueId(),
@@ -206,7 +208,6 @@ export function useLayout(initialState: LayoutState) {
           activeTab: panelId,
         };
 
-        // 3. Insert split at target container
         updatedLayout = mapLayout(updatedLayout, (c) => {
           if (c.id !== targetContainerId) return c;
           const splitNode: SplitLayoutNode = {
@@ -232,7 +233,7 @@ export function useLayout(initialState: LayoutState) {
       const newPanel: Panel = {
         id: panelId,
         type: "notation",
-        meiFriendId: "new-file.mei",
+        meiFriendId: null,
       };
 
       const panels = { ...state.panels, [panelId]: newPanel };
@@ -245,6 +246,95 @@ export function useLayout(initialState: LayoutState) {
     });
   }, []);
 
+  /** Opens a notation panel for the given file path, or activates an existing one. */
+  const openOrActivateFile = useCallback((path: string) => {
+    setLayoutState((state) => {
+      // Look for an existing notation panel for this path
+      const existingPanelId = Object.entries(state.panels).find(
+        ([, p]) => p.meiFriendId === path && p.type === "notation",
+      )?.[0];
+
+      if (existingPanelId && state.layout) {
+        const containerId = findContainerForPanel(
+          state.layout,
+          existingPanelId,
+        );
+        if (containerId) {
+          const layout = mapLayout(state.layout, (c) =>
+            c.id === containerId ? { ...c, activeTab: existingPanelId } : c,
+          );
+          return { ...state, layout, focusedPanelId: existingPanelId };
+        }
+      }
+
+      // Create a new notation panel
+      const panelId = uniqueId("panel");
+      const newPanel: Panel = {
+        id: panelId,
+        type: "notation",
+        meiFriendId: path,
+      };
+      const panels = { ...state.panels, [panelId]: newPanel };
+
+      let layout: LayoutNode;
+      if (!state.layout) {
+        layout = {
+          type: "container",
+          id: uniqueId("container"),
+          tabs: [panelId],
+          activeTab: panelId,
+        };
+      } else {
+        const targetContainerId =
+          (state.focusedPanelId
+            ? findContainerForPanel(state.layout, state.focusedPanelId)
+            : null) ?? getFirstContainerId(state.layout);
+
+        if (!targetContainerId) return state;
+
+        const newLayout = mapLayout(state.layout, (c) => {
+          if (c.id !== targetContainerId) return c;
+          return { ...c, tabs: [...c.tabs, panelId], activeTab: panelId };
+        });
+        layout = newLayout ?? state.layout;
+      }
+
+      return { panels, layout, focusedPanelId: panelId };
+    });
+  }, []);
+
+  /** Opens a CodeMirror panel for the same file as the given notation panel. */
+  const openCodeMirrorForPanel = useCallback(
+    (panelId: string, containerId: string) => {
+      setLayoutState((state) => {
+        const sourcePanel = state.panels[panelId];
+        if (!sourcePanel?.meiFriendId) return state;
+
+        const newPanelId = uniqueId("panel");
+        const newPanel: Panel = {
+          id: newPanelId,
+          type: "xmlcode",
+          meiFriendId: sourcePanel.meiFriendId,
+        };
+
+        const panels = { ...state.panels, [newPanelId]: newPanel };
+        const layout = state.layout
+          ? mapLayout(state.layout, (c) => {
+              if (c.id !== containerId) return c;
+              return {
+                ...c,
+                tabs: [...c.tabs, newPanelId],
+                activeTab: newPanelId,
+              };
+            })
+          : null;
+
+        return { ...state, panels, layout, focusedPanelId: newPanelId };
+      });
+    },
+    [],
+  );
+
   return {
     layoutState,
     setActivePanel,
@@ -253,5 +343,7 @@ export function useLayout(initialState: LayoutState) {
     movePanelToContainer,
     splitContainer,
     addNewPanelToContainer,
+    openOrActivateFile,
+    openCodeMirrorForPanel,
   };
 }

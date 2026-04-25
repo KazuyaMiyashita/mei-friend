@@ -2,6 +2,7 @@ export * from "./api/index.js";
 export * from "./MeiDraft.js";
 export * from "./MeiElement.js";
 export * from "./MeiFriend.js";
+export * from "./MeiFriendWorkspace.js";
 export * from "./MeiUpdateEvent.js";
 export * from "./mei/index.js";
 export * from "./models/index.js";

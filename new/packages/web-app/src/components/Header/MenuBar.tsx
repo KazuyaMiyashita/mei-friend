@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { useActiveMeiFriend, useAppState } from "../../context/AppStateContext";
 import styles from "./Header.module.css";
-
-interface MenuBarProps {
-  onToggleSplash?: () => void;
-  onNewFile?: () => void;
-  onOpenFile?: () => void;
-  onOpenWorkspace?: () => void;
-  onOpenUrl?: () => void;
-}
 
 function useDropdownState() {
   const [openId, setOpenId] = useState<string | null>(null);
@@ -30,7 +23,6 @@ function useDropdownState() {
     if (!isNavOpen) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as Element;
-      // Use id check for navbar since class name is now hashed
       if (!target.closest("#menuBar")) close();
     };
     document.addEventListener("mousedown", handler);
@@ -83,6 +75,7 @@ interface MenuItemProps {
   children: React.ReactNode;
   onClick?: () => void;
   onClose: () => void;
+  disabled?: boolean;
 }
 
 function MenuItem({
@@ -91,15 +84,20 @@ function MenuItem({
   children,
   onClick,
   onClose,
+  disabled,
 }: MenuItemProps) {
   return (
     <a
       href={href}
       onClick={(e) => {
         e.preventDefault();
-        onClick?.();
-        onClose();
+        if (!disabled) {
+          onClick?.();
+          onClose();
+        }
       }}
+      style={disabled ? { opacity: 0.4, cursor: "default" } : undefined}
+      aria-disabled={disabled}
     >
       <span>{children}</span>
       {shortcut && <span className={styles.keyShortCut}>{shortcut}</span>}
@@ -111,6 +109,13 @@ function MenuLine() {
   return <hr className={styles.dropdownLine} />;
 }
 
+interface MenuBarProps {
+  onNewFile?: () => void;
+  onOpenFile?: () => void;
+  onOpenWorkspace?: () => void;
+  onOpenUrl?: () => void;
+}
+
 export default function MenuBar({
   onNewFile,
   onOpenFile,
@@ -118,13 +123,53 @@ export default function MenuBar({
   onOpenUrl,
 }: MenuBarProps) {
   const { openId, handleClick, handleHover, close } = useDropdownState();
+  const { activeMeiFriend, activeSelectedId } = useActiveMeiFriend();
+  const { workspace, activeMeiFriendPath } = useAppState();
+
+  const hasActiveNote = !!(activeMeiFriend && activeSelectedId);
+
+  const handlePitchUp = useCallback(() => {
+    if (!activeMeiFriendPath || !activeSelectedId) return;
+    const meiFriend = workspace.getMeiFriend(activeMeiFriendPath);
+    if (!meiFriend) return;
+    try {
+      const result = meiFriend.api.editor.pitchUp(activeSelectedId);
+      meiFriend.updateBatch([
+        result.note,
+        ...result.accidentalCorrections.map((c) => c.element),
+      ]);
+    } catch {
+      // ignore if element is not a note
+    }
+  }, [activeMeiFriendPath, activeSelectedId, workspace]);
+
+  const handlePitchDown = useCallback(() => {
+    if (!activeMeiFriendPath || !activeSelectedId) return;
+    const mf = workspace.getMeiFriend(activeMeiFriendPath);
+    if (!mf) return;
+    try {
+      const result = mf.api.editor.pitchDown(activeSelectedId);
+      mf.updateBatch([
+        result.note,
+        ...result.accidentalCorrections.map((c) => c.element),
+      ]);
+    } catch {
+      // ignore if element is not a note
+    }
+  }, [activeMeiFriendPath, activeSelectedId, workspace]);
 
   const item = (
     label: React.ReactNode,
     shortcut?: React.ReactNode,
     action?: () => void,
+    disabled?: boolean,
   ) => (
-    <MenuItem shortcut={shortcut} onClose={close} onClick={action}>
+    <MenuItem
+      shortcut={shortcut}
+      onClose={close}
+      onClick={action}
+      disabled={disabled}
+    >
       {label}
     </MenuItem>
   );
@@ -140,17 +185,14 @@ export default function MenuBar({
         onClose={close}
       >
         {item("New file", "⌃N", onNewFile)}
-        {item("Open files...", "⌘O", onOpenFile)}
-        {item("Open Workspace...", undefined, onOpenWorkspace)}
-        {item("Open URL...", undefined, onOpenUrl)}
+        {item("Open files…", "⌘O", onOpenFile)}
+        {item("Open Workspace…", undefined, onOpenWorkspace)}
+        {item("Open URL…", undefined, onOpenUrl)}
         <MenuLine />
-        {item("Rename Workspace...", undefined)}
+        {item("Rename Workspace…", undefined)}
         {item("Save Workspace", undefined)}
         <MenuLine />
         {item("Public repertoire")}
-        <MenuLine />
-        {item("Save MEI", undefined)}
-        {item("Save SVG", undefined)}
       </Dropdown>
 
       <Dropdown
@@ -176,11 +218,7 @@ export default function MenuBar({
         onHover={handleHover}
         onClose={close}
       >
-        {item("Playback controls", "SPACE")}
-        <MenuLine />
-        {item("Zoom In", undefined)}
-        {item("Zoom Out", undefined)}
-        <MenuLine />
+        {item("Open Score", undefined)}
         {item("Open XML code", undefined)}
       </Dropdown>
 
@@ -192,6 +230,9 @@ export default function MenuBar({
         onHover={handleHover}
         onClose={close}
       >
+        {item("Pitch Up", "↑", handlePitchUp, !hasActiveNote)}
+        {item("Pitch Down", "↓", handlePitchDown, !hasActiveNote)}
+        <MenuLine />
         {item("Delete element", "⌫", undefined)}
       </Dropdown>
 

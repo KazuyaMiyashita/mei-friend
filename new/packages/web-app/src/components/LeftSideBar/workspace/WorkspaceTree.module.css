@@ -71,8 +71,7 @@
 }
 
 .fileNode.active {
-  background-color: var(--explorer-item-active-bg);
-  color: var(--explorer-item-active-fg);
+  background-color: var(--dropdownBackgroundHighlightColor);
 }
 
 .fileNode .icon {
@@ -88,9 +87,12 @@
 }
 
 .openIndicator {
-  color: var(--accent-color);
-  font-weight: bold;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--highlightColor);
+  flex-shrink: 0;
   margin-left: 4px;
+  margin-right: 6px;
 }
 
 /* Use default cursor for non-clickable files (annotation, other, etc.) */

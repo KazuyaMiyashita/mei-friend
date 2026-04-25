@@ -1,6 +1,6 @@
 # @mei-friend/core
 
-The core library of the next-generation [*mei-friend*](https://mei-friend.mdw.ac.at) editor — a web-based "last mile" editor for [Music Encoding Initiative (MEI)](https://music-encoding.org) encodings.
+The core library of [*mei-friend*](https://mei-friend.mdw.ac.at) — a web-based "last mile" editor for [Music Encoding Initiative (MEI)](https://music-encoding.org) encodings.
 
 This package provides the structured document model that powers bidirectional editing between MEI XML and music notation: you can load an MEI file, edit elements programmatically through a high-level API, navigate the score structure, and serialize the result back to XML. Changes flow in both directions — from notation to code and back — making this library the foundation for building tightly coupled, interactive MEI editors.
 

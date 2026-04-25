@@ -20,6 +20,7 @@
   "include": ["src"],
   "references": [
     { "path": "../core/tsconfig.lib.json" },
-    { "path": "../lib-codemirror" }
+    { "path": "../lib-codemirror" },
+    { "path": "../lib-verovio-react/tsconfig.lib.json" }
   ]
 }

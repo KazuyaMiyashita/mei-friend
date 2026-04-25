@@ -11,6 +11,10 @@ export default defineConfig({
         __dirname,
         "../lib-codemirror/src/index.ts",
       ),
+      "@mei-friend/lib-verovio-react": path.resolve(
+        __dirname,
+        "../lib-verovio-react/src/index.ts",
+      ),
     },
   },
 });
