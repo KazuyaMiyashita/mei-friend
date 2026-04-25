@@ -22,3 +22,4 @@ export * from "./elements/structure/MeiStaff.js";
 export * from "./utils/buildScoreModel.js";
 export * from "./utils/duration.js";
 export * from "./utils/meter.js";
+export * from "./utils/navigable.js";

@@ -1,4 +1,9 @@
-import type { Cursor, ScoreModel } from "@mei-friend/core";
+import {
+  type Cursor,
+  isNavigable,
+  type MeiFriend,
+  type ScoreModel,
+} from "@mei-friend/core";
 import type { BBox, DebugFilters, VerovioCanvasColors } from "./types.js";
 
 export function applySvgFitStyles(
@@ -178,6 +183,7 @@ export function createCaret(
 export function renderOverlays(
   container: HTMLElement,
   scoreModel: ScoreModel,
+  meiFriend: MeiFriend,
   bboxMap: Map<string, BBox>,
   debugFilters: DebugFilters,
   selectedId: string | null,
@@ -352,8 +358,9 @@ export function renderOverlays(
 
         if (sBbox) {
           const points: { offset: number; x: number }[] = [];
-          const measureLength = measure.meter.beatType.value
-            .mul(measure.meter.beats)
+          const meter = meiFriend.api.getMeterAt(measureIndex);
+          const measureLength = meter.beatType.value
+            .mul(meter.beats)
             .toDouble();
 
           // Collect event points first
@@ -361,7 +368,7 @@ export function renderOverlays(
           for (const [_sN, mStaff] of measure.staves) {
             for (const [_lN, mLayer] of mStaff.layers) {
               for (const event of mLayer.events) {
-                if (!event.isNavigable) continue;
+                if (!isNavigable(meiFriend, event.id)) continue;
                 const eBbox = bboxMap.get(event.id);
                 if (eBbox) {
                   const off = event.offset.value.toDouble();

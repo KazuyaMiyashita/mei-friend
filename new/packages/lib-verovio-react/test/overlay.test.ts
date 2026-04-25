@@ -43,6 +43,7 @@ describe("VerovioCanvas Overlays", () => {
       renderOverlays(
         container,
         scoreModel,
+        meiFriend,
         bboxMap,
         { staff: true, note: true, caret: true },
         "n-1-1-2", // set selectedId to a note to verify caret height

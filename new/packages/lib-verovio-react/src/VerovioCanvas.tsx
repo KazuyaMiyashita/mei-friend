@@ -245,6 +245,7 @@ export const VerovioCanvas = forwardRef<
     renderOverlays(
       container,
       scoreModel,
+      meiFriend,
       bboxCacheRef.current,
       debugFilters,
       selectedId,
@@ -255,6 +256,7 @@ export const VerovioCanvas = forwardRef<
   }, [
     currentSvg,
     scoreModel,
+    meiFriend,
     debugFilters,
     selectedId,
     cursor,

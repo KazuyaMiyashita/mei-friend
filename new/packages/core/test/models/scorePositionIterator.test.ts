@@ -11,12 +11,11 @@ import type { MeasureModel, Position } from "../../src/models/score.js";
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeEvent(id: string, offset: number, duration = 1, navigable = true) {
+function makeEvent(id: string, offset: number, duration = 1) {
   return {
     id,
     offset: Offset.of(offset),
     duration: Duration.of(1, duration),
-    isNavigable: navigable,
   };
 }
 
@@ -34,22 +33,12 @@ function makeLayer(
 
 /**
  * Two-measure score, each measure has one staff (staffN=1) with two layers.
- *
- * Measure 0 (id "m0"):
- *   Layer 1: n0_l1_e0 @ 0, n0_l1_e1 @ 1
- *   Layer 2: n0_l2_e0 @ 0, n0_l2_e1 @ 1
- *
- * Measure 1 (id "m1"):
- *   Layer 1: n1_l1_e0 @ 0, n1_l1_e1 @ 1
- *   Layer 2: n1_l2_e0 @ 0, n1_l2_e1 @ 1
  */
 function makeTwoMeasureScore(): ScoreModel {
   const makeMeasure = (idx: number): MeasureModel => ({
     id: `m${idx}`,
     measureIndex: idx,
     measureN: String(idx + 1),
-    meter: { beats: 2, beatType: Duration.of(1) },
-    totalDuration: Duration.of(2),
     staves: new Map([
       [
         1,

@@ -8,6 +8,7 @@ import type {
   MeiUpdateEvent,
 } from "./MeiUpdateEvent.js";
 import { Mei } from "./mei/elements/Mei.js";
+import { reconcileScoreModel } from "./mei/utils/buildScoreModel.js";
 import type { ScoreModel } from "./models/score.js";
 import { IdGenerator } from "./utils/IdGenerator.js";
 import { ROOT_WRAPPER_TAG, XmlSerde } from "./utils/XmlSerde.js";
@@ -46,7 +47,7 @@ export class MeiFriend {
   private readonly tagMap = new Map<string, Set<Y.XmlElement>>();
   /** Reverse index to track which ID belongs to which element, for efficient updates. */
   private readonly elementToIdMap = new Map<Y.XmlElement, string>();
-  /** Cached ScoreModel; invalidated on every document update. */
+  /** Cached ScoreModel; updated incrementally or rebuilt as needed. */
   private _scoreModelCache: ScoreModel | null = null;
   /** Internal ID Generator for auto-assigning IDs */
   public readonly idGenerator: IdGenerator;
@@ -127,7 +128,7 @@ export class MeiFriend {
 
   /**
    * Returns a cached ScoreModel built from the current document state.
-   * The cache is invalidated on every document update.
+   * The cache is updated incrementally on document updates.
    */
   public getScoreModel(): ScoreModel {
     if (!this._scoreModelCache) {
@@ -556,12 +557,11 @@ export class MeiFriend {
     this.buildIndex(target);
   }
 
-  /** Sets up observers to maintain the idMap and tagMap. */
+  /** Sets up observers to maintain the idMap, tagMap, and ScoreModel cache. */
   private initializeIndex(): void {
     this.buildIndex(this.xmlRoot);
 
     this.xmlRoot.observeDeep((events) => {
-      this._scoreModelCache = null;
       for (const event of events) {
         if (event instanceof Y.YXmlEvent) {
           if (
@@ -588,6 +588,31 @@ export class MeiFriend {
               }
             }
           });
+        }
+      }
+    });
+
+    this.onUpdate((events) => {
+      if (this._scoreModelCache) {
+        const updatedXmlIds: string[] = [];
+        let needsRebuild = false;
+
+        for (const event of events) {
+          if (event.type === "document-replace") {
+            needsRebuild = true;
+            break;
+          }
+          updatedXmlIds.push(event.xmlId);
+        }
+
+        if (needsRebuild) {
+          this._scoreModelCache = null;
+        } else {
+          this._scoreModelCache = reconcileScoreModel(
+            this._scoreModelCache,
+            this,
+            updatedXmlIds,
+          );
         }
       }
     });

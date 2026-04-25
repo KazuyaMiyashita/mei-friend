@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { Cursor } from "../../src/api/Cursor.js";
 import { MeiFriend } from "../../src/MeiFriend.js";
-import { Cursor } from "../../src/models/score.js";
 
 describe("Cursor Navigation", () => {
   it("prevBeat() moves to the last beat of the previous measure", () => {
@@ -17,10 +17,10 @@ describe("Cursor Navigation", () => {
       measureIndex: 1,
       staffN: 1,
       layerN: 1,
-      offset: scoreModel.measures[1].meter.beatType.asOffset(),
+      offset: friend.api.getMeterAt(1).beatType.asOffset(),
       measureId: scoreModel.measures[1].id,
     };
-    let cursor = new Cursor(scoreModel, startPos);
+    let cursor = new Cursor(friend, scoreModel, startPos);
 
     // prevBeat() -> measure 1, offset 0
     cursor = cursor.prevBeat();
@@ -40,10 +40,10 @@ describe("Cursor Navigation", () => {
       measureIndex: 2,
       staffN: 1,
       layerN: 1,
-      offset: scoreModel.measures[2].meter.beatType.asOffset().mul(0), // offset 0
+      offset: friend.api.getMeterAt(2).beatType.asOffset().mul(0), // offset 0
       measureId: scoreModel.measures[2].id,
     };
-    let cursor2 = new Cursor(scoreModel, pos2);
+    let cursor2 = new Cursor(friend, scoreModel, pos2);
     cursor2 = cursor2.prevBeat();
     expect(cursor2.position.measureIndex).toBe(1);
     // last beat of 6/8 measure should be 2.5

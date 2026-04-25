@@ -1,5 +1,4 @@
-import { type Duration, Offset } from "./index.js";
-import { Rational } from "./math.js";
+import type { Duration, Offset } from "./index.js";
 
 // ---------------------------------------------------------------------------
 // ScoreModel data types
@@ -11,17 +10,10 @@ export interface EventModel {
   readonly offset: Offset;
   /**
    * The logical duration of this event.
-   * May be `Duration.of(0)` for grace notes or elements whose duration cannot
-   * be determined.
+   * May be `Duration.of(0)` for elements whose duration cannot be determined
+   * or that do not occupy time (e.g. keySig, meterSig, clef).
    */
   readonly duration: Duration;
-  /**
-   * True for top-level musical events (note, rest, chord, space, mRest).
-   * False for notes inside a chord — kept so that `ScoreModel.getPositionById`
-   * can resolve a chord-internal note ID to its parent chord's position, but
-   * not treated as a navigation step by `Cursor`.
-   */
-  readonly isNavigable: boolean;
 }
 
 export interface LayerModel {
@@ -32,7 +24,6 @@ export interface LayerModel {
   /**
    * Events in document order. Offsets are not guaranteed to be monotonically
    * increasing — out-of-order offsets can arise from certain MEI constructs.
-   * TODO: Consider enforcing ascending offset order as a model invariant.
    */
   readonly events: ReadonlyArray<EventModel>;
 }
@@ -42,8 +33,7 @@ export interface StaffModel {
   readonly id: string;
   /**
    * The value of the `n` attribute on the corresponding `<staffDef>` / `<staff>`
-   * element, as defined in the score definition. Not necessarily a contiguous
-   * sequence — e.g. a score may define only n=1 and n=3.
+   * element, as defined in the score definition.
    */
   readonly staffN: number;
   /** Keyed by `layerN`. */
@@ -65,28 +55,33 @@ export interface MeasureModel {
   readonly measureIndex: number;
   /**
    * The value of the `n` attribute on the corresponding `<measure>` element —
-   * the number printed on the score. May be duplicated across measures (e.g.
-   * first and second endings share the same number) and may be `undefined`
-   * when the attribute is absent.
+   * the number printed on the score. May be duplicated across measures.
    */
   readonly measureN: string | undefined;
-  readonly meter: Meter;
-  readonly totalDuration: Duration;
   /** Keyed by `staffN`. */
   readonly staves: ReadonlyMap<number, StaffModel>;
 }
 
 // ---------------------------------------------------------------------------
-// Position
+// Positions
 // ---------------------------------------------------------------------------
 
-export interface Position {
-  /** Zero-based index into `ScoreModel.measures`. */
+export interface MeasurePosition {
   readonly measureIndex: number;
-  /** The `n` attribute value of the target `<staff>`. See `StaffModel.staffN`. */
+}
+
+export interface StaffPosition extends MeasurePosition {
   readonly staffN: number;
-  /** The `n` attribute value of the target `<layer>`. See `LayerModel.layerN`. */
+}
+
+export interface LayerPosition extends StaffPosition {
   readonly layerN: number;
+}
+
+/**
+ * Represents a precise time position within a specific layer of the score.
+ */
+export interface Position extends LayerPosition {
   readonly offset: Offset;
   /**
    * The `xml:id` of the measure element at this position.
@@ -96,12 +91,25 @@ export interface Position {
   readonly measureId?: string;
 }
 
+/**
+ * A union type representing a position at any level of the score hierarchy.
+ */
+export type AnyPosition =
+  | MeasurePosition
+  | StaffPosition
+  | LayerPosition
+  | Position;
+
 // ---------------------------------------------------------------------------
 // ScoreModel class
 // ---------------------------------------------------------------------------
 
 export class ScoreModel {
-  constructor(readonly measures: ReadonlyArray<MeasureModel>) {}
+  constructor(
+    readonly measures: ReadonlyArray<MeasureModel>,
+    /** Fast lookup from xml:id to its position in the model. */
+    readonly idIndex: ReadonlyMap<string, AnyPosition> = new Map(),
+  ) {}
 
   getMeasure(index: number): MeasureModel | undefined {
     return this.measures[index];
@@ -112,75 +120,14 @@ export class ScoreModel {
   }
 
   /**
-   * Returns the navigable EventModel whose time span includes pos.offset.
-   * Span: event.offset <= pos.offset < event.offset + event.duration.
-   * For virtual beat positions (no note starts here), returns the note that is
-   * currently sounding at that offset.
+   * Returns a Position for the given element id.
+   * Uses the internal idIndex for O(1) lookup.
    */
-  getEventAt(pos: Position): EventModel | undefined {
-    const layer = this.getLayer(pos);
-    if (!layer) return undefined;
-
-    for (const event of layer.events) {
-      if (!event.isNavigable) continue;
-      const end = event.offset.add(event.duration);
-      if (
-        pos.offset.compareTo(event.offset) >= 0 &&
-        pos.offset.compareTo(end) < 0
-      ) {
-        return event;
-      }
-    }
-
-    // Fallback: cursor exactly at the end of the last navigable event
-    const navigable = layer.events.filter((e) => e.isNavigable);
-    const last = navigable[navigable.length - 1];
-    if (last) {
-      const end = last.offset.add(last.duration);
-      if (end.compareTo(pos.offset) === 0) return last;
-    }
-
-    return undefined;
+  getPositionById(id: string): AnyPosition | undefined {
+    return this.idIndex.get(id);
   }
 
-  /**
-   * Returns a Position for the given event id.
-   * For chord-internal notes (isNavigable: false), returns the parent chord's position.
-   */
-  getPositionById(id: string): Position | undefined {
-    for (const measure of this.measures) {
-      for (const [staffN, staff] of measure.staves) {
-        for (const [layerN, layer] of staff.layers) {
-          for (const event of layer.events) {
-            if (event.id !== id) continue;
-            if (!event.isNavigable) {
-              const parent = layer.events.find(
-                (e) => e.isNavigable && e.offset.compareTo(event.offset) === 0,
-              );
-              if (!parent) return undefined;
-              return {
-                measureIndex: measure.measureIndex,
-                staffN,
-                layerN,
-                offset: parent.offset,
-                measureId: measure.id,
-              };
-            }
-            return {
-              measureIndex: measure.measureIndex,
-              staffN,
-              layerN,
-              offset: event.offset,
-              measureId: measure.id,
-            };
-          }
-        }
-      }
-    }
-    return undefined;
-  }
-
-  private getLayer(pos: Position): LayerModel | undefined {
+  getLayer(pos: LayerPosition): LayerModel | undefined {
     return this.getMeasure(pos.measureIndex)
       ?.staves.get(pos.staffN)
       ?.layers.get(pos.layerN);
@@ -212,23 +159,6 @@ export interface ScorePositionIteratorOptions {
  *   boundaries as needed.
  * - `direction: "forward"` — from `position.offset` toward the end of the
  *   score, yielding events in ascending offset order.
- *
- * The event at exactly `position.offset` is included in both directions.
- *
- * `scope: "layer"` restricts iteration to the layer identified by `layerN`.
- * `scope: "staff"` includes all layers of the staff.
- *
- * @example
- * ```ts
- * // Find the most recent keySig before (and at) a position
- * for (const event of new ScorePositionIterator(scoreModel, pos, {
- *   scope: "staff",
- *   direction: "backward",
- * })) {
- *   const el = meiFriend.getElementById(event.id);
- *   if (MeiKeySig.create(el)) { ... }
- * }
- * ```
  */
 export class ScorePositionIterator implements Iterable<EventModel> {
   constructor(
@@ -259,7 +189,7 @@ export class ScorePositionIterator implements Iterable<EventModel> {
         for (const layer of getLayers(measure)) {
           for (const event of layer.events) {
             if (mi === measureIndex && event.offset.compareTo(offset) > 0) {
-              continue; // skip events strictly after the reference offset
+              continue;
             }
             collected.push(event);
           }
@@ -278,7 +208,7 @@ export class ScorePositionIterator implements Iterable<EventModel> {
         for (const layer of getLayers(measure)) {
           for (const event of layer.events) {
             if (mi === measureIndex && event.offset.compareTo(offset) < 0) {
-              continue; // skip events strictly before the reference offset
+              continue;
             }
             collected.push(event);
           }
@@ -289,247 +219,5 @@ export class ScorePositionIterator implements Iterable<EventModel> {
     }
 
     return direction === "backward" ? backward() : forward();
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Cursor
-// ---------------------------------------------------------------------------
-
-export class Cursor {
-  constructor(
-    readonly scoreModel: ScoreModel,
-    readonly position: Position,
-  ) {}
-
-  static fromId(scoreModel: ScoreModel, id: string): Cursor | undefined {
-    const pos = scoreModel.getPositionById(id);
-    return pos ? new Cursor(scoreModel, pos) : undefined;
-  }
-
-  /** Returns the navigable EventModel at the current position, or undefined for virtual positions. */
-  getEvent(): EventModel | undefined {
-    return this.scoreModel.getEventAt(this.position);
-  }
-
-  /** Moves to the next navigable event (including across measure boundaries). */
-  nextEvent(): Cursor {
-    const { measureIndex, staffN, layerN, offset } = this.position;
-    const layer = this.scoreModel
-      .getMeasure(measureIndex)
-      ?.staves.get(staffN)
-      ?.layers.get(layerN);
-    if (!layer) return this;
-
-    const navigable = layer.events.filter((e) => e.isNavigable);
-    const next = navigable.find((e) => e.offset.compareTo(offset) > 0);
-    if (next) {
-      return new Cursor(this.scoreModel, {
-        ...this.position,
-        offset: next.offset,
-      });
-    }
-
-    // Jump to next measure's first navigable event
-    const nextMeasureIndex = measureIndex + 1;
-    if (nextMeasureIndex >= this.scoreModel.length) return this;
-    const nextMeasure = this.scoreModel.getMeasure(nextMeasureIndex);
-    if (!nextMeasure) return this;
-    const nextLayer = nextMeasure.staves.get(staffN)?.layers.get(layerN);
-    if (!nextLayer) return this;
-    const firstNavig = nextLayer.events.find((e) => e.isNavigable);
-    if (!firstNavig) return this;
-    return new Cursor(this.scoreModel, {
-      measureIndex: nextMeasureIndex,
-      staffN,
-      layerN,
-      offset: firstNavig.offset,
-      measureId: nextMeasure.id,
-    });
-  }
-
-  /** Moves to the previous navigable event. */
-  prevEvent(): Cursor {
-    const { measureIndex, staffN, layerN, offset } = this.position;
-    const layer = this.scoreModel
-      .getMeasure(measureIndex)
-      ?.staves.get(staffN)
-      ?.layers.get(layerN);
-    if (!layer) return this;
-
-    const navigable = layer.events.filter((e) => e.isNavigable);
-    let prev: EventModel | undefined;
-    for (const e of navigable) {
-      if (e.offset.compareTo(offset) < 0) prev = e;
-      else break;
-    }
-    if (prev) {
-      return new Cursor(this.scoreModel, {
-        ...this.position,
-        offset: prev.offset,
-      });
-    }
-
-    // Jump to prev measure's last navigable event
-    if (measureIndex <= 0) return this;
-    const prevMeasure = this.scoreModel.getMeasure(measureIndex - 1);
-    if (!prevMeasure) return this;
-    const prevLayer = prevMeasure.staves.get(staffN)?.layers.get(layerN);
-    if (!prevLayer) return this;
-    const prevNavigable = prevLayer.events.filter((e) => e.isNavigable);
-    const lastNavig = prevNavigable[prevNavigable.length - 1];
-    if (!lastNavig) return this;
-    return new Cursor(this.scoreModel, {
-      measureIndex: measureIndex - 1,
-      staffN,
-      layerN,
-      offset: lastNavig.offset,
-      measureId: prevMeasure.id,
-    });
-  }
-
-  /** Moves up one staff (validates against ScoreModel). */
-  staffUp(): Cursor {
-    const newStaffN = this.position.staffN - 1;
-    if (newStaffN < 1) return this;
-    const measure = this.scoreModel.getMeasure(this.position.measureIndex);
-    if (!measure?.staves.has(newStaffN)) return this;
-    return new Cursor(this.scoreModel, { ...this.position, staffN: newStaffN });
-  }
-
-  /** Moves down one staff (validates against ScoreModel). */
-  staffDown(): Cursor {
-    const newStaffN = this.position.staffN + 1;
-    const measure = this.scoreModel.getMeasure(this.position.measureIndex);
-    if (!measure?.staves.has(newStaffN)) return this;
-    return new Cursor(this.scoreModel, { ...this.position, staffN: newStaffN });
-  }
-
-  /**
-   * Advances to the next beat boundary within the measure, or moves to the start of the next measure.
-   */
-  nextBeat(): Cursor {
-    const { measureIndex, staffN, layerN } = this.position;
-    const measure = this.scoreModel.getMeasure(measureIndex);
-    if (!measure) return this;
-    const beatDuration = measure.meter.beatType;
-
-    const k =
-      Math.floor(
-        this.position.offset.value.div(beatDuration.value).toDouble() + 1e-9,
-      ) + 1;
-    const nextOffset = new Offset(beatDuration.value.mul(k));
-
-    const layer = measure.staves.get(staffN)?.layers.get(layerN);
-    const navigable = layer?.events.filter((e) => e.isNavigable) ?? [];
-    const lastEvent = navigable[navigable.length - 1];
-    const measureEnd = lastEvent
-      ? lastEvent.offset.add(lastEvent.duration)
-      : new Offset(beatDuration.value.mul(measure.meter.beats));
-
-    if (nextOffset.compareTo(measureEnd) < 0) {
-      return new Cursor(this.scoreModel, {
-        ...this.position,
-        offset: nextOffset,
-      });
-    }
-
-    const nextMeasureIndex = measureIndex + 1;
-    if (nextMeasureIndex >= this.scoreModel.length) return this;
-    const nextMeasure = this.scoreModel.getMeasure(nextMeasureIndex);
-    if (!nextMeasure) return this;
-    return new Cursor(this.scoreModel, {
-      measureIndex: nextMeasureIndex,
-      staffN,
-      layerN,
-      offset: Offset.of(0),
-      measureId: nextMeasure.id,
-    });
-  }
-
-  /**
-   * Retreats to the previous beat boundary, or moves to the start of the previous measure.
-   */
-  prevBeat(): Cursor {
-    const { measureIndex, staffN, layerN } = this.position;
-    const measure = this.scoreModel.getMeasure(measureIndex);
-    if (!measure) return this;
-    const beatDuration = measure.meter.beatType;
-
-    const k =
-      Math.ceil(
-        this.position.offset.value.div(beatDuration.value).toDouble() - 1e-9,
-      ) - 1;
-    const prevOffset = new Offset(beatDuration.value.mul(k));
-
-    if (prevOffset.value.compareTo(new Rational(0)) >= 0) {
-      return new Cursor(this.scoreModel, {
-        ...this.position,
-        offset: prevOffset,
-      });
-    }
-
-    if (measureIndex <= 0) return this;
-    const prevMeasure = this.scoreModel.getMeasure(measureIndex - 1);
-    if (!prevMeasure) return this;
-    const lastBeatOffset = prevMeasure.totalDuration
-      .sub(prevMeasure.meter.beatType)
-      .asOffset();
-    return new Cursor(this.scoreModel, {
-      measureIndex: measureIndex - 1,
-      staffN,
-      layerN,
-      offset: lastBeatOffset,
-      measureId: prevMeasure.id,
-    });
-  }
-
-  /**
-   * Snaps the current position to the nearest preceding beat boundary strictly defined by beatType.
-   * Example: 4/4 (beatType 1), offset 1.5 -> 1.0. Offset 1.0 -> 1.0.
-   */
-  snapToBeat(): Cursor {
-    const { measureIndex, offset } = this.position;
-    const measure = this.scoreModel.getMeasure(measureIndex);
-    if (!measure) return this;
-    const beatDuration = measure.meter.beatType;
-
-    const k = Math.floor(
-      offset.value.div(beatDuration.value).toDouble() + 1e-9,
-    );
-    const snappedOffset = new Offset(beatDuration.value.mul(k));
-
-    if (snappedOffset.compareTo(offset) === 0) return this;
-    return new Cursor(this.scoreModel, {
-      ...this.position,
-      offset: snappedOffset,
-    });
-  }
-
-  /**
-   * Snaps the current position to the nearest preceding navigable event in the current staff/layer.
-   * If no such event exists, snaps to Offset 0.
-   */
-  snapToEvent(): Cursor {
-    const { measureIndex, staffN, layerN, offset } = this.position;
-    const measure = this.scoreModel.getMeasure(measureIndex);
-    if (!measure) return this;
-
-    const layer = measure.staves.get(staffN)?.layers.get(layerN);
-    const navigable = layer?.events.filter((e) => e.isNavigable) ?? [];
-    let snappedOffset = Offset.of(0);
-    for (const e of navigable) {
-      if (e.offset.compareTo(offset) <= 0) {
-        snappedOffset = e.offset;
-      } else {
-        break;
-      }
-    }
-
-    if (snappedOffset.compareTo(offset) === 0) return this;
-    return new Cursor(this.scoreModel, {
-      ...this.position,
-      offset: snappedOffset,
-    });
   }
 }

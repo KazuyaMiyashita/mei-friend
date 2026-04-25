@@ -16,9 +16,10 @@ export function VerovioCanvasFooter({
   enabled,
 }: Props) {
   const pos = cursor?.position ?? null;
-  const measure =
-    enabled && pos ? cursor?.scoreModel.getMeasure(pos.measureIndex) : null;
-  const meter = measure?.meter;
+  const meter =
+    enabled && pos && meiFriend
+      ? meiFriend.api.getMeterAt(pos.measureIndex)
+      : null;
 
   const [, forceUpdate] = useState(0);
   useEffect(() => {

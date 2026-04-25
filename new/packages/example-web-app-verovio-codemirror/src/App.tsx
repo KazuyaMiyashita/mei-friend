@@ -113,7 +113,7 @@ export default function App() {
       // so set verovioFocused explicitly here.
       verovioFocused.current = true;
       if (meiFriend && id) {
-        const newCursor = Cursor.fromId(meiFriend.getScoreModel(), id);
+        const newCursor = Cursor.fromId(meiFriend, id);
         if (newCursor) setCursor(newCursor);
       }
       // Cross-panel: propagate Verovio selection → CodeMirror

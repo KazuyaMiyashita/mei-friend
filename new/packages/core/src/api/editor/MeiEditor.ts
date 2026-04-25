@@ -78,7 +78,7 @@ export class MeiEditor {
   ): IPNAlter | undefined {
     const scoreModel = this.meiFriend.getScoreModel();
     const pos = scoreModel.getPositionById(noteId);
-    if (!pos) return undefined;
+    if (!pos || !("staffN" in pos) || !("offset" in pos)) return undefined;
 
     const candidates = this.eventsAtPosition(
       pos.measureIndex,
@@ -186,9 +186,10 @@ export class MeiEditor {
 
     const scoreModel = this.meiFriend.getScoreModel();
     const pos = scoreModel.getPositionById(noteId);
-    const key = pos
-      ? this.meiApi.getKeyAt(pos)
-      : (this.meiApi.getInitialKeyForStaff(1) ?? Key.parse("C Major"));
+    const key =
+      pos && "offset" in pos
+        ? this.meiApi.getKeyAt(pos)
+        : (this.meiApi.getInitialKeyForStaff(1) ?? Key.parse("C Major"));
 
     const ip = key.diatonicScalePitch(targetPos).internationalPitchNotation();
     const alteredIp = new IPN(
@@ -205,8 +206,12 @@ export class MeiEditor {
     // If the moving note had a printed accidental, subsequent notes in the
     // measure may have been relying on its carry-over effect.
     const accidentalCorrections =
-      note.hasPrintedAccidental && pos
-        ? this.findContextualAccidUpdates(sourcePos, key, pos)
+      note.hasPrintedAccidental && pos && "staffN" in pos && "offset" in pos
+        ? this.findContextualAccidUpdates(sourcePos, key, {
+            measureIndex: pos.measureIndex,
+            staffN: pos.staffN,
+            offset: pos.offset,
+          })
         : [];
 
     // TODO: If a note is tied to the next note, that note also moves.

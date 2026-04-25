@@ -35,7 +35,7 @@ export default function App() {
     (id: string | null) => {
       setSelectedId(id);
       if (meiFriend && id) {
-        const newCursor = Cursor.fromId(meiFriend.getScoreModel(), id);
+        const newCursor = Cursor.fromId(meiFriend, id);
         if (newCursor) {
           setCursor(newCursor);
         }

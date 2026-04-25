@@ -2,10 +2,13 @@ import type { MeiElement } from "../MeiElement.js";
 import type { MeiFriend } from "../MeiFriend.js";
 import type { Mei } from "../mei/elements/Mei.js";
 import { MeiKeySig } from "../mei/elements/score-def/MeiKeySig.js";
+import { MeiMeterSig } from "../mei/elements/score-def/MeiMeterSig.js";
+import { MeiScoreDef } from "../mei/elements/score-def/MeiScoreDef.js";
 import { MeiStaffDef } from "../mei/elements/score-def/MeiStaffDef.js";
 import { buildScoreModel } from "../mei/utils/buildScoreModel.js";
-import { Key } from "../models/index.js";
-import type { Position } from "../models/score.js";
+import { getGlobalMeter } from "../mei/utils/meter.js";
+import { Duration, Key } from "../models/index.js";
+import type { Meter, Position } from "../models/score.js";
 import { type ScoreModel, ScorePositionIterator } from "../models/score.js";
 import { MeiEditor } from "./editor/MeiEditor.js";
 
@@ -71,6 +74,41 @@ export class MeiApi {
     const root = this.meiFriend.getRootElement();
     if (!root) throw new Error("No root element to convert to ScoreModel");
     return buildScoreModel(root);
+  }
+
+  /**
+   * Returns the meter in effect for the specified measure.
+   */
+  public getMeterAt(measureIndex: number): Meter {
+    const root = this.meiFriend.getRootElement();
+    if (!root) throw new Error("No root element");
+
+    let currentMeter = getGlobalMeter(root);
+    const measures = root.getElementsByTagName("measure");
+
+    for (let i = 0; i <= measureIndex && i < measures.length; i++) {
+      const mEl = measures[i];
+      const meterSigEl = mEl.getElementsByTagName("meterSig")[0];
+      if (meterSigEl) {
+        const ms = MeiMeterSig.create(meterSigEl);
+        if (ms?.count !== undefined && ms.unit !== undefined) {
+          currentMeter = { beats: ms.count, beatType: Duration.of(4, ms.unit) };
+        }
+      } else {
+        const scoreDefEl = mEl.getElementsByTagName("scoreDef")[0];
+        if (scoreDefEl && scoreDefEl.parentElement?.id === mEl.id) {
+          const meter = MeiScoreDef.create(scoreDefEl)?.getMeter();
+          if (meter) currentMeter = meter;
+        }
+      }
+    }
+
+    return (
+      currentMeter ?? {
+        beats: 4,
+        beatType: Duration.of(4, 4),
+      }
+    );
   }
 
   /**
