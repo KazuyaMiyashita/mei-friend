@@ -2,11 +2,34 @@ import { MeiFriend } from "./MeiFriend.js";
 
 export type WorkspaceFileType = "MEI" | "Image" | "WebAnnotation" | "Other";
 
+/**
+ * How a file entered the workspace. This is immutable provenance — it records
+ * where the file came from, not where it is currently stored.
+ *
+ * - "workspace"  Scanned from a local directory (showDirectoryPicker). The
+ *                workspace root directory handle can write it back in place.
+ * - "loose"      Opened individually (showOpenFilePicker / drag-drop / <input>).
+ *                The original file is never overwritten; on Save Workspace the
+ *                content is written to the workspace root directory.
+ * - "memory"     Created in-app (e.g. New file). Never existed on disk.
+ * - "remote"     Fetched from a URL. Reserved for future URL-workspace support.
+ */
+export type EntryOrigin = "workspace" | "loose" | "memory" | "remote";
+
 export interface WorkspaceEntry {
   readonly path: string;
   readonly type: WorkspaceFileType;
-  meiFriend?: MeiFriend;
+  readonly origin: EntryOrigin;
+  /**
+   * True when the workspace root directory does not reflect the current state
+   * of this file. This covers two cases:
+   *   1. The content has been edited since the last save (all origins).
+   *   2. The file has never been written to the workspace root directory
+   *      ("loose" / "memory" / "remote" files start dirty).
+   * Reset to false by markSaved().
+   */
   isDirty: boolean;
+  meiFriend?: MeiFriend;
 }
 
 export interface WorkspaceSnapshot {
@@ -15,28 +38,34 @@ export interface WorkspaceSnapshot {
   isDirty: boolean;
 }
 
-
 /**
- * Manages a workspace — a named collection of file paths with optional MEI content.
- * Does not perform any file I/O; call loadMeiContent() to supply MEI XML data.
+ * Manages a workspace — a named collection of file paths with optional MEI
+ * content. Does not perform any file I/O; the caller (AppStateContext /
+ * WorkspaceContext) is responsible for reading files and calling
+ * loadMeiContent(), and for writing files on save.
  *
  * subscribe/getSnapshot follow the useSyncExternalStore convention.
  */
 export class MeiFriendWorkspace {
-  private _name?: string;
+  private _name: string;
   private _entries: WorkspaceEntry[] = [];
   private _listeners: Array<() => void> = [];
   private _unsubscribers = new Map<string, () => void>();
-  private _snapshot: WorkspaceSnapshot = {
-    name: undefined,
-    entries: [],
-    isDirty: false,
-  };
+  private _snapshot: WorkspaceSnapshot;
 
-  get name(): string | undefined {
+  constructor(name: string) {
+    this._name = name;
+    this._snapshot = {
+      name: this._name,
+      entries: [],
+      isDirty: false,
+    };
+  }
+
+  get name(): string {
     return this._name;
   }
-  set name(v: string | undefined) {
+  set name(v: string) {
     this._name = v;
     this._notify();
   }
@@ -68,9 +97,17 @@ export class MeiFriendWorkspace {
     const ext = path.split(".").pop()?.toLowerCase() ?? "";
     if (ext === "mei" || ext === "xml" || ext === "musicxml") return "MEI";
     if (
-      ["jpg", "jpeg", "png", "gif", "svg", "bmp", "webp", "tiff", "tif"].includes(
-        ext,
-      )
+      [
+        "jpg",
+        "jpeg",
+        "png",
+        "gif",
+        "svg",
+        "bmp",
+        "webp",
+        "tiff",
+        "tif",
+      ].includes(ext)
     )
       return "Image";
     if (ext === "jsonld") return "WebAnnotation";
@@ -80,8 +117,16 @@ export class MeiFriendWorkspace {
   /**
    * Adds a file path to the workspace. Returns null for hidden paths.
    * Returns the existing entry if the path is already present.
+   *
+   * isDirty initial value is determined by origin:
+   *   - "workspace" → false  (file already exists in the workspace directory)
+   *   - all others  → true   (file has not yet been written to a workspace dir)
    */
-  public addFile(path: string, type?: WorkspaceFileType): WorkspaceEntry | null {
+  public addFile(
+    path: string,
+    origin: EntryOrigin,
+    type?: WorkspaceFileType,
+  ): WorkspaceEntry | null {
     const classified = MeiFriendWorkspace.classifyFile(path);
     if (classified === "hidden") return null;
 
@@ -91,7 +136,8 @@ export class MeiFriendWorkspace {
     const entry: WorkspaceEntry = {
       path,
       type: type ?? classified,
-      isDirty: false,
+      origin,
+      isDirty: origin !== "workspace",
     };
     this._entries = [...this._entries, entry];
     this._notify();
@@ -115,12 +161,17 @@ export class MeiFriendWorkspace {
 
   /**
    * Loads or replaces MEI XML content for the given path.
-   * Adds the file to the workspace as "MEI" type if not already present.
+   * The entry must already exist (added via addFile) and be of type "MEI".
+   *
+   * isDirty is NOT reset here for non-workspace files: loading content from the
+   * original source does not mean the file has been written to the workspace
+   * root directory. Only markSaved() resets isDirty.
    */
   public loadMeiContent(path: string, xmlString: string): MeiFriend {
     let entry = this._entries.find((e) => e.path === path);
     if (!entry) {
-      const added = this.addFile(path, "MEI");
+      // Fallback: auto-register with "loose" origin if not yet in workspace.
+      const added = this.addFile(path, "loose", "MEI");
       if (!added) throw new Error(`Cannot add "${path}" to workspace.`);
       entry = added;
     } else if (entry.type !== "MEI") {
@@ -133,7 +184,13 @@ export class MeiFriendWorkspace {
 
     const mf = MeiFriend.fromXmlString(xmlString);
     entry.meiFriend = mf;
-    entry.isDirty = false;
+
+    // "workspace" files: loading from disk means the local copy is in sync.
+    // Other origins: isDirty stays true — content has not been saved to
+    // the workspace root directory yet.
+    if (entry.origin === "workspace") {
+      entry.isDirty = false;
+    }
 
     const unsub = mf.onUpdate(() => {
       if (entry) {
@@ -151,6 +208,7 @@ export class MeiFriendWorkspace {
     return this._entries.find((e) => e.path === path)?.meiFriend;
   }
 
+  /** Marks a file as saved (isDirty = false). Call after successfully writing to disk. */
   public markSaved(path: string): void {
     const entry = this._entries.find((e) => e.path === path);
     if (entry) {

@@ -5,7 +5,8 @@ import {
 } from "@mei-friend/lib-verovio-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VerovioOptions } from "verovio";
-import { useAppState, useWorkspace } from "../../../../context/AppStateContext";
+import { useAppState } from "../../../../context/AppStateContext";
+import { useWorkspace } from "../../../../context/WorkspaceContext";
 import styles from "./VerovioPanel.module.css";
 import { VerovioPanelFooter } from "./VerovioPanelFooter";
 import { VerovioPanelHeader } from "./VerovioPanelHeader";

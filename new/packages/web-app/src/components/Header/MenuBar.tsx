@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { useActiveMeiFriend, useAppState } from "../../context/AppStateContext";
+import { useActiveMeiFriend } from "../../context/AppStateContext";
+import { useWorkspaceContext } from "../../context/WorkspaceContext";
 import styles from "./Header.module.css";
 
 function useDropdownState() {
@@ -113,6 +114,7 @@ interface MenuBarProps {
   onNewFile?: () => void;
   onOpenFile?: () => void;
   onOpenWorkspace?: () => void;
+  onSaveWorkspace?: () => void;
   onOpenUrl?: () => void;
 }
 
@@ -120,11 +122,15 @@ export default function MenuBar({
   onNewFile,
   onOpenFile,
   onOpenWorkspace,
+  onSaveWorkspace,
   onOpenUrl,
 }: MenuBarProps) {
   const { openId, handleClick, handleHover, close } = useDropdownState();
-  const { activeMeiFriend, activeSelectedId } = useActiveMeiFriend();
-  const { workspace, activeMeiFriendPath } = useAppState();
+  const { activeMeiFriend, activeSelectedId, activeMeiFriendPath } =
+    useActiveMeiFriend();
+  // workspace is needed for pitch operations — sourced from WorkspaceContext
+  // rather than AppStateContext since it is part of the data layer.
+  const { workspace } = useWorkspaceContext();
 
   const hasActiveNote = !!(activeMeiFriend && activeSelectedId);
 
@@ -189,8 +195,7 @@ export default function MenuBar({
         {item("Open Workspace…", undefined, onOpenWorkspace)}
         {item("Open URL…", undefined, onOpenUrl)}
         <MenuLine />
-        {item("Rename Workspace…", undefined)}
-        {item("Save Workspace", undefined)}
+        {item("Save Workspace", "⌘S", onSaveWorkspace)}
         <MenuLine />
         {item("Public repertoire")}
       </Dropdown>

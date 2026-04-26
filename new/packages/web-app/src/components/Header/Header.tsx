@@ -1,11 +1,12 @@
 import logoUrl from "../../assets/menu-logo.svg";
-import { useAppState } from "../../context/AppStateContext";
+import { useWorkspaceContext } from "../../context/WorkspaceContext";
 import FileStatus from "./FileStatus";
 import styles from "./Header.module.css";
 import MenuBar from "./MenuBar";
 
 export default function Header() {
-  const { addFilesFromPicker, openWorkspaceFromDirectory } = useAppState();
+  const { addFilesFromPicker, openWorkspaceFromDirectory, saveWorkspace } =
+    useWorkspaceContext();
 
   return (
     <header className={styles.header}>
@@ -15,6 +16,7 @@ export default function Header() {
       <MenuBar
         onOpenFile={addFilesFromPicker}
         onOpenWorkspace={openWorkspaceFromDirectory}
+        onSaveWorkspace={saveWorkspace}
       />
       <FileStatus schemaStatus="MEI" fileName="" isDirty={false} />
     </header>

@@ -337,6 +337,7 @@ export function useLayout(initialState: LayoutState) {
 
   return {
     layoutState,
+    setLayoutState,
     setActivePanel,
     closePanel,
     reorderPanelInContainer,

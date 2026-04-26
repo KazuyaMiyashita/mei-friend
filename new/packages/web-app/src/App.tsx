@@ -16,6 +16,10 @@ import MainContent from "./components/MainContent/MainContent";
 import DragOverlay from "./components/Modals/DragOverlay";
 import SplashOverlay from "./components/Modals/SplashOverlay";
 import { AppStateProvider, useAppState } from "./context/AppStateContext";
+import {
+  useWorkspaceContext,
+  WorkspaceProvider,
+} from "./context/WorkspaceContext";
 
 function AppContent() {
   const [activeSidebar, setActiveSidebar] = useState<SidebarPanel | null>(
@@ -24,7 +28,8 @@ function AppContent() {
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
 
-  const { openFileInPanel, addFilesFromFileList, settings } = useAppState();
+  const { openFileInPanel } = useAppState();
+  const { addFilesFromFileList, settings } = useWorkspaceContext();
   const [showSplash, setShowSplash] = useState(() => settings.showSplash);
 
   const toggleSidebar = useCallback((panel: SidebarPanel) => {
@@ -128,8 +133,12 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AppStateProvider>
-      <AppContent />
-    </AppStateProvider>
+    // WorkspaceProvider must be the outer wrapper: AppStateProvider depends on
+    // WorkspaceContext.loadFileIfNeeded to implement openFileInPanel.
+    <WorkspaceProvider>
+      <AppStateProvider>
+        <AppContent />
+      </AppStateProvider>
+    </WorkspaceProvider>
   );
 }

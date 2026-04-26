@@ -1,6 +1,7 @@
 import type { EditorCursorInfo, SyncState } from "@mei-friend/lib-codemirror";
 import { useCallback, useRef, useState } from "react";
-import { useAppState, useWorkspace } from "../../../../context/AppStateContext";
+import { useAppState } from "../../../../context/AppStateContext";
+import { useWorkspace } from "../../../../context/WorkspaceContext";
 import { CodeMirrorEditor, type CodeMirrorEditorRef } from "./CodeMirrorEditor";
 import styles from "./CodeMirrorPanel.module.css";
 import { CodeMirrorPanelFooter } from "./CodeMirrorPanelFooter";

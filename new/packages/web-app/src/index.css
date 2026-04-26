@@ -19,6 +19,7 @@
   --overlayBorderColor: darkblue;
   --fileStatusColor: green;
   --fileStatusChangedColor: darkorange;
+  --warningColor: #ffd000;
 }
 
 *,

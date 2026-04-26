@@ -217,3 +217,37 @@
   opacity: 0.7;
   z-index: 1;
 }
+
+/* Storage type badge shown next to the workspace name */
+.storageBadge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  border-radius: 3px;
+  color: white;
+  vertical-align: middle;
+  opacity: 0.85;
+}
+
+.storageBadgeMemory {
+  background: var(--highlightColor);
+}
+
+.storageBadgeLocal {
+  background: var(--warningColor, #ffd000);
+  color: #2c2c2c;
+}
+
+.storageWarning {
+  font-size: 11px;
+  color: var(--textColor);
+  background-color: color-mix(in srgb, var(--warningColor) 20%, transparent);
+  border-left: 3px solid var(--warningColor);
+  padding: 6px 8px;
+  margin-top: 8px;
+  border-radius: 2px;
+  line-height: 1.3;
+}

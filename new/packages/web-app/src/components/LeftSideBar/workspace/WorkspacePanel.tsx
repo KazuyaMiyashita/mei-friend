@@ -1,5 +1,9 @@
 import { useCallback } from "react";
-import { useAppState, useWorkspace } from "../../../context/AppStateContext";
+import { useAppState } from "../../../context/AppStateContext";
+import {
+  useWorkspace,
+  useWorkspaceContext,
+} from "../../../context/WorkspaceContext";
 import panelStyles from "../Panel.module.css";
 import styles from "./WorkspacePanel.module.css";
 import WorkspaceTree from "./WorkspaceTree";
@@ -10,6 +14,7 @@ interface WorkspacePanelProps {
 
 export default function WorkspacePanel({ onOpenFile }: WorkspacePanelProps) {
   const { name, entries } = useWorkspace();
+  const { workspaceStorage } = useWorkspaceContext();
   const { activeMeiFriendPath } = useAppState();
 
   const handleFileClick = useCallback(
@@ -27,9 +32,30 @@ export default function WorkspacePanel({ onOpenFile }: WorkspacePanelProps) {
       <div className={panelStyles.panelTitle}>WORKSPACE</div>
 
       <div className={panelStyles.panelSection}>
+        <div className={panelStyles.panelSectionHeader}>Workspace Storage:</div>
+        <div className={panelStyles.panelSectionContent}>
+          <span
+            className={`${styles.storageBadge} ${
+              workspaceStorage === "local"
+                ? styles.storageBadgeLocal
+                : styles.storageBadgeMemory
+            }`}
+          >
+            {workspaceStorage === "local" ? "LOCAL" : "MEMORY"}
+          </span>
+          {workspaceStorage === "local" && (
+            <div className={styles.storageWarning}>
+              ⚠️ When you select "Save Workspace", it will overwrite the files in
+              the selected directory.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className={panelStyles.panelSection}>
         <div className={panelStyles.panelSectionHeader}>Workspace Name:</div>
         <div className={panelStyles.panelSectionContent}>
-          {name ? name.toUpperCase() : ""}
+          <span>{name || ""}</span>
         </div>
       </div>
 

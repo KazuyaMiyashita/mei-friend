@@ -1,6 +1,7 @@
 import { DragDropProvider } from "@dnd-kit/react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useAppState } from "../../context/AppStateContext";
+import { useWorkspaceContext } from "../../context/WorkspaceContext";
 import styles from "./MainContent.module.css";
 import SplitLayout from "./SplitLayout";
 import type { LayoutState } from "./types";
@@ -15,14 +16,13 @@ const INITIAL_STATE: LayoutState = {
 };
 
 export default function MainContent() {
-  const {
-    registerPanelOpener,
-    setActiveMeiFriendPath,
-    setActiveSelectedId,
-  } = useAppState();
+  const { registerPanelOpener, setActiveMeiFriendPath, setActiveSelectedId } =
+    useAppState();
+  const { registerResetHandler } = useWorkspaceContext();
 
   const {
     layoutState,
+    setLayoutState,
     setActivePanel,
     closePanel,
     reorderPanelInContainer,
@@ -41,6 +41,22 @@ export default function MainContent() {
     });
     return () => unregister();
   }, [registerPanelOpener, openOrActivateFile, setActiveMeiFriendPath]);
+
+  // When the workspace is replaced (Open Workspace), reset all panels and
+  // clear the active file so the UI starts from a clean slate.
+  useEffect(() => {
+    const unregister = registerResetHandler(() => {
+      setLayoutState(INITIAL_STATE);
+      setActiveMeiFriendPath(null);
+      setActiveSelectedId(null);
+    });
+    return () => unregister();
+  }, [
+    registerResetHandler,
+    setLayoutState,
+    setActiveMeiFriendPath,
+    setActiveSelectedId,
+  ]);
 
   // Synchronously update on render to prevent stale closures in DnD handlers
   const layoutStateRef = useRef(layoutState);
