@@ -21,17 +21,17 @@ function AppContent() {
   const [activeSidebar, setActiveSidebar] = useState<SidebarPanel | null>(
     "workspace",
   );
-  const [showSplash, setShowSplash] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
 
-  const { openFileInPanel, addFilesFromFileList } = useAppState();
+  const { openFileInPanel, addFilesFromFileList, settings } = useAppState();
+  const [showSplash, setShowSplash] = useState(() => settings.showSplash);
 
   const toggleSidebar = useCallback((panel: SidebarPanel) => {
     setActiveSidebar((prev) => (prev === panel ? null : panel));
   }, []);
 
-  const handleDismissSplash = useCallback((_alwaysShow: boolean) => {
+  const handleDismissSplash = useCallback(() => {
     setShowSplash(false);
   }, []);
 

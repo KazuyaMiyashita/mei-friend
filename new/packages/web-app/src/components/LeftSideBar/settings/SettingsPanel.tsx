@@ -1,18 +1,8 @@
-import { useState } from "react";
+import { useAppState } from "../../../context/AppStateContext";
 import panelStyles from "../Panel.module.css";
 
-export type AppSettings = {
-  showSplash: boolean;
-  workspaceStorageMode: "browser" | "local" | null;
-};
-
-const DEFAULT_SETTINGS: AppSettings = {
-  showSplash: true,
-  workspaceStorageMode: null,
-};
-
 export default function SettingsPanel() {
-  const [settings, updateSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const { settings, updateSettings } = useAppState();
 
   return (
     <section className={panelStyles.panelContaioner} aria-label="Settings">
@@ -34,12 +24,7 @@ export default function SettingsPanel() {
             <input
               type="checkbox"
               checked={settings.showSplash}
-              onChange={(e) =>
-                updateSettings((settings) => ({
-                  ...settings,
-                  showSplash: e.target.checked,
-                }))
-              }
+              onChange={(e) => updateSettings({ showSplash: e.target.checked })}
             />
             Always show splash screen
           </label>

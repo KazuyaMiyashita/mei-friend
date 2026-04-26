@@ -1,15 +1,15 @@
-import { useState } from "react";
 import logoUrl from "../../assets/menu-logo.svg";
+import { useAppState } from "../../context/AppStateContext";
 import styles from "./Modals.module.css";
 
 interface SplashOverlayProps {
-  onDismiss: (alwaysShow: boolean) => void;
+  onDismiss: () => void;
 }
 
 const VERSION = "6.0.0";
 
 export default function SplashOverlay({ onDismiss }: SplashOverlayProps) {
-  const [alwaysShow, setAlwaysShow] = useState(true);
+  const { settings, updateSettings } = useAppState();
 
   return (
     <div className={styles.overlayBackdrop}>
@@ -51,7 +51,7 @@ export default function SplashOverlay({ onDismiss }: SplashOverlayProps) {
           <button
             type="button"
             className={styles.splashConfirmButton}
-            onClick={() => onDismiss(alwaysShow)}
+            onClick={onDismiss}
           >
             OK
           </button>
@@ -59,8 +59,8 @@ export default function SplashOverlay({ onDismiss }: SplashOverlayProps) {
             <input
               id="splashAlwaysShow"
               type="checkbox"
-              checked={alwaysShow}
-              onChange={(e) => setAlwaysShow(e.target.checked)}
+              checked={settings.showSplash}
+              onChange={(e) => updateSettings({ showSplash: e.target.checked })}
               title="Always show this splash screen on application load"
             />
             <label

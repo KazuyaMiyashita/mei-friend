@@ -10,12 +10,33 @@ import {
   useSyncExternalStore,
 } from "react";
 
+export type AppSettings = {
+  showSplash: boolean;
+};
+
+const DEFAULT_SETTINGS: AppSettings = { showSplash: true };
+const SETTINGS_KEY = "mei-friend:settings";
+
+function loadSettings(): AppSettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as AppSettings) };
+  } catch {}
+  return DEFAULT_SETTINGS;
+}
+
+function saveSettings(s: AppSettings): void {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+}
+
 interface AppState {
   workspace: MeiFriendWorkspace;
   activeMeiFriendPath: string | null;
   setActiveMeiFriendPath: (path: string | null) => void;
   activeSelectedId: string | null;
   setActiveSelectedId: (id: string | null) => void;
+  settings: AppSettings;
+  updateSettings: (patch: Partial<AppSettings>) => void;
   /** Opens a file in the main content panel (delegates to registered MainContent handler). */
   openFileInPanel: (path: string) => void;
   /** Used by MainContent to register its openOrActivateFile function. */
@@ -35,7 +56,16 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     null,
   );
   const [activeSelectedId, setActiveSelectedId] = useState<string | null>(null);
+  const [settings, setSettings] = useState<AppSettings>(loadSettings);
   const panelOpenerRef = useRef<((path: string) => void) | null>(null);
+
+  const updateSettings = useCallback((patch: Partial<AppSettings>) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...patch };
+      saveSettings(next);
+      return next;
+    });
+  }, []);
 
   // Prevent accidental navigation away when workspace has unsaved changes
   useEffect(() => {
@@ -180,6 +210,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setActiveMeiFriendPath,
     activeSelectedId,
     setActiveSelectedId,
+    settings,
+    updateSettings,
     openFileInPanel,
     registerPanelOpener,
     openWorkspaceFromDirectory,
