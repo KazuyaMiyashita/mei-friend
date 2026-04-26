@@ -30,6 +30,7 @@ const AppStateContext = createContext<AppState | null>(null);
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const workspaceRef = useRef(new MeiFriendWorkspace());
+  const fileHandlesRef = useRef(new Map<string, FileSystemFileHandle>());
   const [activeMeiFriendPath, setActiveMeiFriendPath] = useState<string | null>(
     null,
   );
@@ -58,7 +59,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  const openFileInPanel = useCallback((path: string): void => {
+  const openFileInPanel = useCallback(async (path: string): Promise<void> => {
+    const workspace = workspaceRef.current;
+    if (!workspace.getMeiFriend(path)) {
+      const handle = fileHandlesRef.current.get(path);
+      if (handle) {
+        try {
+          const file = await handle.getFile();
+          const content = await file.text();
+          workspace.loadMeiContent(path, content);
+        } catch (err) {
+          console.error(`Failed to lazy-load ${path}:`, err);
+        }
+      }
+    }
     panelOpenerRef.current?.(path);
   }, []);
 
@@ -91,6 +105,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       const workspace = workspaceRef.current;
       workspace.name = dirHandle.name;
 
+      const handles = fileHandlesRef.current;
+      handles.clear();
+
       async function collectFiles(
         handle: FileSystemDirectoryHandle,
         prefix: string,
@@ -100,16 +117,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           const filePath = prefix ? `${prefix}/${name}` : name;
           if (entry.kind === "file") {
             const fileHandle = entry as FileSystemFileHandle;
-            const wsEntry = workspace.addFile(filePath);
-            if (wsEntry?.type === "MEI") {
-              try {
-                const file = await fileHandle.getFile();
-                const content = await file.text();
-                workspace.loadMeiContent(filePath, content);
-              } catch (err) {
-                console.error(`Failed to load ${filePath}:`, err);
-              }
-            }
+            workspace.addFile(filePath);
+            handles.set(filePath, fileHandle);
           } else if (entry.kind === "directory") {
             await collectFiles(entry as FileSystemDirectoryHandle, filePath);
           }
