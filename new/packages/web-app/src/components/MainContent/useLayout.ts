@@ -232,7 +232,7 @@ export function useLayout(initialState: LayoutState) {
       const panelId = uniqueId("panel");
       const newPanel: Panel = {
         id: panelId,
-        type: "notation",
+        type: "verovio",
         meiFriendId: null,
       };
 
@@ -251,7 +251,7 @@ export function useLayout(initialState: LayoutState) {
     setLayoutState((state) => {
       // Look for an existing notation panel for this path
       const existingPanelId = Object.entries(state.panels).find(
-        ([, p]) => p.meiFriendId === path && p.type === "notation",
+        ([, p]) => p.meiFriendId === path && p.type === "verovio",
       )?.[0];
 
       if (existingPanelId && state.layout) {
@@ -267,11 +267,11 @@ export function useLayout(initialState: LayoutState) {
         }
       }
 
-      // Create a new notation panel
+      // Create a new verovio panel
       const panelId = uniqueId("panel");
       const newPanel: Panel = {
         id: panelId,
-        type: "notation",
+        type: "verovio",
         meiFriendId: path,
       };
       const panels = { ...state.panels, [panelId]: newPanel };
@@ -313,7 +313,7 @@ export function useLayout(initialState: LayoutState) {
         const newPanelId = uniqueId("panel");
         const newPanel: Panel = {
           id: newPanelId,
-          type: "xmlcode",
+          type: "codemirror",
           meiFriendId: sourcePanel.meiFriendId,
         };
 

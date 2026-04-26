@@ -14,27 +14,10 @@ export type Zone = "top" | "bottom" | "left" | "right" | "center";
 // ── panel content renderer ─────────────────────────────────────────────────
 
 function renderPanelContent(panel: Panel) {
-  if (panel.type === "notation") {
+  if (panel.type === "verovio") {
     return <VerovioPanel meiFriendId={panel.meiFriendId} />;
   }
-  if (panel.type === "xmlcode") {
-    return <CodeMirrorPanel meiFriendId={panel.meiFriendId} />;
-  }
-  // Placeholder for other panel types
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: "100%",
-        height: "100%",
-        color: "var(--borderColor)",
-      }}
-    >
-      {panel.type} — {panel.meiFriendId ?? "no file"}
-    </div>
-  );
+  return <CodeMirrorPanel meiFriendId={panel.meiFriendId} />;
 }
 
 // ── PanelTabLabel ─────────────────────────────────────────────────────────
@@ -42,38 +25,19 @@ function renderPanelContent(panel: Panel) {
 function PanelTabLabel({ panel }: { panel: Panel }) {
   const fileName = panel.meiFriendId?.split("/").pop() ?? "—";
 
-  if (panel.type === "notation")
+  if (panel.type === "verovio")
     return (
       <>
         <span className={styles.tabTypeIcon}>🎼</span>
         {fileName}
       </>
     );
-  if (panel.type === "xmlcode")
-    return (
-      <>
-        <span className={styles.tabTypeIcon}>&lt;/&gt;</span>
-        {fileName}
-      </>
-    );
-  if (panel.type === "annotation") return <>Annotations</>;
-  if (panel.type === "facsimile")
-    return (
-      <>
-        <span className={styles.tabTypeIcon}>🖼</span>
-        {fileName}
-      </>
-    );
-  if (panel.type === "image") {
-    const imgName = panel.imagePath?.split("/").pop() ?? "—";
-    return (
-      <>
-        <span className={styles.tabTypeIcon}>🖼</span>
-        {imgName}
-      </>
-    );
-  }
-  return <>{panel.type}</>;
+  return (
+    <>
+      <span className={styles.tabTypeIcon}>&lt;/&gt;</span>
+      {fileName}
+    </>
+  );
 }
 
 // ── DraggingInfo ───────────────────────────────────────────────────────────
@@ -267,7 +231,7 @@ export default function PanelContainer({
       },
     ];
 
-    if (panel?.type === "notation" && panel.meiFriendId) {
+    if (panel?.type === "verovio" && panel.meiFriendId) {
       items.splice(1, 0, {
         label: "Open in CodeMirror",
         onClick: () => onOpenCodeMirror(contextMenu.panelId, containerId),

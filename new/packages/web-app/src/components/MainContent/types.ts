@@ -1,15 +1,9 @@
-export type PanelType =
-  | "notation"
-  | "xmlcode"
-  | "annotation"
-  | "facsimile"
-  | "image";
+export type PanelType = "verovio" | "codemirror";
 
 export interface Panel {
   id: string;
   type: PanelType;
   meiFriendId: string | null;
-  imagePath?: string;
 }
 
 export interface SplitLayoutNode {
