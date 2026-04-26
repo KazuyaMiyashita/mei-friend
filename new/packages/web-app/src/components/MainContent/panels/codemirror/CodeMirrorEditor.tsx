@@ -72,8 +72,8 @@ interface Props {
 }
 
 export interface CodeMirrorEditorRef {
-  refresh: () => void;
   apply: () => boolean;
+  refresh: () => void;
   navigateTo: (xmlId: string) => boolean;
   highlightElement: (xmlId: string | null) => boolean;
   get isDirty(): boolean;

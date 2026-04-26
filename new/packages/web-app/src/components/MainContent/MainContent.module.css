@@ -19,7 +19,7 @@
 
 .notationPlaceholder {
   text-align: center;
-  color: var(--dropdownBorderColor);
+  color: var(--borderColor);
   font-size: 14pt;
   user-select: none;
   padding: 2em;
@@ -28,7 +28,7 @@
 .notationPlaceholder p {
   margin: 0.5em 0;
   font-size: 11pt;
-  color: var(--dropdownBorderColor);
+  color: var(--borderColor);
 }
 
 .editorPlaceholder {
@@ -36,7 +36,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--dropdownBorderColor);
+  color: var(--borderColor);
   font-family: monospace;
   font-size: 11pt;
   user-select: none;

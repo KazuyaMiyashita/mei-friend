@@ -1,6 +1,6 @@
 import { type Cursor, type MeiFriend, MeiNote } from "@mei-friend/core";
 import { useEffect, useState } from "react";
-import styles from "./Footer.module.css";
+import styles from "../Footer.module.css";
 
 interface Props {
   cursor: Cursor | null;
@@ -63,16 +63,14 @@ export function VerovioPanelFooter({ cursor, selectedId, meiFriend }: Props) {
 
       <div className={styles.statusItem}>
         <span className={styles.statusLabel}>ID</span>
-        <span className={`${styles.statusValue} ${styles.statusValueId}`}>
+        <span className={`${styles.statusValue}`}>
           {selectedId ? selectedId : "-"}
         </span>
       </div>
 
       <div className={styles.statusItem}>
         <span className={styles.statusLabel}>Pitch</span>
-        <span className={styles.statusValue} style={{ minWidth: "4ch" }}>
-          {pitch ?? "-"}
-        </span>
+        <span className={styles.statusValue}>{pitch ?? "-"}</span>
       </div>
     </div>
   );

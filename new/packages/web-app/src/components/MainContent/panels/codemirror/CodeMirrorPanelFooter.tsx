@@ -1,5 +1,5 @@
 import type { EditorCursorInfo } from "@mei-friend/lib-codemirror";
-import styles from "./Footer.module.css";
+import styles from "../Footer.module.css";
 
 interface Props {
   cursorInfo: EditorCursorInfo | null;

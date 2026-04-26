@@ -1,6 +1,6 @@
 import type React from "react";
 import type { VerovioOptions } from "verovio";
-import styles from "./Header.module.css";
+import styles from "../Header.module.css";
 
 interface Props {
   currentPage: number;

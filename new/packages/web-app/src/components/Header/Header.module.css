@@ -6,7 +6,7 @@
   justify-content: flex-start;
   flex-shrink: 0;
   background-color: var(--headerBackgroundColor);
-  border-bottom: 1px solid var(--dropdownBorderColor);
+  border-bottom: 1px solid var(--borderColor);
 }
 
 .title {
@@ -113,7 +113,7 @@
 }
 
 .dropdownLine {
-  border: 1px solid var(--dropdownBorderColor);
+  border: 1px solid var(--borderColor);
   border-radius: 1px;
   margin: 4px 10px;
 }

@@ -5,8 +5,8 @@ import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import ContextMenu, { type ContextMenuItem } from "../ui/ContextMenu";
 import styles from "./PanelContainer.module.css";
-import CodeMirrorPanel from "./panels/CodeMirrorPanel";
-import VerovioPanel from "./panels/VerovioPanel";
+import CodeMirrorPanel from "./panels/codemirror/CodeMirrorPanel";
+import VerovioPanel from "./panels/verovioPanel/VerovioPanel";
 import type { Panel, PanelContainerNode } from "./types";
 
 export type Zone = "top" | "bottom" | "left" | "right" | "center";
@@ -29,7 +29,7 @@ function renderPanelContent(panel: Panel) {
         justifyContent: "center",
         width: "100%",
         height: "100%",
-        color: "var(--dropdownBorderColor)",
+        color: "var(--borderColor)",
       }}
     >
       {panel.type} — {panel.meiFriendId ?? "no file"}

@@ -107,7 +107,7 @@
 }
 
 .dropdownLine {
-  border: 1px solid var(--dropdownBorderColor);
+  border: 1px solid var(--borderColor);
   border-radius: 1px;
   margin: 4px 10px;
 }

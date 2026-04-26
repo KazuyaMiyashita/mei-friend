@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { useAppState, useWorkspace } from "../../../context/AppStateContext";
+import panelStyles from "../Panel.module.css";
 import styles from "./WorkspacePanel.module.css";
 import WorkspaceTree from "./WorkspaceTree";
 
@@ -45,7 +46,7 @@ export default function WorkspacePanel({ onOpenFile }: WorkspacePanelProps) {
   return (
     <section
       {...getRootProps()}
-      className={`${styles.explorerPanel}${isDragActive ? ` ${styles["explorerPanel--dropTarget"]}` : ""}`}
+      className={`${panelStyles.panelContaioner}${isDragActive ? ` ${styles["explorerPanel--dropTarget"]}` : ""}`}
       aria-label="Workspace Explorer"
     >
       {isDragActive && (
@@ -54,13 +55,20 @@ export default function WorkspacePanel({ onOpenFile }: WorkspacePanelProps) {
         </div>
       )}
 
-      <div className={styles.explorerTitle}>
-        {name ? name.toUpperCase() : "WORKSPACE"}
+      <div className={panelStyles.panelTitle}>WORKSPACE</div>
+
+      <div className={panelStyles.panelSection}>
+        <div className={panelStyles.panelSectionHeader}>Workspace Name:</div>
+        <div className={panelStyles.panelSectionContent}>
+          {name ? name.toUpperCase() : ""}
+        </div>
       </div>
 
-      <div className={styles.explorerSection}>
-        <div className={styles.explorerSectionHeader}>FILES</div>
-        <div className={styles.explorerSectionContent}>
+      <div
+        className={`${panelStyles.panelSection} ${panelStyles.panelSectionGrow}`}
+      >
+        <div className={panelStyles.panelSectionHeader}>Files:</div>
+        <div className={panelStyles.panelSectionContent}>
           {entries.length === 0 ? (
             <div className={styles.explorerEmpty}>
               No files open. Use File → Open files… or drop files here.

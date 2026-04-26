@@ -1,5 +1,5 @@
 import type { SyncState } from "@mei-friend/lib-codemirror";
-import styles from "./Header.module.css";
+import styles from "../Header.module.css";
 
 interface Props {
   syncState: SyncState;

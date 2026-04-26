@@ -14,7 +14,7 @@
 
 .welcomeContent {
   text-align: center;
-  color: var(--dropdownBorderColor);
+  color: var(--borderColor);
 }
 
 .welcomeHint {

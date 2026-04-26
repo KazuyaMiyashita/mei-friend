@@ -1,4 +1,4 @@
-export type SidebarPanel = "workspace" | "settings" | "notation";
+export type SidebarPanel = "workspace" | "settings";
 
 import styles from "./LeftSideBar.module.css";
 

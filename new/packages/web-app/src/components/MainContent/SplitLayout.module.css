@@ -4,7 +4,7 @@
 }
 
 .resizeHandle {
-  background-color: var(--dropdownBorderColor);
+  background-color: var(--borderColor);
   flex-shrink: 0;
   outline: none;
   transition: background-color 0.15s;

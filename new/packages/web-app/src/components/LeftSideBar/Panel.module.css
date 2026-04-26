@@ -1,0 +1,48 @@
+.panelContaioner {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--sidePanelBackgroundColor);
+  border-right: 1px solid var(--borderColor);
+  overflow: hidden;
+  position: relative;
+}
+
+.panelTitle {
+  padding: 12px 8px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--textColor);
+  opacity: 0.7;
+}
+
+.panelSection {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panelSectionGrow {
+  flex: 1;
+}
+
+.panelSectionHeader {
+  width: 100%;
+  padding: 8px;
+  font-size: 11px;
+  /* font-weight: 600; */
+  letter-spacing: 0.06em;
+  color: var(--textColor);
+  user-select: none;
+}
+
+.panelSectionContent {
+  flex: 1;
+  padding: 4px 8px 4px 16px;
+  font-size: 12px;
+  min-height: 0;
+  overflow-y: auto;
+}

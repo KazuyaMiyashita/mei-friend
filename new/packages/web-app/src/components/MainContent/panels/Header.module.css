@@ -5,7 +5,7 @@
   padding: 0 8px;
   height: 34px;
   background-color: var(--panelHeaderColor);
-  border-bottom: 1px solid var(--dropdownBorderColor);
+  border-bottom: 1px solid var(--borderColor);
   flex-shrink: 0;
   position: relative;
   overflow-x: auto;
@@ -51,7 +51,7 @@
 /* Buttons */
 .button {
   background: none;
-  border: 1px solid var(--dropdownBorderColor);
+  border: 1px solid var(--borderColor);
   border-radius: 3px;
   color: var(--textColor);
   cursor: pointer;
@@ -100,7 +100,7 @@
   display: inline-block;
   width: 1px;
   height: 14px;
-  background-color: var(--dropdownBorderColor);
+  background-color: var(--borderColor);
   margin: 0 2px;
 }
 
@@ -139,7 +139,7 @@
 .input {
   font-size: 0.75rem;
   padding: 1px 4px;
-  border: 1px solid var(--dropdownBorderColor);
+  border: 1px solid var(--borderColor);
   border-radius: 3px;
   background-color: var(--headerBackgroundColor);
   color: var(--textColor);

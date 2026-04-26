@@ -2,7 +2,7 @@
   position: fixed;
   z-index: 9999;
   background: var(--dropdownBackgroundColor);
-  border: 1px solid var(--dropdownBorderColor);
+  border: 1px solid var(--borderColor);
   border-radius: 4px;
   padding: 4px 0;
   min-width: 160px;
@@ -27,12 +27,12 @@
 }
 
 .contextMenuItem.disabled {
-  color: var(--dropdownBorderColor);
+  color: var(--borderColor);
   cursor: default;
 }
 
 .contextMenuSeparator {
   border: none;
-  border-top: 1px solid var(--dropdownBorderColor, #444);
+  border-top: 1px solid var(--borderColor);
   margin: 4px 0;
 }

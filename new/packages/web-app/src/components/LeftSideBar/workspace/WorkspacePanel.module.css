@@ -4,7 +4,7 @@
   width: 100%;
   height: 100%;
   background: var(--dropdownBackgroundColor);
-  border-right: 1px solid var(--dropdownBorderColor);
+  border-right: 1px solid var(--borderColor);
   overflow: hidden;
   position: relative;
 }
@@ -62,8 +62,8 @@
   letter-spacing: 0.06em;
   color: var(--textColor);
   background: var(--navbarBackgroundColor);
-  border-top: 1px solid var(--dropdownBorderColor);
-  border-bottom: 1px solid var(--dropdownBorderColor);
+  border-top: 1px solid var(--borderColor);
+  border-bottom: 1px solid var(--borderColor);
   user-select: none;
 }
 

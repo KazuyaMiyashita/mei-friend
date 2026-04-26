@@ -18,7 +18,7 @@
   flex-shrink: 0;
   height: 35px;
   background-color: var(--notationBackgroundColor);
-  border-bottom: 1px solid var(--dropdownBorderColor);
+  border-bottom: 1px solid var(--borderColor);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -31,7 +31,7 @@
 .tabBar.dropTarget {
   background-color: color-mix(
     in srgb,
-    var(--dropdownBorderColor) 20%,
+    var(--borderColor) 20%,
     var(--notationBackgroundColor)
   );
 }
@@ -46,7 +46,7 @@
   height: 100%;
   font-size: 11pt;
   cursor: pointer;
-  border-right: 1px solid var(--dropdownBorderColor);
+  border-right: 1px solid var(--borderColor);
   white-space: nowrap;
   flex-shrink: 0;
   user-select: none;
@@ -68,7 +68,7 @@
   opacity: 1;
   background-color: color-mix(
     in srgb,
-    var(--dropdownBorderColor) 15%,
+    var(--borderColor) 15%,
     var(--notationBackgroundColor)
   );
 }
@@ -143,11 +143,7 @@
 
 .tab:hover .tabCloseBtn:hover {
   opacity: 1;
-  background-color: color-mix(
-    in srgb,
-    var(--dropdownBorderColor) 30%,
-    transparent
-  );
+  background-color: color-mix(in srgb, var(--borderColor) 30%, transparent);
 }
 
 /* ── Content area ─────────────────────────────────────────────────────────── */
@@ -175,7 +171,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--dropdownBorderColor);
+  color: var(--borderColor);
   font-size: 11pt;
   user-select: none;
 }
