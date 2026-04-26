@@ -2,7 +2,6 @@ import { pointerIntersection } from "@dnd-kit/collision";
 import { useDroppable } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { useCallback, useState } from "react";
-import { useDropzone } from "react-dropzone";
 import ContextMenu, { type ContextMenuItem } from "../ui/ContextMenu";
 import styles from "./PanelContainer.module.css";
 import CodeMirrorPanel from "./panels/codemirror/CodeMirrorPanel";
@@ -173,7 +172,6 @@ interface PanelContainerProps {
   onFocusContainer: (containerId: string) => void;
   onNewPanel: (containerId: string) => void;
   onOpenCodeMirror: (panelId: string, containerId: string) => void;
-  onFileDrop: (file: File, containerId: string) => void;
 }
 
 export default function PanelContainer({
@@ -186,7 +184,6 @@ export default function PanelContainer({
   onFocusContainer,
   onNewPanel,
   onOpenCodeMirror,
-  onFileDrop,
 }: PanelContainerProps) {
   const { id: containerId, tabs, activeTab } = node;
   const [contextMenu, setContextMenu] = useState<{
@@ -194,18 +191,6 @@ export default function PanelContainer({
     y: number;
     panelId: string;
   } | null>(null);
-
-  const { getRootProps, isDragActive: isFileDragging } = useDropzone({
-    onDrop: useCallback(
-      (files: File[]) => {
-        if (files[0]) onFileDrop(files[0], containerId);
-      },
-      [onFileDrop, containerId],
-    ),
-    accept: { "application/xml": [".mei", ".xml", ".musicxml"] },
-    noClick: true,
-    noKeyboard: true,
-  });
 
   const handleTabContextMenu = useCallback(
     (e: React.MouseEvent, panelId: string) => {
@@ -260,7 +245,6 @@ export default function PanelContainer({
 
   return (
     <section
-      {...getRootProps()}
       className={styles.panelContainer}
       onClick={() => onFocusContainer(containerId)}
       onKeyDown={(e) => {
@@ -336,7 +320,6 @@ export default function PanelContainer({
           disabled={centerDisabled}
         />
       </div>
-      {isFileDragging && <div className={styles.fileDropOverlay} />}
       {contextMenu && (
         <ContextMenu
           x={contextMenu.x}

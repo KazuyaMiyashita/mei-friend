@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { useDropzone } from "react-dropzone";
 import { useAppState, useWorkspace } from "../../../context/AppStateContext";
 import panelStyles from "../Panel.module.css";
 import styles from "./WorkspacePanel.module.css";
@@ -11,30 +10,7 @@ interface WorkspacePanelProps {
 
 export default function WorkspacePanel({ onOpenFile }: WorkspacePanelProps) {
   const { name, entries } = useWorkspace();
-  const {
-    activeMeiFriendPath,
-
-    addFilesFromFileList,
-  } = useAppState();
-
-  const { getRootProps, isDragActive } = useDropzone({
-    onDrop: useCallback(
-      async (files: File[]) => {
-        await addFilesFromFileList(files);
-        const meiFile = files.find((f) =>
-          /\.(mei|xml|musicxml)$/i.test(f.name),
-        );
-        if (meiFile) onOpenFile(meiFile.name);
-      },
-      [addFilesFromFileList, onOpenFile],
-    ),
-    accept: {
-      "application/xml": [".mei", ".xml", ".musicxml"],
-      "image/*": [".jpg", ".jpeg", ".png", ".svg", ".gif"],
-    },
-    noClick: true,
-    noKeyboard: true,
-  });
+  const { activeMeiFriendPath } = useAppState();
 
   const handleFileClick = useCallback(
     (path: string) => {
@@ -45,16 +21,9 @@ export default function WorkspacePanel({ onOpenFile }: WorkspacePanelProps) {
 
   return (
     <section
-      {...getRootProps()}
-      className={`${panelStyles.panelContaioner}${isDragActive ? ` ${styles["explorerPanel--dropTarget"]}` : ""}`}
+      className={panelStyles.panelContaioner}
       aria-label="Workspace Explorer"
     >
-      {isDragActive && (
-        <div className={styles.explorerDropOverlay}>
-          <div className={styles.explorerDropOverlayText}>Drop files here</div>
-        </div>
-      )}
-
       <div className={panelStyles.panelTitle}>WORKSPACE</div>
 
       <div className={panelStyles.panelSection}>

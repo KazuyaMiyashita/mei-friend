@@ -19,7 +19,6 @@ export default function MainContent() {
     registerPanelOpener,
     setActiveMeiFriendPath,
     setActiveSelectedId,
-    addFilesFromFileList,
   } = useAppState();
 
   const {
@@ -56,26 +55,6 @@ export default function MainContent() {
       reorderPanelInContainer,
     });
 
-  // ── File Drop ──────────────────────────────────────────────────────
-
-  const handleFileDrop = useCallback(
-    async (file: File, _containerId: string | null) => {
-      await addFilesFromFileList([file]);
-      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-      if (ext === "mei" || ext === "xml" || ext === "musicxml") {
-        openOrActivateFile(file.name);
-        setActiveMeiFriendPath(file.name);
-        setActiveSelectedId(null);
-      }
-    },
-    [
-      addFilesFromFileList,
-      openOrActivateFile,
-      setActiveMeiFriendPath,
-      setActiveSelectedId,
-    ],
-  );
-
   // ── Panel activation ─────────────────────────────────────────────────────
 
   const handleActivate = useCallback(
@@ -102,14 +81,12 @@ export default function MainContent() {
       onFocusContainer: (_containerId: string) => {},
       onNewPanel: addNewPanelToContainer,
       onOpenCodeMirror: openCodeMirrorForPanel,
-      onFileDrop: handleFileDrop,
     }),
     [
       handleActivate,
       closePanel,
       addNewPanelToContainer,
       openCodeMirrorForPanel,
-      handleFileDrop,
     ],
   );
 
@@ -128,7 +105,7 @@ export default function MainContent() {
           }}
         >
           {layoutState.layout === null ? (
-            <WelcomeScreen onFileDrop={(file) => handleFileDrop(file, null)} />
+            <WelcomeScreen />
           ) : (
             <SplitLayout
               node={layoutState.layout}
