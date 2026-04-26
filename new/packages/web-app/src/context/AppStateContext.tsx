@@ -27,9 +27,6 @@ interface AppState {
 
 const AppStateContext = createContext<AppState | null>(null);
 
-function isHiddenPath(path: string): boolean {
-  return path.split("/").some((seg) => seg.startsWith("."));
-}
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const workspaceRef = useRef(new MeiFriendWorkspace());
@@ -69,10 +66,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     async (files: File[]): Promise<void> => {
       const workspace = workspaceRef.current;
       for (const file of files) {
-        if (isHiddenPath(file.name)) continue;
-        const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-        workspace.addFile(file.name);
-        if (ext === "mei" || ext === "xml" || ext === "musicxml") {
+        const entry = workspace.addFile(file.name);
+        if (entry?.type === "MEI") {
           try {
             const content = await file.text();
             workspace.loadMeiContent(file.name, content);
@@ -105,9 +100,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           const filePath = prefix ? `${prefix}/${name}` : name;
           if (entry.kind === "file") {
             const fileHandle = entry as FileSystemFileHandle;
-            workspace.addFile(filePath);
-            const ext = name.split(".").pop()?.toLowerCase() ?? "";
-            if (ext === "mei" || ext === "xml" || ext === "musicxml") {
+            const wsEntry = workspace.addFile(filePath);
+            if (wsEntry?.type === "MEI") {
               try {
                 const file = await fileHandle.getFile();
                 const content = await file.text();

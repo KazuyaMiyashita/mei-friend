@@ -15,18 +15,6 @@ export interface WorkspaceSnapshot {
   isDirty: boolean;
 }
 
-function classifyFile(path: string): WorkspaceFileType {
-  const ext = path.split(".").pop()?.toLowerCase() ?? "";
-  if (ext === "mei" || ext === "xml" || ext === "musicxml") return "MEI";
-  if (
-    ["jpg", "jpeg", "png", "gif", "svg", "bmp", "webp", "tiff", "tif"].includes(
-      ext,
-    )
-  )
-    return "Image";
-  if (ext === "jsonld") return "WebAnnotation";
-  return "Other";
-}
 
 /**
  * Manages a workspace — a named collection of file paths with optional MEI content.
@@ -74,14 +62,35 @@ export class MeiFriendWorkspace {
     return this._snapshot;
   };
 
-  /** Adds a file path to the workspace. Returns the existing entry if already present. */
-  public addFile(path: string, type?: WorkspaceFileType): WorkspaceEntry {
+  /** Classifies a file path. Returns "hidden" for paths with a segment starting with ".". */
+  public static classifyFile(path: string): WorkspaceFileType | "hidden" {
+    if (path.split("/").some((seg) => seg.startsWith("."))) return "hidden";
+    const ext = path.split(".").pop()?.toLowerCase() ?? "";
+    if (ext === "mei" || ext === "xml" || ext === "musicxml") return "MEI";
+    if (
+      ["jpg", "jpeg", "png", "gif", "svg", "bmp", "webp", "tiff", "tif"].includes(
+        ext,
+      )
+    )
+      return "Image";
+    if (ext === "jsonld") return "WebAnnotation";
+    return "Other";
+  }
+
+  /**
+   * Adds a file path to the workspace. Returns null for hidden paths.
+   * Returns the existing entry if the path is already present.
+   */
+  public addFile(path: string, type?: WorkspaceFileType): WorkspaceEntry | null {
+    const classified = MeiFriendWorkspace.classifyFile(path);
+    if (classified === "hidden") return null;
+
     const existing = this._entries.find((e) => e.path === path);
     if (existing) return existing;
 
     const entry: WorkspaceEntry = {
       path,
-      type: type ?? classifyFile(path),
+      type: type ?? classified,
       isDirty: false,
     };
     this._entries = [...this._entries, entry];
@@ -111,9 +120,8 @@ export class MeiFriendWorkspace {
   public loadMeiContent(path: string, xmlString: string): MeiFriend {
     let entry = this._entries.find((e) => e.path === path);
     if (!entry) {
-      this.addFile(path, "MEI");
-      const added = this._entries.find((e) => e.path === path);
-      if (!added) throw new Error(`Failed to add "${path}" to workspace.`);
+      const added = this.addFile(path, "MEI");
+      if (!added) throw new Error(`Cannot add "${path}" to workspace.`);
       entry = added;
     } else if (entry.type !== "MEI") {
       throw new Error(`File "${path}" is not classified as MEI.`);
