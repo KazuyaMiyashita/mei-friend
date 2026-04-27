@@ -20,6 +20,7 @@ import {
   useWorkspaceContext,
   WorkspaceProvider,
 } from "./context/WorkspaceContext";
+import { useGlobalKeyboard } from "./hooks/useGlobalKeyboard";
 
 function AppContent() {
   const [activeSidebar, setActiveSidebar] = useState<SidebarPanel | null>(
@@ -46,6 +47,20 @@ function AppContent() {
     },
     [openFileInPanel],
   );
+
+  useGlobalKeyboard({
+    onSave: () => {
+      // TODO: implement global save
+      console.log("Global Save triggered");
+    },
+    onOpen: () => {
+      // For now just log, ideally trigger a file picker or focus workspace
+      console.log("Global Open triggered");
+    },
+    onNew: () => {
+      console.log("Global New triggered");
+    },
+  });
 
   // Global file drag-and-drop via window listeners
   useEffect(() => {

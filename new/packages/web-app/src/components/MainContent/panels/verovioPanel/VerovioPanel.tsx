@@ -7,17 +7,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { VerovioOptions } from "verovio";
 import { useAppState } from "../../../../context/AppStateContext";
 import { useWorkspace } from "../../../../context/WorkspaceContext";
+import { useVerovioKeyboard } from "../../../../hooks/useVerovioKeyboard";
 import styles from "./VerovioPanel.module.css";
 import { VerovioPanelFooter } from "./VerovioPanelFooter";
 import { VerovioPanelHeader } from "./VerovioPanelHeader";
 
 interface Props {
+  panelId: string;
   meiFriendId: string | null;
 }
 
-export default function VerovioPanel({ meiFriendId }: Props) {
+export default function VerovioPanel({ panelId, meiFriendId }: Props) {
   const { workspace } = useWorkspace();
-  const { setActiveMeiFriendPath, setActiveSelectedId } = useAppState();
+  const { setActiveMeiFriendPath, setActiveSelectedId, setFocusedPanelId } =
+    useAppState();
 
   const meiFriend = meiFriendId ? workspace.getMeiFriend(meiFriendId) : null;
 
@@ -55,71 +58,13 @@ export default function VerovioPanel({ meiFriendId }: Props) {
   );
 
   const handlePanelClick = useCallback(() => {
-    if (meiFriendId) setActiveMeiFriendPath(meiFriendId);
-  }, [meiFriendId, setActiveMeiFriendPath]);
+    if (meiFriendId) {
+      setActiveMeiFriendPath(meiFriendId);
+      setFocusedPanelId(panelId);
+    }
+  }, [meiFriendId, panelId, setActiveMeiFriendPath, setFocusedPanelId]);
 
-  // Cursor keyboard navigation when panel is focused
-  const panelRef = useRef<HTMLDivElement>(null);
-  const isFocused = useRef(false);
-
-  useEffect(() => {
-    const el = panelRef.current;
-    if (!el) return;
-    const onFocusIn = () => {
-      isFocused.current = true;
-    };
-    const onFocusOut = () => {
-      isFocused.current = false;
-    };
-    el.addEventListener("focusin", onFocusIn);
-    el.addEventListener("focusout", onFocusOut);
-    return () => {
-      el.removeEventListener("focusin", onFocusIn);
-      el.removeEventListener("focusout", onFocusOut);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isFocused.current || !cursor) return;
-
-      let nextCursor: Cursor | undefined;
-      switch (e.key) {
-        case "ArrowRight":
-          e.preventDefault();
-          nextCursor = e.shiftKey ? cursor.nextBeat() : cursor.nextEvent();
-          break;
-        case "ArrowLeft":
-          e.preventDefault();
-          nextCursor = e.shiftKey ? cursor.prevBeat() : cursor.prevEvent();
-          break;
-        case "ArrowUp":
-          e.preventDefault();
-          nextCursor = e.shiftKey
-            ? cursor.staffUp().snapToBeat()
-            : cursor.staffUp().snapToEvent();
-          break;
-        case "ArrowDown":
-          e.preventDefault();
-          nextCursor = e.shiftKey
-            ? cursor.staffDown().snapToBeat()
-            : cursor.staffDown().snapToEvent();
-          break;
-      }
-
-      if (nextCursor && nextCursor !== cursor) {
-        setCursor(nextCursor);
-        const eventId = nextCursor.getEvent()?.id ?? null;
-        setSelectedId(eventId);
-        if (meiFriendId && eventId !== undefined) {
-          setActiveSelectedId(eventId);
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [cursor, meiFriendId, setActiveSelectedId]);
+  useVerovioKeyboard(panelId, meiFriendId, cursor, setCursor, setSelectedId);
 
   if (!meiFriend) {
     return (
@@ -132,7 +77,7 @@ export default function VerovioPanel({ meiFriendId }: Props) {
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: panel focus
     // biome-ignore lint/a11y/useKeyWithClickEvents: panel focus
-    <div ref={panelRef} className={styles.panel} onClick={handlePanelClick}>
+    <div className={styles.panel} onClick={handlePanelClick}>
       <VerovioPanelHeader
         currentPage={currentPage}
         totalPages={totalPages}

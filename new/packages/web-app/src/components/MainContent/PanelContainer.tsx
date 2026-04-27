@@ -14,9 +14,9 @@ export type Zone = "top" | "bottom" | "left" | "right" | "center";
 
 function renderPanelContent(panel: Panel) {
   if (panel.type === "verovio") {
-    return <VerovioPanel meiFriendId={panel.meiFriendId} />;
+    return <VerovioPanel panelId={panel.id} meiFriendId={panel.meiFriendId} />;
   }
-  return <CodeMirrorPanel meiFriendId={panel.meiFriendId} />;
+  return <CodeMirrorPanel panelId={panel.id} meiFriendId={panel.meiFriendId} />;
 }
 
 // ── PanelTabLabel ─────────────────────────────────────────────────────────

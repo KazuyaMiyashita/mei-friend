@@ -111,23 +111,24 @@ function MenuLine() {
 }
 
 interface MenuBarProps {
-  onNewFile?: () => void;
   onOpenFile?: () => void;
   onOpenWorkspace?: () => void;
   onSaveWorkspace?: () => void;
-  onOpenUrl?: () => void;
 }
 
 export default function MenuBar({
-  onNewFile,
   onOpenFile,
   onOpenWorkspace,
   onSaveWorkspace,
-  onOpenUrl,
 }: MenuBarProps) {
   const { openId, handleClick, handleHover, close } = useDropdownState();
-  const { activeMeiFriend, activeSelectedId, activeMeiFriendPath } =
-    useActiveMeiFriend();
+  const {
+    activeMeiFriend,
+    activeSelectedId,
+    activeMeiFriendPath,
+    canUndo,
+    canRedo,
+  } = useActiveMeiFriend();
   // workspace is needed for pitch operations — sourced from WorkspaceContext
   // rather than AppStateContext since it is part of the data layer.
   const { workspace } = useWorkspaceContext();
@@ -190,14 +191,14 @@ export default function MenuBar({
         onHover={handleHover}
         onClose={close}
       >
-        {item("New file", "⌃N", onNewFile)}
+        {item("New file", "⌃N", () => {}, true)}
         {item("Open files…", "⌘O", onOpenFile)}
         {item("Open Workspace…", undefined, onOpenWorkspace)}
-        {item("Open URL…", undefined, onOpenUrl)}
+        {item("Open URL…", undefined, () => {}, true)}
         <MenuLine />
         {item("Save Workspace", "⌘S", onSaveWorkspace)}
         <MenuLine />
-        {item("Public repertoire")}
+        {item("Public repertoire", undefined, () => {}, true)}
       </Dropdown>
 
       <Dropdown
@@ -208,11 +209,8 @@ export default function MenuBar({
         onHover={handleHover}
         onClose={close}
       >
-        {item("Undo", undefined)}
-        {item("Redo", undefined)}
-        <MenuLine />
-        {item("Search", "⌘F")}
-        {item("Replace", "⌥⌘F")}
+        {item("Undo", "⌘Z", () => activeMeiFriend?.undo(), !canUndo)}
+        {item("Redo", "⇧⌘Z", () => activeMeiFriend?.redo(), !canRedo)}
       </Dropdown>
 
       <Dropdown
@@ -237,8 +235,6 @@ export default function MenuBar({
       >
         {item("Pitch Up", "↑", handlePitchUp, !hasActiveNote)}
         {item("Pitch Down", "↓", handlePitchDown, !hasActiveNote)}
-        <MenuLine />
-        {item("Delete element", "⌫", undefined)}
       </Dropdown>
 
       <Dropdown
@@ -249,8 +245,8 @@ export default function MenuBar({
         onHover={handleHover}
         onClose={close}
       >
-        {item("Preferences", undefined)}
-        {item("About mei-friend", undefined)}
+        {item("Preferences", undefined, () => {}, true)}
+        {item("About mei-friend", undefined, () => {}, true)}
       </Dropdown>
     </nav>
   );

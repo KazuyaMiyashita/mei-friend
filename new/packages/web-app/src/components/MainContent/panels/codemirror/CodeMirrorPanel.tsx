@@ -8,12 +8,13 @@ import { CodeMirrorPanelFooter } from "./CodeMirrorPanelFooter";
 import { CodeMirrorPanelHeader } from "./CodeMirrorPanelHeader";
 
 interface Props {
+  panelId: string;
   meiFriendId: string | null;
 }
 
-export default function CodeMirrorPanel({ meiFriendId }: Props) {
+export default function CodeMirrorPanel({ panelId, meiFriendId }: Props) {
   const { workspace } = useWorkspace();
-  const { setActiveMeiFriendPath } = useAppState();
+  const { setActiveMeiFriendPath, setFocusedPanelId } = useAppState();
 
   const meiFriend = meiFriendId ? workspace.getMeiFriend(meiFriendId) : null;
 
@@ -22,8 +23,11 @@ export default function CodeMirrorPanel({ meiFriendId }: Props) {
   const editorRef = useRef<CodeMirrorEditorRef>(null);
 
   const handleClick = useCallback(() => {
-    if (meiFriendId) setActiveMeiFriendPath(meiFriendId);
-  }, [meiFriendId, setActiveMeiFriendPath]);
+    if (meiFriendId) {
+      setActiveMeiFriendPath(meiFriendId);
+      setFocusedPanelId(panelId);
+    }
+  }, [meiFriendId, panelId, setActiveMeiFriendPath, setFocusedPanelId]);
 
   const handleApply = useCallback(() => {
     editorRef.current?.apply();

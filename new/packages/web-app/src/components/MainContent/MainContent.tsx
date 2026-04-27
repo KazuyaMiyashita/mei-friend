@@ -16,8 +16,12 @@ const INITIAL_STATE: LayoutState = {
 };
 
 export default function MainContent() {
-  const { registerPanelOpener, setActiveMeiFriendPath, setActiveSelectedId } =
-    useAppState();
+  const {
+    registerPanelOpener,
+    setActiveMeiFriendPath,
+    setActiveSelectedId,
+    setFocusedPanelId,
+  } = useAppState();
   const { registerResetHandler } = useWorkspaceContext();
 
   const {
@@ -61,6 +65,10 @@ export default function MainContent() {
   // Synchronously update on render to prevent stale closures in DnD handlers
   const layoutStateRef = useRef(layoutState);
   layoutStateRef.current = layoutState;
+
+  useEffect(() => {
+    setFocusedPanelId(layoutState.focusedPanelId);
+  }, [layoutState.focusedPanelId, setFocusedPanelId]);
 
   // ── Panel DnD ────────────────────────────────────────────────────────────
 

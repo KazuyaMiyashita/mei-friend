@@ -14,6 +14,8 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -27,6 +29,9 @@ interface AppState {
 
   activeSelectedId: string | null;
   setActiveSelectedId: (id: string | null) => void;
+
+  focusedPanelId: string | null;
+  setFocusedPanelId: (id: string | null) => void;
 
   /**
    * Opens a file in the main content panel.
@@ -55,6 +60,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     null,
   );
   const [activeSelectedId, setActiveSelectedId] = useState<string | null>(null);
+  const [focusedPanelId, setFocusedPanelId] = useState<string | null>(null);
 
   // Ref rather than state: the opener is set once by MainContent and never
   // triggers a re-render when changed.
@@ -84,6 +90,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setActiveMeiFriendPath,
     activeSelectedId,
     setActiveSelectedId,
+    focusedPanelId,
+    setFocusedPanelId,
     openFileInPanel,
     registerPanelOpener,
   };
@@ -114,16 +122,49 @@ export function useActiveMeiFriend() {
     setActiveMeiFriendPath,
     activeSelectedId,
     setActiveSelectedId,
+    focusedPanelId,
+    setFocusedPanelId,
   } = useAppState();
 
+  const activeMeiFriend = useMemo(
+    () =>
+      activeMeiFriendPath
+        ? (workspace.getMeiFriend(activeMeiFriendPath) ?? null)
+        : null,
+    [activeMeiFriendPath, workspace],
+  );
+
+  const [historyState, setHistoryState] = useState({
+    canUndo: false,
+    canRedo: false,
+  });
+
+  useEffect(() => {
+    if (!activeMeiFriend) {
+      setHistoryState({ canUndo: false, canRedo: false });
+      return;
+    }
+
+    const updateHistory = () => {
+      setHistoryState({
+        canUndo: activeMeiFriend.canUndo,
+        canRedo: activeMeiFriend.canRedo,
+      });
+    };
+
+    updateHistory();
+    return activeMeiFriend.onUpdate(updateHistory);
+  }, [activeMeiFriend]);
+
   return {
-    activeMeiFriend: activeMeiFriendPath
-      ? (workspace.getMeiFriend(activeMeiFriendPath) ?? null)
-      : null,
+    activeMeiFriend,
     activeMeiFriendPath,
     setActiveMeiFriendPath,
     activeSelectedId,
     setActiveSelectedId,
+    focusedPanelId,
+    setFocusedPanelId,
+    ...historyState,
   };
 }
 
