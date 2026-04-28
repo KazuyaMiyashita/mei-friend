@@ -5,11 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "turbo run dev --filter=@mei-friend/web-app",
-    "dev:codemirror": "turbo run dev --filter=@mei-friend/example-web-app-codemirror",
-    "dev:verovio": "turbo run dev --filter=@mei-friend/example-web-app-verovio",
-    "dev:verovio-codemirror": "turbo run dev --filter=@mei-friend/example-web-app-verovio-codemirror",
     "build": "pnpm lint && turbo run build",
-    "build:libs": "turbo run build --filter=@mei-friend/core --filter=@mei-friend/lib-codemirror --filter=@mei-friend/lib-verovio-react --filter=@mei-friend/example-cli",
+    "build:libs": "turbo run build --filter=@mei-friend/core --filter=@mei-friend/lib-codemirror --filter=@mei-friend/lib-verovio-react",
     "build-skiplint": "turbo run build",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean",
