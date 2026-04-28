@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useAppState } from "../../../context/AppStateContext";
+import { useFocus } from "../../../context/FocusContext";
 import {
   useWorkspace,
   useWorkspaceContext,
@@ -9,20 +9,23 @@ import styles from "./WorkspacePanel.module.css";
 import WorkspaceTree from "./WorkspaceTree";
 
 interface WorkspacePanelProps {
-  onOpenFile: (path: string) => void;
+  onOpenFile: (id: string) => void;
 }
 
 export default function WorkspacePanel({ onOpenFile }: WorkspacePanelProps) {
   const { name, entries } = useWorkspace();
   const { workspaceStorage } = useWorkspaceContext();
-  const { activeMeiFriendPath } = useAppState();
+  const { focusedLocation } = useFocus();
 
   const handleFileClick = useCallback(
-    (path: string) => {
-      onOpenFile(path);
+    (id: string) => {
+      onOpenFile(id);
     },
     [onOpenFile],
   );
+
+  const activeId =
+    focusedLocation?.source === "workspace" ? focusedLocation.id : null;
 
   return (
     <section
@@ -72,7 +75,7 @@ export default function WorkspacePanel({ onOpenFile }: WorkspacePanelProps) {
             <div className={styles.explorerFileList}>
               <WorkspaceTree
                 entries={entries}
-                activePath={activeMeiFriendPath}
+                activeId={activeId}
                 onFileClick={handleFileClick}
               />
             </div>

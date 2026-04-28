@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useActiveMeiFriend } from "../context/AppStateContext";
+import { useFocusedMeiFriend } from "../context/FocusContext";
 
 interface GlobalKeyboardProps {
   onSave?: () => void;
@@ -12,7 +12,7 @@ export function useGlobalKeyboard({
   onOpen,
   onNew,
 }: GlobalKeyboardProps = {}) {
-  const { activeMeiFriend, canUndo, canRedo } = useActiveMeiFriend();
+  const { focusedMeiFriend, canUndo, canRedo } = useFocusedMeiFriend();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -22,18 +22,18 @@ export function useGlobalKeyboard({
         if (e.shiftKey) {
           if (canRedo) {
             e.preventDefault();
-            activeMeiFriend?.redo();
+            focusedMeiFriend?.redo();
           }
         } else {
           if (canUndo) {
             e.preventDefault();
-            activeMeiFriend?.undo();
+            focusedMeiFriend?.undo();
           }
         }
       } else if (isMod && e.key === "y") {
         if (canRedo) {
           e.preventDefault();
-          activeMeiFriend?.redo();
+          focusedMeiFriend?.redo();
         }
       } else if (isMod && e.key === "s") {
         if (onSave) {
@@ -55,5 +55,5 @@ export function useGlobalKeyboard({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeMeiFriend, canUndo, canRedo, onSave, onOpen, onNew]);
+  }, [focusedMeiFriend, canUndo, canRedo, onSave, onOpen, onNew]);
 }

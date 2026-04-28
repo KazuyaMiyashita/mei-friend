@@ -1,4 +1,4 @@
-export type SidebarPanel = "workspace" | "settings";
+export type SidebarPanel = "workspace" | "live-share" | "settings";
 
 import styles from "./LeftSideBar.module.css";
 
@@ -38,6 +38,31 @@ export default function LeftSideBar({
             <title>Workspace</title>
             <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
             <polyline points="13 2 13 9 20 9" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className={`${styles.leftSideBarBtn}${activeSidebar === "live-share" ? ` ${styles.active}` : ""}`}
+          onClick={() => onToggleSidebar("live-share")}
+          title="Live Share"
+          aria-label="Live Share"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <title>Live Share</title>
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
           </svg>
         </button>
       </div>

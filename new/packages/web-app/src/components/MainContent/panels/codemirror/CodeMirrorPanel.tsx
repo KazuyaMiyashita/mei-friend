@@ -1,7 +1,12 @@
 import type { EditorCursorInfo, SyncState } from "@mei-friend/lib-codemirror";
-import { useCallback, useRef, useState } from "react";
-import { useAppState } from "../../../../context/AppStateContext";
-import { useWorkspace } from "../../../../context/WorkspaceContext";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  getLocationKey,
+  type MeiFriendLocation,
+  useFocus,
+  useFocusedMeiFriend,
+  useMeiFriend,
+} from "../../../../context/FocusContext";
 import { CodeMirrorEditor, type CodeMirrorEditorRef } from "./CodeMirrorEditor";
 import styles from "./CodeMirrorPanel.module.css";
 import { CodeMirrorPanelFooter } from "./CodeMirrorPanelFooter";
@@ -9,25 +14,36 @@ import { CodeMirrorPanelHeader } from "./CodeMirrorPanelHeader";
 
 interface Props {
   panelId: string;
-  meiFriendId: string | null;
+  meiFriendId: MeiFriendLocation | null;
 }
 
 export default function CodeMirrorPanel({ panelId, meiFriendId }: Props) {
-  const { workspace } = useWorkspace();
-  const { setActiveMeiFriendPath, setFocusedPanelId } = useAppState();
+  const { setFocusedLocation, setFocusedPanelId, selections, navigateEnabled } =
+    useFocus();
+  const { setFocusedSelectionId } = useFocusedMeiFriend();
 
-  const meiFriend = meiFriendId ? workspace.getMeiFriend(meiFriendId) : null;
+  const meiFriend = useMeiFriend(meiFriendId);
 
   const [syncState, setSyncState] = useState<SyncState>({ status: "idle" });
   const [cursorInfo, setCursorInfo] = useState<EditorCursorInfo | null>(null);
   const editorRef = useRef<CodeMirrorEditorRef>(null);
 
+  const selectionState = useMemo(() => {
+    if (!meiFriendId) return { selectionId: null, origin: null };
+    return (
+      selections[getLocationKey(meiFriendId)] ?? {
+        selectionId: null,
+        origin: null,
+      }
+    );
+  }, [meiFriendId, selections]);
+
   const handleClick = useCallback(() => {
     if (meiFriendId) {
-      setActiveMeiFriendPath(meiFriendId);
+      setFocusedLocation(meiFriendId);
       setFocusedPanelId(panelId);
     }
-  }, [meiFriendId, panelId, setActiveMeiFriendPath, setFocusedPanelId]);
+  }, [meiFriendId, panelId, setFocusedLocation, setFocusedPanelId]);
 
   const handleApply = useCallback(() => {
     editorRef.current?.apply();
@@ -41,17 +57,46 @@ export default function CodeMirrorPanel({ panelId, meiFriendId }: Props) {
     setSyncState(state);
   }, []);
 
-  const handleCursorChange = useCallback((info: EditorCursorInfo) => {
-    setCursorInfo(info);
-  }, []);
+  const handleCursorChange = useCallback(
+    (info: EditorCursorInfo) => {
+      setCursorInfo(info);
+      if (meiFriendId && info.xmlId) {
+        setFocusedLocation(meiFriendId);
+        setFocusedSelectionId(info.xmlId, "codemirror");
+      }
+    },
+    [meiFriendId, setFocusedLocation, setFocusedSelectionId],
+  );
+
+  // React to external selection if Navigate is enabled
+  useEffect(() => {
+    if (navigateEnabled) {
+      if (selectionState.selectionId) {
+        if (selectionState.origin !== "codemirror") {
+          editorRef.current?.highlightElement(selectionState.selectionId);
+          editorRef.current?.navigateTo(selectionState.selectionId);
+        } else {
+          editorRef.current?.highlightElement(null);
+        }
+      }
+    } else {
+      editorRef.current?.highlightElement(null);
+    }
+  }, [navigateEnabled, selectionState]);
+
+  if (!meiFriendId) {
+    return (
+      <div className={styles.panel}>
+        <div className={styles.welcomeContent}>No file selected</div>
+      </div>
+    );
+  }
 
   if (!meiFriend) {
     return (
       <div className={styles.panel}>
         <div className={styles.welcomeContent}>
-          {meiFriendId
-            ? `No MEI content loaded for "${meiFriendId}"`
-            : "No file selected"}
+          Loading MEI content for "{meiFriendId.id}"…
         </div>
       </div>
     );

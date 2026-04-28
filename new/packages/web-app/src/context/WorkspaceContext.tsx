@@ -6,11 +6,11 @@
  * to read or modify workspace data should use useWorkspaceContext() or the
  * convenience hook useWorkspace().
  *
- * Provider nesting order: <WorkspaceProvider> must wrap <AppStateProvider>
- * because AppStateContext depends on loadFileIfNeeded from this context.
+ * Provider nesting order: <WorkspaceProvider> must wrap <FocusProvider>
+ * because FocusContext depends on loadFileIfNeeded from this context.
  */
 
-import type { WorkspaceSnapshot } from "@mei-friend/core";
+import type { WorkspaceEntry, WorkspaceSnapshot } from "@mei-friend/core";
 import { MeiFriendWorkspace } from "@mei-friend/core";
 import {
   createContext,
@@ -21,28 +21,6 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-
-// ── App settings ─────────────────────────────────────────────────────────────
-
-export type AppSettings = { showSplash: boolean };
-
-const DEFAULT_SETTINGS: AppSettings = { showSplash: true };
-const SETTINGS_KEY = "mei-friend:settings";
-
-function loadSettings(): AppSettings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw)
-      return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as AppSettings) };
-  } catch {
-    // Ignore malformed JSON — fall back to defaults.
-  }
-  return DEFAULT_SETTINGS;
-}
-
-function persistSettings(s: AppSettings): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-}
 
 // ── Context interface ─────────────────────────────────────────────────────────
 
@@ -55,7 +33,7 @@ interface WorkspaceContextValue {
    * directory. All other origins are loaded eagerly at add-time, so this is
    * a no-op for them.
    */
-  loadFileIfNeeded: (path: string) => Promise<void>;
+  loadFileIfNeeded: (id: string) => Promise<void>;
 
   /**
    * Opens a native file picker (FSA showOpenFilePicker or <input> fallback).
@@ -68,7 +46,7 @@ interface WorkspaceContextValue {
    * Adds an array of File objects (e.g. from drag-drop) to the workspace.
    * Files are registered as "loose" and their content is loaded immediately.
    */
-  addFilesFromFileList: (files: File[]) => Promise<void>;
+  addFilesFromFileList: (files: File[]) => Promise<WorkspaceEntry[]>;
 
   /**
    * Opens a directory as the workspace via FSA showDirectoryPicker.
@@ -107,9 +85,6 @@ interface WorkspaceContextValue {
    * reset the panel layout. Returns a cleanup function.
    */
   registerResetHandler: (fn: () => void) => () => void;
-
-  settings: AppSettings;
-  updateSettings: (patch: Partial<AppSettings>) => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -139,8 +114,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const [settings, setSettings] = useState<AppSettings>(loadSettings);
-
   // Warn before closing the tab when there are unsaved changes.
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -153,29 +126,24 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
-  const updateSettings = useCallback((patch: Partial<AppSettings>) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...patch };
-      persistSettings(next);
-      return next;
-    });
-  }, []);
-
   // ── Lazy loading ───────────────────────────────────────────────────────────
 
   const loadFileIfNeeded = useCallback(
-    async (path: string): Promise<void> => {
+    async (id: string): Promise<void> => {
       const workspace = workspaceRef.current;
-      if (workspace.getMeiFriend(path)) return; // content already in memory
+      const entry = workspace.entries.find((e) => e.id === id);
+      if (!entry) return;
+
+      if (entry.meiFriend) return; // content already in memory
 
       // Only "workspace" origin files can be read from the root directory handle.
       // Loose / memory / remote files are always loaded at add-time.
       const rootDir = rootDirHandle;
-      if (!rootDir) return;
+      if (!rootDir || entry.origin !== "workspace") return;
 
       try {
         // Re-derive the file handle from the root — no need to store per-file handles.
-        const segments = path.split("/");
+        const segments = entry.path.split("/");
         const fileName = segments.pop();
         if (!fileName) return;
 
@@ -185,10 +153,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         }
         const fileHandle = await dir.getFileHandle(fileName);
         const file = await fileHandle.getFile();
-        workspace.loadMeiContent(path, await file.text());
+        workspace.loadMeiContent(entry.path, await file.text());
       } catch (err) {
         console.error(
-          `Failed to lazy-load "${path}" from workspace directory:`,
+          `Failed to lazy-load "${entry.path}" from workspace directory:`,
           err,
         );
       }
@@ -199,19 +167,24 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   // ── File add helpers ───────────────────────────────────────────────────────
 
   const addFilesFromFileList = useCallback(
-    async (files: File[]): Promise<void> => {
+    async (files: File[]): Promise<WorkspaceEntry[]> => {
       const workspace = workspaceRef.current;
+      const addedEntries: WorkspaceEntry[] = [];
       for (const file of files) {
         // Register as "loose" — these files are not part of an open directory.
         const entry = workspace.addFile(file.name, "loose");
-        if (entry?.type === "MEI") {
-          try {
-            workspace.loadMeiContent(file.name, await file.text());
-          } catch (err) {
-            console.error(`Failed to load "${file.name}":`, err);
+        if (entry) {
+          addedEntries.push(entry);
+          if (entry.type === "MEI") {
+            try {
+              workspace.loadMeiContent(file.name, await file.text());
+            } catch (err) {
+              console.error(`Failed to load "${file.name}":`, err);
+            }
           }
         }
       }
+      return addedEntries;
     },
     [],
   );
@@ -390,8 +363,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     saveWorkspace,
     workspaceStorage,
     registerResetHandler,
-    settings,
-    updateSettings,
   };
 
   return (

@@ -1,6 +1,6 @@
 import { DragDropProvider } from "@dnd-kit/react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useAppState } from "../../context/AppStateContext";
+import { useFocus } from "../../context/FocusContext";
 import { useWorkspaceContext } from "../../context/WorkspaceContext";
 import styles from "./MainContent.module.css";
 import SplitLayout from "./SplitLayout";
@@ -16,12 +16,8 @@ const INITIAL_STATE: LayoutState = {
 };
 
 export default function MainContent() {
-  const {
-    registerPanelOpener,
-    setActiveMeiFriendPath,
-    setActiveSelectedId,
-    setFocusedPanelId,
-  } = useAppState();
+  const { registerPanelOpener, setFocusedLocation, setFocusedPanelId } =
+    useFocus();
   const { registerResetHandler } = useWorkspaceContext();
 
   const {
@@ -39,28 +35,22 @@ export default function MainContent() {
 
   // Register the panel opener so WorkspacePanel can trigger it via context
   useEffect(() => {
-    const unregister = registerPanelOpener((path) => {
-      openOrActivateFile(path);
-      setActiveMeiFriendPath(path);
+    const unregister = registerPanelOpener((location) => {
+      openOrActivateFile(location);
+      setFocusedLocation(location);
     });
     return () => unregister();
-  }, [registerPanelOpener, openOrActivateFile, setActiveMeiFriendPath]);
+  }, [registerPanelOpener, openOrActivateFile, setFocusedLocation]);
 
   // When the workspace is replaced (Open Workspace), reset all panels and
-  // clear the active file so the UI starts from a clean slate.
+  // clear the focus so the UI starts from a clean slate.
   useEffect(() => {
     const unregister = registerResetHandler(() => {
       setLayoutState(INITIAL_STATE);
-      setActiveMeiFriendPath(null);
-      setActiveSelectedId(null);
+      setFocusedLocation(null);
     });
     return () => unregister();
-  }, [
-    registerResetHandler,
-    setLayoutState,
-    setActiveMeiFriendPath,
-    setActiveSelectedId,
-  ]);
+  }, [registerResetHandler, setLayoutState, setFocusedLocation]);
 
   // Synchronously update on render to prevent stale closures in DnD handlers
   const layoutStateRef = useRef(layoutState);
@@ -85,15 +75,11 @@ export default function MainContent() {
     (panelId: string, containerId: string) => {
       setActivePanel(panelId, containerId);
       const panel = layoutState.panels[panelId];
-      setActiveMeiFriendPath(panel?.meiFriendId ?? null);
-      setActiveSelectedId(null);
+      if (panel?.meiFriendId) {
+        setFocusedLocation(panel.meiFriendId);
+      }
     },
-    [
-      setActivePanel,
-      layoutState.panels,
-      setActiveMeiFriendPath,
-      setActiveSelectedId,
-    ],
+    [setActivePanel, layoutState.panels, setFocusedLocation],
   );
 
   // ── Callbacks ────────────────────────────────────────────────────────

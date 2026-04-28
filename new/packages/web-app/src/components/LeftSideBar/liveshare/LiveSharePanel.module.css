@@ -1,0 +1,66 @@
+.emptyText {
+  color: var(--textColor);
+  opacity: 0.5;
+  margin-bottom: 8px;
+}
+
+.roomInfo {
+  font-size: 11px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.roomId {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaveBtn {
+  background: none;
+  border: 1px solid var(--borderColor);
+  border-radius: 3px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--textColor);
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.leaveBtn:hover {
+  background-color: var(--hoverColor, rgba(255, 255, 255, 0.1));
+}
+
+.fileList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+}
+
+.fileItem {
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--textColor);
+  border-radius: 4px;
+}
+
+.fileItem:hover {
+  background-color: var(--hoverColor, rgba(255, 255, 255, 0.1));
+}
+
+.fileItem.active {
+  background-color: var(--activeColor, rgba(0, 120, 215, 0.2));
+  font-weight: 500;
+}
+
+.fileName {
+  color: inherit;
+}

@@ -17,6 +17,7 @@ export type WorkspaceFileType = "MEI" | "Image" | "WebAnnotation" | "Other";
 export type EntryOrigin = "workspace" | "loose" | "memory" | "remote";
 
 export interface WorkspaceEntry {
+  readonly id: string;
   readonly path: string;
   readonly type: WorkspaceFileType;
   readonly origin: EntryOrigin;
@@ -134,6 +135,7 @@ export class MeiFriendWorkspace {
     if (existing) return existing;
 
     const entry: WorkspaceEntry = {
+      id: Math.random().toString(36).substring(2, 11),
       path,
       type: type ?? classified,
       origin,
@@ -204,8 +206,8 @@ export class MeiFriendWorkspace {
     return mf;
   }
 
-  public getMeiFriend(path: string): MeiFriend | undefined {
-    return this._entries.find((e) => e.path === path)?.meiFriend;
+  public getMeiFriend(id: string): MeiFriend | undefined {
+    return this._entries.find((e) => e.id === id || e.path === id)?.meiFriend;
   }
 
   /** Marks a file as saved (isDirty = false). Call after successfully writing to disk. */

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { useActiveMeiFriend } from "../../context/AppStateContext";
+import { useFocus, useFocusedMeiFriend } from "../../context/FocusContext";
+import { useLiveShare } from "../../context/LiveShareContext";
 import { useWorkspaceContext } from "../../context/WorkspaceContext";
 import styles from "./Header.module.css";
 
@@ -123,47 +124,62 @@ export default function MenuBar({
 }: MenuBarProps) {
   const { openId, handleClick, handleHover, close } = useDropdownState();
   const {
-    activeMeiFriend,
-    activeSelectedId,
-    activeMeiFriendPath,
+    focusedMeiFriend,
+    focusedSelectionId,
+    focusedLocation,
     canUndo,
     canRedo,
-  } = useActiveMeiFriend();
-  // workspace is needed for pitch operations — sourced from WorkspaceContext
-  // rather than AppStateContext since it is part of the data layer.
+  } = useFocusedMeiFriend();
   const { workspace } = useWorkspaceContext();
+  const { navigateEnabled, setNavigateEnabled } = useFocus();
 
-  const hasActiveNote = !!(activeMeiFriend && activeSelectedId);
+  const { sendToLiveShare, addToWorkspace } = useLiveShare();
+
+  const hasFocusedNote = !!(focusedMeiFriend && focusedSelectionId);
 
   const handlePitchUp = useCallback(() => {
-    if (!activeMeiFriendPath || !activeSelectedId) return;
-    const meiFriend = workspace.getMeiFriend(activeMeiFriendPath);
-    if (!meiFriend) return;
+    if (!focusedMeiFriend || !focusedSelectionId) return;
     try {
-      const result = meiFriend.api.editor.pitchUp(activeSelectedId);
-      meiFriend.updateBatch([
+      const result = focusedMeiFriend.api.editor.pitchUp(focusedSelectionId);
+      focusedMeiFriend.updateBatch([
         result.note,
         ...result.accidentalCorrections.map((c) => c.element),
       ]);
     } catch {
       // ignore if element is not a note
     }
-  }, [activeMeiFriendPath, activeSelectedId, workspace]);
+  }, [focusedMeiFriend, focusedSelectionId]);
 
   const handlePitchDown = useCallback(() => {
-    if (!activeMeiFriendPath || !activeSelectedId) return;
-    const mf = workspace.getMeiFriend(activeMeiFriendPath);
-    if (!mf) return;
+    if (!focusedMeiFriend || !focusedSelectionId) return;
     try {
-      const result = mf.api.editor.pitchDown(activeSelectedId);
-      mf.updateBatch([
+      const result = focusedMeiFriend.api.editor.pitchDown(focusedSelectionId);
+      focusedMeiFriend.updateBatch([
         result.note,
         ...result.accidentalCorrections.map((c) => c.element),
       ]);
     } catch {
       // ignore if element is not a note
     }
-  }, [activeMeiFriendPath, activeSelectedId, workspace]);
+  }, [focusedMeiFriend, focusedSelectionId]);
+
+  const handleSendToLiveShare = useCallback(async () => {
+    if (focusedMeiFriend && focusedLocation?.source === "workspace") {
+      const entry = workspace.entries.find((e) => e.id === focusedLocation.id);
+      const name = entry?.path.split("/").pop() ?? "Untitled";
+      const roomId = await sendToLiveShare(focusedMeiFriend, name);
+      alert(
+        `Shared! Room ID: ${roomId}\nURL: ${window.location.origin}${window.location.pathname}?share=${roomId}`,
+      );
+    }
+  }, [focusedMeiFriend, focusedLocation, sendToLiveShare, workspace.entries]);
+
+  const handleAddToWorkspace = useCallback(async () => {
+    if (focusedLocation?.source === "live-share") {
+      await addToWorkspace(focusedLocation.id);
+      alert("Added to workspace!");
+    }
+  }, [focusedLocation, addToWorkspace]);
 
   const item = (
     label: React.ReactNode,
@@ -209,8 +225,8 @@ export default function MenuBar({
         onHover={handleHover}
         onClose={close}
       >
-        {item("Undo", "⌘Z", () => activeMeiFriend?.undo(), !canUndo)}
-        {item("Redo", "⇧⌘Z", () => activeMeiFriend?.redo(), !canRedo)}
+        {item("Undo", "⌘Z", () => focusedMeiFriend?.undo(), !canUndo)}
+        {item("Redo", "⇧⌘Z", () => focusedMeiFriend?.redo(), !canRedo)}
       </Dropdown>
 
       <Dropdown
@@ -233,8 +249,53 @@ export default function MenuBar({
         onHover={handleHover}
         onClose={close}
       >
-        {item("Pitch Up", "↑", handlePitchUp, !hasActiveNote)}
-        {item("Pitch Down", "↓", handlePitchDown, !hasActiveNote)}
+        {item("Pitch Up", "↑", handlePitchUp, !hasFocusedNote)}
+        {item("Pitch Down", "↓", handlePitchDown, !hasFocusedNote)}
+      </Dropdown>
+
+      <Dropdown
+        id="toolMenuTitle"
+        label="Tool"
+        isOpen={openId === "toolMenuTitle"}
+        onClick={handleClick}
+        onHover={handleHover}
+        onClose={close}
+      >
+        {item(
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <input
+              type="checkbox"
+              checked={navigateEnabled}
+              readOnly
+              style={{ pointerEvents: "none" }}
+            />
+            Navigate
+          </div>,
+          undefined,
+          () => setNavigateEnabled(!navigateEnabled),
+        )}
+      </Dropdown>
+
+      <Dropdown
+        id="shareMenuTitle"
+        label="Share"
+        isOpen={openId === "shareMenuTitle"}
+        onClick={handleClick}
+        onHover={handleHover}
+        onClose={close}
+      >
+        {item(
+          "Send to Live Share",
+          undefined,
+          handleSendToLiveShare,
+          focusedLocation?.source !== "workspace",
+        )}
+        {item(
+          "Add to Workspace",
+          undefined,
+          handleAddToWorkspace,
+          focusedLocation?.source !== "live-share",
+        )}
       </Dropdown>
 
       <Dropdown

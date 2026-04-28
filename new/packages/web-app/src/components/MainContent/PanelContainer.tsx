@@ -2,6 +2,7 @@ import { pointerIntersection } from "@dnd-kit/collision";
 import { useDroppable } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { useCallback, useState } from "react";
+import { useWorkspaceContext } from "../../context/WorkspaceContext";
 import ContextMenu, { type ContextMenuItem } from "../ui/ContextMenu";
 import styles from "./PanelContainer.module.css";
 import CodeMirrorPanel from "./panels/codemirror/CodeMirrorPanel";
@@ -22,7 +23,19 @@ function renderPanelContent(panel: Panel) {
 // ── PanelTabLabel ─────────────────────────────────────────────────────────
 
 function PanelTabLabel({ panel }: { panel: Panel }) {
-  const fileName = panel.meiFriendId?.split("/").pop() ?? "—";
+  const { workspace } = useWorkspaceContext();
+
+  let fileName = "—";
+  if (panel.meiFriendId) {
+    if (panel.meiFriendId.source === "workspace") {
+      const entry = workspace.entries.find(
+        (e) => e.id === panel.meiFriendId?.id,
+      );
+      fileName = entry?.path.split("/").pop() ?? "—";
+    } else {
+      fileName = `Shared: ${panel.meiFriendId.id.slice(0, 8)}…`;
+    }
+  }
 
   if (panel.type === "verovio")
     return (

@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import type { MeiFriendLocation } from "../../context/FocusContext";
 import type {
   LayoutNode,
   LayoutState,
@@ -9,6 +10,15 @@ import type {
 
 export function uniqueId(prefix = "container"): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function locationsMatch(
+  a: MeiFriendLocation | null,
+  b: MeiFriendLocation | null,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.source === b.source && a.id === b.id;
 }
 
 function mapLayout(
@@ -246,12 +256,13 @@ export function useLayout(initialState: LayoutState) {
     });
   }, []);
 
-  /** Opens a notation panel for the given file path, or activates an existing one. */
-  const openOrActivateFile = useCallback((path: string) => {
+  /** Opens a notation panel for the given location, or activates an existing one. */
+  const openOrActivateFile = useCallback((location: MeiFriendLocation) => {
     setLayoutState((state) => {
-      // Look for an existing notation panel for this path
+      // Look for an existing notation panel for this location
       const existingPanelId = Object.entries(state.panels).find(
-        ([, p]) => p.meiFriendId === path && p.type === "verovio",
+        ([, p]) =>
+          locationsMatch(p.meiFriendId, location) && p.type === "verovio",
       )?.[0];
 
       if (existingPanelId && state.layout) {
@@ -272,7 +283,7 @@ export function useLayout(initialState: LayoutState) {
       const newPanel: Panel = {
         id: panelId,
         type: "verovio",
-        meiFriendId: path,
+        meiFriendId: location,
       };
       const panels = { ...state.panels, [panelId]: newPanel };
 

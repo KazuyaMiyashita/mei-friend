@@ -10,12 +10,18 @@ import Header from "./components/Header/Header";
 import LeftSideBar, {
   type SidebarPanel,
 } from "./components/LeftSideBar/LeftSideBar";
+import LiveSharePanel from "./components/LeftSideBar/liveshare/LiveSharePanel";
 import SettingsPanel from "./components/LeftSideBar/settings/SettingsPanel";
 import WorkspacePanel from "./components/LeftSideBar/workspace/WorkspacePanel";
 import MainContent from "./components/MainContent/MainContent";
 import DragOverlay from "./components/Modals/DragOverlay";
 import SplashOverlay from "./components/Modals/SplashOverlay";
-import { AppStateProvider, useAppState } from "./context/AppStateContext";
+import {
+  AppSettingsProvider,
+  useAppSettings,
+} from "./context/AppSettingsContext";
+import { FocusProvider, useFocus } from "./context/FocusContext";
+import { LiveShareProvider } from "./context/LiveShareContext";
 import {
   useWorkspaceContext,
   WorkspaceProvider,
@@ -29,8 +35,9 @@ function AppContent() {
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
 
-  const { openFileInPanel } = useAppState();
-  const { addFilesFromFileList, settings } = useWorkspaceContext();
+  const { openMeiFriendInPanel } = useFocus();
+  const { addFilesFromFileList } = useWorkspaceContext();
+  const { settings } = useAppSettings();
   const [showSplash, setShowSplash] = useState(() => settings.showSplash);
 
   const toggleSidebar = useCallback((panel: SidebarPanel) => {
@@ -41,11 +48,18 @@ function AppContent() {
     setShowSplash(false);
   }, []);
 
-  const handleOpenFile = useCallback(
-    (path: string) => {
-      openFileInPanel(path);
+  const handleOpenWorkspaceFile = useCallback(
+    (id: string) => {
+      openMeiFriendInPanel({ source: "workspace", id });
     },
-    [openFileInPanel],
+    [openMeiFriendInPanel],
+  );
+
+  const handleOpenLiveShareFile = useCallback(
+    (id: string) => {
+      openMeiFriendInPanel({ source: "live-share", id });
+    },
+    [openMeiFriendInPanel],
   );
 
   useGlobalKeyboard({
@@ -88,9 +102,13 @@ function AppContent() {
       setIsDragOver(false);
       const files = e.dataTransfer ? Array.from(e.dataTransfer.files) : [];
       if (files.length === 0) return;
-      await addFilesFromFileList(files);
-      const meiFile = files.find((f) => /\.(mei|xml|musicxml)$/i.test(f.name));
-      if (meiFile) openFileInPanel(meiFile.name);
+
+      const addedEntries = await addFilesFromFileList(files);
+      // Open the first MEI file added
+      const firstMei = addedEntries.find((e) => e.type === "MEI");
+      if (firstMei) {
+        openMeiFriendInPanel({ source: "workspace", id: firstMei.id });
+      }
     };
 
     window.addEventListener("dragenter", onDragEnter);
@@ -103,7 +121,7 @@ function AppContent() {
       window.removeEventListener("dragover", onDragOver);
       window.removeEventListener("drop", onDrop as unknown as EventListener);
     };
-  }, [addFilesFromFileList, openFileInPanel]);
+  }, [addFilesFromFileList, openMeiFriendInPanel]);
 
   return (
     <>
@@ -128,7 +146,10 @@ function AppContent() {
                 maxSize={"40%"}
               >
                 {activeSidebar === "workspace" && (
-                  <WorkspacePanel onOpenFile={handleOpenFile} />
+                  <WorkspacePanel onOpenFile={handleOpenWorkspaceFile} />
+                )}
+                {activeSidebar === "live-share" && (
+                  <LiveSharePanel onOpenFile={handleOpenLiveShareFile} />
                 )}
                 {activeSidebar === "settings" && <SettingsPanel />}
               </Panel>
@@ -148,12 +169,14 @@ function AppContent() {
 
 export default function App() {
   return (
-    // WorkspaceProvider must be the outer wrapper: AppStateProvider depends on
-    // WorkspaceContext.loadFileIfNeeded to implement openFileInPanel.
-    <WorkspaceProvider>
-      <AppStateProvider>
-        <AppContent />
-      </AppStateProvider>
-    </WorkspaceProvider>
+    <AppSettingsProvider>
+      <WorkspaceProvider>
+        <LiveShareProvider>
+          <FocusProvider>
+            <AppContent />
+          </FocusProvider>
+        </LiveShareProvider>
+      </WorkspaceProvider>
+    </AppSettingsProvider>
   );
 }

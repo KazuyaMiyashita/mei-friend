@@ -1,8 +1,8 @@
-import { useWorkspaceContext } from "../../../context/WorkspaceContext";
+import { useAppSettings } from "../../../context/AppSettingsContext";
 import panelStyles from "../Panel.module.css";
 
 export default function SettingsPanel() {
-  const { settings, updateSettings } = useWorkspaceContext();
+  const { settings, updateSettings } = useAppSettings();
 
   return (
     <section className={panelStyles.panelContaioner} aria-label="Settings">

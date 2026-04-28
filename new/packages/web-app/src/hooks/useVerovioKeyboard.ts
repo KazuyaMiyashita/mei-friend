@@ -1,15 +1,15 @@
 import type { Cursor } from "@mei-friend/core";
 import { useEffect } from "react";
-import { useAppState } from "../context/AppStateContext";
+import { type MeiFriendLocation, useFocus } from "../context/FocusContext";
 
 export function useVerovioKeyboard(
   panelId: string,
-  meiFriendId: string | null,
+  meiFriendId: MeiFriendLocation | null,
   cursor: Cursor | null,
   setCursor: (c: Cursor | null) => void,
   setSelectedId: (id: string | null) => void,
 ) {
-  const { focusedPanelId, setActiveSelectedId } = useAppState();
+  const { focusedPanelId, setMeiFriendSelection } = useFocus();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -46,8 +46,8 @@ export function useVerovioKeyboard(
         setCursor(nextCursor);
         const eventId = nextCursor.getEvent()?.id ?? null;
         setSelectedId(eventId);
-        if (meiFriendId && eventId !== null) {
-          setActiveSelectedId(eventId);
+        if (meiFriendId) {
+          setMeiFriendSelection(meiFriendId, eventId, "verovio");
         }
       }
     };
@@ -61,6 +61,6 @@ export function useVerovioKeyboard(
     meiFriendId,
     setCursor,
     setSelectedId,
-    setActiveSelectedId,
+    setMeiFriendSelection,
   ]);
 }

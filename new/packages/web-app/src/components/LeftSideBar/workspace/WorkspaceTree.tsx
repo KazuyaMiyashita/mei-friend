@@ -45,7 +45,7 @@ function buildTree(entries: readonly WorkspaceEntry[]): Map<string, TreeNode> {
   return root;
 }
 
-// ── File icons ──────────────────────────────────────────────────────────────��─
+// ── File icons ────────────────────────────────────────────────────────────────
 
 function fileIcon(type: WorkspaceFileType): string {
   switch (type) {
@@ -66,15 +66,15 @@ interface TreeNodeViewProps {
   name: string;
   node: TreeNode;
   depth: number;
-  activePath: string | null;
-  onFileClick: (path: string, type: WorkspaceFileType) => void;
+  activeId: string | null;
+  onFileClick: (id: string, type: WorkspaceFileType) => void;
 }
 
 function TreeNodeView({
   name,
   node,
   depth,
-  activePath,
+  activeId,
   onFileClick,
 }: TreeNodeViewProps) {
   const [open, setOpen] = useState(true);
@@ -82,7 +82,7 @@ function TreeNodeView({
 
   if (node.kind === "file") {
     const { entry } = node;
-    const isActive = activePath === entry.path;
+    const isActive = activeId === entry.id;
     const isClickable = entry.type === "MEI";
 
     return (
@@ -90,7 +90,7 @@ function TreeNodeView({
         type="button"
         className={`${styles.fileNode}${isActive ? ` ${styles.active}` : ""}${!isClickable ? ` ${styles.nonClickable}` : ""}`}
         style={{ paddingLeft: `${indent + 8}px` }}
-        onClick={() => isClickable && onFileClick(entry.path, entry.type)}
+        onClick={() => isClickable && onFileClick(entry.id, entry.type)}
         title={entry.path}
       >
         <span className={styles.icon}>{fileIcon(entry.type)}</span>
@@ -127,7 +127,7 @@ function TreeNodeView({
               name={childName}
               node={childNode}
               depth={depth + 1}
-              activePath={activePath}
+              activeId={activeId}
               onFileClick={onFileClick}
             />
           ))}
@@ -141,13 +141,13 @@ function TreeNodeView({
 
 interface WorkspaceTreeProps {
   entries: readonly WorkspaceEntry[];
-  activePath: string | null;
-  onFileClick: (path: string, type: WorkspaceFileType) => void;
+  activeId: string | null;
+  onFileClick: (id: string, type: WorkspaceFileType) => void;
 }
 
 export default function WorkspaceTree({
   entries,
-  activePath,
+  activeId,
   onFileClick,
 }: WorkspaceTreeProps) {
   const tree = buildTree(entries);
@@ -164,7 +164,7 @@ export default function WorkspaceTree({
           name={name}
           node={node}
           depth={0}
-          activePath={activePath}
+          activeId={activeId}
           onFileClick={onFileClick}
         />
       ))}
