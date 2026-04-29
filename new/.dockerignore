@@ -1,0 +1,13 @@
+node_modules
+.pnpm-store
+.turbo
+dist
+.git
+.venv
+venv
+__pycache__
+*.log
+.vscode
+.claude
+playwright-report
+test-results
