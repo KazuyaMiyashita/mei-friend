@@ -111,6 +111,9 @@ importers:
       '@types/node':
         specifier: ^24.12.2
         version: 24.12.2
+      '@types/verovio':
+        specifier: ^5.1.0
+        version: 5.1.0
       '@vitest/browser':
         specifier: ^4.1.4
         version: 4.1.4(vite@8.0.8(@types/node@24.12.2))(vitest@4.1.4)
