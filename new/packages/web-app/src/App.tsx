@@ -61,19 +61,7 @@ function AppContent() {
     [openContent],
   );
 
-  useGlobalKeyboard({
-    onSave: () => {
-      // TODO: implement global save
-      console.log("Global Save triggered");
-    },
-    onOpen: () => {
-      // For now just log, ideally trigger a file picker or focus workspace
-      console.log("Global Open triggered");
-    },
-    onNew: () => {
-      console.log("Global New triggered");
-    },
-  });
+  useGlobalKeyboard();
 
   // Global file drag-and-drop via window listeners
   useEffect(() => {

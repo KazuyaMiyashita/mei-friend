@@ -125,14 +125,25 @@ export default function MenuBar() {
     openFilePicker,
     openWorkspace,
     saveWorkspace,
+    undo,
+    redo,
     pitchUp,
     pitchDown,
+    nextBeat,
+    nextEvent,
+    prevBeat,
+    prevEvent,
+    staffUpSnapToBeat,
+    staffUpSnapToEvent,
+    staffDownSnapToBeat,
+    staffDownSnapToEvent,
     sendToLiveShare,
     addToWorkspace,
   } = useApplication();
 
   const focusedSelectionId = focusedState?.selectionId;
   const hasFocusedNote = !!(focusedMeiFriend && focusedSelectionId);
+  const hasCursor = !!(focusedMeiFriend && focusedState?.cursor);
 
   const isWorkspaceFile = focusedState?.source === "workspace";
   const isSharedFile = focusedState?.source === "live-share";
@@ -175,14 +186,14 @@ export default function MenuBar() {
 
       <Dropdown
         id="editMenuTitle"
-        label="Code"
+        label="Edit"
         isOpen={openId === "editMenuTitle"}
         onClick={handleClick}
         onHover={handleHover}
         onClose={close}
       >
-        {item("Undo", "⌘Z", () => focusedMeiFriend?.undo(), !canUndo)}
-        {item("Redo", "⇧⌘Z", () => focusedMeiFriend?.redo(), !canRedo)}
+        {item("Undo", "⌘Z", undo, !canUndo)}
+        {item("Redo", "⇧⌘Z", redo, !canRedo)}
       </Dropdown>
 
       <Dropdown
@@ -205,8 +216,8 @@ export default function MenuBar() {
         onHover={handleHover}
         onClose={close}
       >
-        {item("Pitch Up", "↑", pitchUp, !hasFocusedNote)}
-        {item("Pitch Down", "↓", pitchDown, !hasFocusedNote)}
+        {item("Pitch Up", "⌥ ↑", pitchUp, !hasFocusedNote)}
+        {item("Pitch Down", "⌥ ↓", pitchDown, !hasFocusedNote)}
       </Dropdown>
 
       <Dropdown
@@ -229,6 +240,26 @@ export default function MenuBar() {
           </div>,
           undefined,
           () => setNavigateEnabled(!navigateEnabled),
+        )}
+        <MenuLine />
+        {item("Next Beat", "⇧→", nextBeat, !hasCursor)}
+        {item("Next Event", "→", nextEvent, !hasCursor)}
+        {item("Previous Beat", "⇧←", prevBeat, !hasCursor)}
+        {item("Previous Event", "←", prevEvent, !hasCursor)}
+        <MenuLine />
+        {item("Staff Up (Snap to Beat)", "⇧↑", staffUpSnapToBeat, !hasCursor)}
+        {item("Staff Up (Snap to Event)", "↑", staffUpSnapToEvent, !hasCursor)}
+        {item(
+          "Staff Down (Snap to Beat)",
+          "⇧↓",
+          staffDownSnapToBeat,
+          !hasCursor,
+        )}
+        {item(
+          "Staff Down (Snap to Event)",
+          "↓",
+          staffDownSnapToEvent,
+          !hasCursor,
         )}
       </Dropdown>
 

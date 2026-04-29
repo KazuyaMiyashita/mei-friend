@@ -1,4 +1,4 @@
-import type { MeiFriend } from "@mei-friend/core";
+import type { Cursor, MeiFriend } from "@mei-friend/core";
 import {
   createContext,
   useCallback,
@@ -27,11 +27,16 @@ export interface MeiFriendState {
    * This prevents infinite loops where a component reacts to its own selection change.
    */
   selectionOrigin: string | null;
+  /**
+   * The current cursor position within this MeiFriend instance.
+   */
+  cursor: Cursor | null;
 }
 
 const DEFAULT_STATE: Omit<MeiFriendState, "name" | "source"> = {
   selectionId: null,
   selectionOrigin: null,
+  cursor: null,
 };
 
 interface MeiFriendRegistryContextValue {
@@ -141,31 +146,44 @@ export function useMeiFriendRegistry() {
 export function useMeiFriend(meiFriendId: string | null | undefined) {
   const { registry, states, updateMeiFriendState } = useMeiFriendRegistry();
 
+  const setSelection = useCallback(
+    (selectionId: string | null, origin: string | null = null) => {
+      if (meiFriendId) {
+        updateMeiFriendState(meiFriendId, {
+          selectionId,
+          selectionOrigin: origin,
+        });
+      }
+    },
+    [meiFriendId, updateMeiFriendState],
+  );
+
+  const setCursor = useCallback(
+    (cursor: Cursor | null) => {
+      if (meiFriendId) {
+        updateMeiFriendState(meiFriendId, { cursor });
+      }
+    },
+    [meiFriendId, updateMeiFriendState],
+  );
+
   if (!meiFriendId) {
     return {
       meiFriend: null,
       state: null,
-      setSelection: (
-        _selectionId: string | null,
-        _origin: string | null = null,
-      ) => {},
+      setSelection,
+      setCursor,
     };
   }
 
   const meiFriend = registry.get(meiFriendId) ?? null;
   const state = states.get(meiFriendId) ?? null;
 
-  const setSelection = (
-    selectionId: string | null,
-    origin: string | null = null,
-  ) => {
-    updateMeiFriendState(meiFriendId, { selectionId, selectionOrigin: origin });
-  };
-
   return {
     meiFriend,
     state,
     setSelection,
+    setCursor,
   };
 }
 
@@ -178,7 +196,8 @@ import { useFocusedContent } from "./FocusedPanelContext";
 export function useFocusedMeiFriend() {
   const focusedContent = useFocusedContent();
   const meiFriendId = focusedContent?.type === "mei" ? focusedContent.id : null;
-  const { meiFriend, state, setSelection } = useMeiFriend(meiFriendId);
+  const { meiFriend, state, setSelection, setCursor } =
+    useMeiFriend(meiFriendId);
 
   const [historyState, setHistoryState] = useState({
     canUndo: false,
@@ -206,6 +225,7 @@ export function useFocusedMeiFriend() {
     meiFriend,
     state,
     setSelection,
+    setCursor,
     ...historyState,
   };
 }

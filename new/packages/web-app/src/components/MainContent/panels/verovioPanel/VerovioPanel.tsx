@@ -22,12 +22,12 @@ export default function VerovioPanel({ panelId, meiFriendId }: Props) {
   const { setFocusedPanelId } = useFocusedPanel();
   const { navigateEnabled } = useAppSettings();
 
-  const { meiFriend, state, setSelection } = useMeiFriend(meiFriendId);
+  const { meiFriend, state, setSelection, setCursor } =
+    useMeiFriend(meiFriendId);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const [cursor, setCursor] = useState<Cursor | null>(null);
   const [fitMode, setFitMode] = useState<"off" | "width" | "height">("width");
   const [vrvOptions, setVrvOptions] = useState<VerovioOptions>({
     scale: 50,
@@ -39,11 +39,11 @@ export default function VerovioPanel({ panelId, meiFriendId }: Props) {
     null,
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset panel state whenever the meiFriend instance changes (file switch)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset panel state whenever the file switches
   useEffect(() => {
     setCurrentPage(1);
     setCursor(null);
-  }, [meiFriend]);
+  }, [meiFriendId, setCursor]);
 
   // React to external selection if Navigate is enabled
   useEffect(() => {
@@ -71,7 +71,7 @@ export default function VerovioPanel({ panelId, meiFriendId }: Props) {
         setSelection(id, "verovio");
       }
     },
-    [meiFriend, meiFriendId, setSelection],
+    [meiFriend, meiFriendId, setSelection, setCursor],
   );
 
   const handlePanelClick = useCallback(() => {
@@ -80,9 +80,7 @@ export default function VerovioPanel({ panelId, meiFriendId }: Props) {
     }
   }, [meiFriendId, panelId, setFocusedPanelId]);
 
-  useVerovioKeyboard(panelId, meiFriendId, cursor, setCursor, (id) => {
-    if (meiFriendId) setSelection(id, "verovio");
-  });
+  useVerovioKeyboard(panelId);
 
   if (!meiFriendId) {
     return <div className={styles.placeholder}>No file selected</div>;
@@ -116,13 +114,13 @@ export default function VerovioPanel({ panelId, meiFriendId }: Props) {
           fitMode={fitMode}
           selectedId={state.selectionId}
           highlightId={verovioHighlightId}
-          cursor={cursor}
+          cursor={state.cursor}
           onSelectionChange={handleSelectionChange}
           onTotalPagesChange={setTotalPages}
         />
       </div>
       <VerovioPanelFooter
-        cursor={cursor}
+        cursor={state.cursor}
         selectedId={state.selectionId}
         meiFriend={meiFriend}
       />

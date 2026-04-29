@@ -1,22 +1,10 @@
 import { useEffect } from "react";
+import { useApplication } from "../context/ApplicationContext";
 import { useFocusedMeiFriend } from "../context/MeiFriendRegistryContext";
 
-interface GlobalKeyboardProps {
-  onSave?: () => void;
-  onOpen?: () => void;
-  onNew?: () => void;
-}
-
-export function useGlobalKeyboard({
-  onSave,
-  onOpen,
-  onNew,
-}: GlobalKeyboardProps) {
-  const {
-    meiFriend: focusedMeiFriend,
-    canUndo,
-    canRedo,
-  } = useFocusedMeiFriend();
+export function useGlobalKeyboard() {
+  const { canUndo, canRedo } = useFocusedMeiFriend();
+  const { undo, redo, saveWorkspace, openFilePicker } = useApplication();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -26,38 +14,31 @@ export function useGlobalKeyboard({
         if (e.shiftKey) {
           if (canRedo) {
             e.preventDefault();
-            focusedMeiFriend?.redo();
+            redo();
           }
         } else {
           if (canUndo) {
             e.preventDefault();
-            focusedMeiFriend?.undo();
+            undo();
           }
         }
       } else if (isMod && e.key === "y") {
         if (canRedo) {
           e.preventDefault();
-          focusedMeiFriend?.redo();
+          redo();
         }
       } else if (isMod && e.key === "s") {
-        if (onSave) {
-          e.preventDefault();
-          onSave();
-        }
+        e.preventDefault();
+        saveWorkspace();
       } else if (isMod && e.key === "o") {
-        if (onOpen) {
-          e.preventDefault();
-          onOpen();
-        }
+        e.preventDefault();
+        openFilePicker();
       } else if (isMod && e.key === "n") {
-        if (onNew) {
-          e.preventDefault();
-          onNew();
-        }
+        // Not implemented
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [focusedMeiFriend, canUndo, canRedo, onSave, onOpen, onNew]);
+  }, [canUndo, canRedo, undo, redo, saveWorkspace, openFilePicker]);
 }

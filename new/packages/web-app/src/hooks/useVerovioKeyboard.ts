@@ -1,68 +1,83 @@
-import type { Cursor } from "@mei-friend/core";
 import { useEffect } from "react";
+import { useApplication } from "../context/ApplicationContext";
 import { useFocusedPanel } from "../context/FocusedPanelContext";
-import { useMeiFriend } from "../context/MeiFriendRegistryContext";
 
-export function useVerovioKeyboard(
-  panelId: string,
-  meiFriendId: string | null,
-  cursor: Cursor | null,
-  setCursor: (c: Cursor | null) => void,
-  setSelectedId: (id: string | null) => void,
-) {
+export function useVerovioKeyboard(panelId: string) {
   const { focusedPanelId } = useFocusedPanel();
-  const { setSelection } = useMeiFriend(meiFriendId);
+  const {
+    nextBeat,
+    nextEvent,
+    prevBeat,
+    prevEvent,
+    staffUpSnapToBeat,
+    staffUpSnapToEvent,
+    staffDownSnapToBeat,
+    staffDownSnapToEvent,
+    pitchUp,
+    pitchDown,
+  } = useApplication();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Only handle if this panel is focused
-      if (focusedPanelId !== panelId || !cursor) return;
+      if (focusedPanelId !== panelId) return;
 
-      let nextCursor: Cursor | undefined;
       switch (e.key) {
         case "ArrowRight":
           e.preventDefault();
-          nextCursor = e.shiftKey ? cursor.nextBeat() : cursor.nextEvent();
+          if (e.shiftKey) {
+            nextBeat();
+          } else {
+            nextEvent();
+          }
           break;
         case "ArrowLeft":
           e.preventDefault();
-          nextCursor = e.shiftKey ? cursor.prevBeat() : cursor.prevEvent();
+          if (e.shiftKey) {
+            prevBeat();
+          } else {
+            prevEvent();
+          }
           break;
         case "ArrowUp":
           e.preventDefault();
-          nextCursor = e.shiftKey
-            ? cursor.staffUp().snapToBeat()
-            : cursor.staffUp().snapToEvent();
+          if (e.altKey) {
+            pitchUp();
+          } else if (e.shiftKey) {
+            staffUpSnapToBeat();
+          } else {
+            staffUpSnapToEvent();
+          }
           break;
         case "ArrowDown":
           e.preventDefault();
-          nextCursor = e.shiftKey
-            ? cursor.staffDown().snapToBeat()
-            : cursor.staffDown().snapToEvent();
+          if (e.altKey) {
+            pitchDown();
+          } else if (e.shiftKey) {
+            staffDownSnapToBeat();
+          } else {
+            staffDownSnapToEvent();
+          }
           break;
         default:
           return;
-      }
-
-      if (nextCursor && nextCursor !== cursor) {
-        setCursor(nextCursor);
-        const eventId = nextCursor.getEvent()?.id ?? null;
-        setSelectedId(eventId);
-        if (meiFriendId) {
-          setSelection(eventId, "verovio");
-        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [
-    cursor,
     focusedPanelId,
     panelId,
-    meiFriendId,
-    setCursor,
-    setSelectedId,
-    setSelection,
+    nextBeat,
+    nextEvent,
+    prevBeat,
+    prevEvent,
+    staffUpSnapToBeat,
+    staffUpSnapToEvent,
+    staffDownSnapToBeat,
+    staffDownSnapToEvent,
+    pitchUp,
+    pitchDown,
   ]);
 }

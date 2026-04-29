@@ -1,3 +1,4 @@
+import type { Cursor } from "@mei-friend/core";
 import { createContext, useCallback, useContext } from "react";
 import { type PanelContent, useFocusedPanel } from "./FocusedPanelContext";
 import { useLiveShare } from "./LiveShareContext";
@@ -9,8 +10,18 @@ export interface ApplicationContextValue {
   openWorkspace: () => Promise<void>;
   saveWorkspace: () => Promise<void>;
   openContent: (content: PanelContent) => Promise<void>;
+  undo: () => void;
+  redo: () => void;
   pitchUp: () => void;
   pitchDown: () => void;
+  nextBeat: () => void;
+  nextEvent: () => void;
+  prevBeat: () => void;
+  prevEvent: () => void;
+  staffUpSnapToBeat: () => void;
+  staffUpSnapToEvent: () => void;
+  staffDownSnapToBeat: () => void;
+  staffDownSnapToEvent: () => void;
   sendToLiveShare: () => Promise<void>;
   addToWorkspace: () => Promise<void>;
 }
@@ -25,8 +36,12 @@ export function ApplicationProvider({
   const workspace = useWorkspaceContext();
   const liveShare = useLiveShare();
   const focusedPanel = useFocusedPanel();
-  const { meiFriend: focusedMeiFriend, state: focusedState } =
-    useFocusedMeiFriend();
+  const {
+    meiFriend: focusedMeiFriend,
+    state: focusedState,
+    setSelection: setFocusedSelection,
+    setCursor: setFocusedCursor,
+  } = useFocusedMeiFriend();
 
   const focusedContent = focusedPanel.focusedPanelId
     ? focusedPanel.panels[focusedPanel.focusedPanelId]
@@ -59,6 +74,14 @@ export function ApplicationProvider({
     }
   }, [workspace, openContent]);
 
+  const undo = useCallback(() => {
+    focusedMeiFriend?.undo();
+  }, [focusedMeiFriend]);
+
+  const redo = useCallback(() => {
+    focusedMeiFriend?.redo();
+  }, [focusedMeiFriend]);
+
   const pitchUp = useCallback(() => {
     const selectionId = focusedState?.selectionId;
     if (!focusedMeiFriend || !selectionId) return;
@@ -86,6 +109,49 @@ export function ApplicationProvider({
       // Ignore if element is not pitchable
     }
   }, [focusedMeiFriend, focusedState?.selectionId]);
+
+  const moveCursor = useCallback(
+    (nextCursor: Cursor | undefined) => {
+      if (nextCursor && nextCursor !== focusedState?.cursor) {
+        setFocusedCursor(nextCursor);
+        const eventId = nextCursor.getEvent()?.id ?? null;
+        setFocusedSelection(eventId, "verovio");
+      }
+    },
+    [focusedState?.cursor, setFocusedCursor, setFocusedSelection],
+  );
+
+  const nextBeat = useCallback(() => {
+    moveCursor(focusedState?.cursor?.nextBeat());
+  }, [focusedState?.cursor, moveCursor]);
+
+  const nextEvent = useCallback(() => {
+    moveCursor(focusedState?.cursor?.nextEvent());
+  }, [focusedState?.cursor, moveCursor]);
+
+  const prevBeat = useCallback(() => {
+    moveCursor(focusedState?.cursor?.prevBeat());
+  }, [focusedState?.cursor, moveCursor]);
+
+  const prevEvent = useCallback(() => {
+    moveCursor(focusedState?.cursor?.prevEvent());
+  }, [focusedState?.cursor, moveCursor]);
+
+  const staffUpSnapToBeat = useCallback(() => {
+    moveCursor(focusedState?.cursor?.staffUp().snapToBeat());
+  }, [focusedState?.cursor, moveCursor]);
+
+  const staffUpSnapToEvent = useCallback(() => {
+    moveCursor(focusedState?.cursor?.staffUp().snapToEvent());
+  }, [focusedState?.cursor, moveCursor]);
+
+  const staffDownSnapToBeat = useCallback(() => {
+    moveCursor(focusedState?.cursor?.staffDown().snapToBeat());
+  }, [focusedState?.cursor, moveCursor]);
+
+  const staffDownSnapToEvent = useCallback(() => {
+    moveCursor(focusedState?.cursor?.staffDown().snapToEvent());
+  }, [focusedState?.cursor, moveCursor]);
 
   const sendToLiveShare = useCallback(async () => {
     if (focusedMeiFriend && focusedContent?.id) {
@@ -119,8 +185,18 @@ export function ApplicationProvider({
         openWorkspace,
         saveWorkspace: workspace.saveWorkspace,
         openContent,
+        undo,
+        redo,
         pitchUp,
         pitchDown,
+        nextBeat,
+        nextEvent,
+        prevBeat,
+        prevEvent,
+        staffUpSnapToBeat,
+        staffUpSnapToEvent,
+        staffDownSnapToBeat,
+        staffDownSnapToEvent,
         sendToLiveShare,
         addToWorkspace,
       }}
