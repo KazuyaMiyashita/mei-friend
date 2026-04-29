@@ -15,6 +15,10 @@ export function useVerovioKeyboard(panelId: string) {
     staffDownSnapToEvent,
     pitchUp,
     pitchDown,
+    pitchOctaveUp,
+    pitchOctaveDown,
+    pitchChromaticUp,
+    pitchChromaticDown,
   } = useApplication();
 
   useEffect(() => {
@@ -41,7 +45,11 @@ export function useVerovioKeyboard(panelId: string) {
           break;
         case "ArrowUp":
           e.preventDefault();
-          if (e.altKey) {
+          if (e.altKey && (e.metaKey || e.ctrlKey)) {
+            pitchOctaveUp();
+          } else if (e.altKey && e.shiftKey) {
+            pitchChromaticUp();
+          } else if (e.altKey) {
             pitchUp();
           } else if (e.shiftKey) {
             staffUpSnapToBeat();
@@ -51,7 +59,11 @@ export function useVerovioKeyboard(panelId: string) {
           break;
         case "ArrowDown":
           e.preventDefault();
-          if (e.altKey) {
+          if (e.altKey && (e.metaKey || e.ctrlKey)) {
+            pitchOctaveDown();
+          } else if (e.altKey && e.shiftKey) {
+            pitchChromaticDown();
+          } else if (e.altKey) {
             pitchDown();
           } else if (e.shiftKey) {
             staffDownSnapToBeat();
@@ -79,5 +91,9 @@ export function useVerovioKeyboard(panelId: string) {
     staffDownSnapToEvent,
     pitchUp,
     pitchDown,
+    pitchOctaveUp,
+    pitchOctaveDown,
+    pitchChromaticUp,
+    pitchChromaticDown,
   ]);
 }

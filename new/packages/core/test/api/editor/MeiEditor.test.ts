@@ -60,8 +60,8 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("0", "major", `<note xml:id="n1" pname="c" oct="4" dur="4"/>`),
       );
-      const result = mf.api.editor.pitchUp("n1");
-      mf.updateElement(result.note);
+      const elements = mf.api.editor.pitchUp("n1");
+      mf.updateBatch(elements);
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("D");
       expect(p.octave.value).toBe(4);
@@ -73,7 +73,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("0", "major", `<note xml:id="n1" pname="e" oct="4" dur="4"/>`),
       );
-      mf.updateElement(mf.api.editor.pitchUp("n1").note);
+      mf.updateBatch(mf.api.editor.pitchUp("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(0);
@@ -84,7 +84,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("0", "major", `<note xml:id="n1" pname="b" oct="4" dur="4"/>`),
       );
-      mf.updateElement(mf.api.editor.pitchUp("n1").note);
+      mf.updateBatch(mf.api.editor.pitchUp("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("C");
       expect(p.octave.value).toBe(5);
@@ -97,7 +97,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("1s", "major", `<note xml:id="n1" pname="d" oct="4" dur="4"/>`),
       );
-      mf.updateElement(mf.api.editor.pitchUp("n1").note);
+      mf.updateBatch(mf.api.editor.pitchUp("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("E");
       expect(p.alter.value).toBe(0);
@@ -108,7 +108,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("1s", "major", `<note xml:id="n1" pname="e" oct="4" dur="4"/>`),
       );
-      mf.updateElement(mf.api.editor.pitchUp("n1").note);
+      mf.updateBatch(mf.api.editor.pitchUp("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(1);
@@ -120,7 +120,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("1s", "major", `<note xml:id="n1" pname="b" oct="4" dur="4"/>`),
       );
-      mf.updateElement(mf.api.editor.pitchUp("n1").note);
+      mf.updateBatch(mf.api.editor.pitchUp("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("C");
       expect(p.octave.value).toBe(5);
@@ -133,7 +133,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("2s", "major", `<note xml:id="n1" pname="b" oct="4" dur="4"/>`),
       );
-      mf.updateElement(mf.api.editor.pitchUp("n1").note);
+      mf.updateBatch(mf.api.editor.pitchUp("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("C");
       expect(p.octave.value).toBe(5);
@@ -147,7 +147,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("2f", "major", `<note xml:id="n1" pname="d" oct="4" dur="4"/>`),
       );
-      mf.updateElement(mf.api.editor.pitchUp("n1").note);
+      mf.updateBatch(mf.api.editor.pitchUp("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("E");
       expect(p.alter.value).toBe(-1);
@@ -158,7 +158,7 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("2f", "major", `<note xml:id="n1" pname="c" oct="4" dur="4"/>`),
       );
-      mf.updateElement(mf.api.editor.pitchUp("n1").note);
+      mf.updateBatch(mf.api.editor.pitchUp("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("D");
       expect(p.alter.value).toBe(0);
@@ -179,7 +179,7 @@ describe("MeiEditor.pitchUp", () => {
            <note xml:id="n1" pname="e" oct="4" dur="4"/>`,
         ),
       );
-      mf.updateElement(mf.api.editor.pitchUp("n1").note);
+      mf.updateBatch(mf.api.editor.pitchUp("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(0);
@@ -197,7 +197,7 @@ describe("MeiEditor.pitchUp", () => {
            <note xml:id="n1" pname="e" oct="4" dur="4"/>`,
         ),
       );
-      mf.updateElement(mf.api.editor.pitchUp("n1").note);
+      mf.updateBatch(mf.api.editor.pitchUp("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(1);
@@ -220,7 +220,7 @@ describe("MeiEditor.pitchUp", () => {
            <note xml:id="n1" pname="e" oct="4" dur="4"/>`,
         ),
       );
-      mf.updateElement(mf.api.editor.pitchUp("n1").note);
+      mf.updateBatch(mf.api.editor.pitchUp("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(1);
@@ -239,7 +239,7 @@ describe("MeiEditor.pitchUp", () => {
            <note xml:id="n1" pname="e" oct="4" dur="4"/>`,
         ),
       );
-      mf.updateElement(mf.api.editor.pitchUp("n1").note);
+      mf.updateBatch(mf.api.editor.pitchUp("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(1);
@@ -251,10 +251,10 @@ describe("MeiEditor.pitchUp", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("1s", "major", `<note xml:id="n1" pname="e" oct="4" dur="4"/>`),
       );
-      const result = mf.api.editor.pitchUp("n1");
+      const [note] = mf.api.editor.pitchUp("n1");
       // F# from key sig — accid.ges is set but no child <accid>
-      expect(result.note.getChildElement("accid")).toBeUndefined();
-      expect(result.note.getAttribute("accid.ges")).toBe("s");
+      expect(note.getChildElement("accid")).toBeUndefined();
+      expect(note.getAttribute("accid.ges")).toBe("s");
     });
 
     it("removes an existing <accid> child from the source note on pitchUp", () => {
@@ -268,9 +268,9 @@ describe("MeiEditor.pitchUp", () => {
            </note>`,
         ),
       );
-      const result = mf.api.editor.pitchUp("n1");
-      expect(result.note.getChildElement("accid")).toBeUndefined();
-      expect(result.note.getAttribute("pname")).toBe("g");
+      const [note] = mf.api.editor.pitchUp("n1");
+      expect(note.getChildElement("accid")).toBeUndefined();
+      expect(note.getAttribute("pname")).toBe("g");
     });
   });
 });
@@ -283,7 +283,7 @@ describe("MeiEditor.pitchDown", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("0", "major", `<note xml:id="n1" pname="d" oct="4" dur="4"/>`),
       );
-      mf.updateElement(mf.api.editor.pitchDown("n1").note);
+      mf.updateBatch(mf.api.editor.pitchDown("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("C");
       expect(p.octave.value).toBe(4);
@@ -294,7 +294,7 @@ describe("MeiEditor.pitchDown", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("0", "major", `<note xml:id="n1" pname="c" oct="4" dur="4"/>`),
       );
-      mf.updateElement(mf.api.editor.pitchDown("n1").note);
+      mf.updateBatch(mf.api.editor.pitchDown("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("B");
       expect(p.octave.value).toBe(3);
@@ -307,7 +307,7 @@ describe("MeiEditor.pitchDown", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("1s", "major", `<note xml:id="n1" pname="g" oct="4" dur="4"/>`),
       );
-      mf.updateElement(mf.api.editor.pitchDown("n1").note);
+      mf.updateBatch(mf.api.editor.pitchDown("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(1);
@@ -320,7 +320,7 @@ describe("MeiEditor.pitchDown", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("2f", "major", `<note xml:id="n1" pname="c" oct="4" dur="4"/>`),
       );
-      mf.updateElement(mf.api.editor.pitchDown("n1").note);
+      mf.updateBatch(mf.api.editor.pitchDown("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("B");
       expect(p.octave.value).toBe(3);
@@ -343,7 +343,7 @@ describe("MeiEditor.pitchDown", () => {
            <note xml:id="n1" pname="g" oct="4" dur="4"/>`,
         ),
       );
-      mf.updateElement(mf.api.editor.pitchDown("n1").note);
+      mf.updateBatch(mf.api.editor.pitchDown("n1"));
       const p = getPitch(mf, "n1");
       expect(p.step.name).toBe("F");
       expect(p.alter.value).toBe(0);
@@ -356,9 +356,9 @@ describe("MeiEditor.pitchDown", () => {
       const mf = MeiFriend.fromXmlString(
         makeMei("1s", "major", `<note xml:id="n1" pname="g" oct="4" dur="4"/>`),
       );
-      const result = mf.api.editor.pitchDown("n1");
-      expect(result.note.getChildElement("accid")).toBeUndefined();
-      expect(result.note.getAttribute("accid.ges")).toBe("s");
+      const [note] = mf.api.editor.pitchDown("n1");
+      expect(note.getChildElement("accid")).toBeUndefined();
+      expect(note.getAttribute("accid.ges")).toBe("s");
     });
 
     it("removes an existing <accid> child from the source note on pitchDown", () => {
@@ -372,10 +372,10 @@ describe("MeiEditor.pitchDown", () => {
            </note>`,
         ),
       );
-      const result = mf.api.editor.pitchDown("n1");
-      expect(result.note.getChildElement("accid")).toBeUndefined();
-      expect(result.note.getAttribute("pname")).toBe("b");
-      expect(result.note.getAttribute("oct")).toBe("3");
+      const [note] = mf.api.editor.pitchDown("n1");
+      expect(note.getChildElement("accid")).toBeUndefined();
+      expect(note.getAttribute("pname")).toBe("b");
+      expect(note.getAttribute("oct")).toBe("3");
     });
   });
 });
@@ -383,9 +383,9 @@ describe("MeiEditor.pitchDown", () => {
 // ------------------------------------------------------------------ contextual accidental corrections
 
 describe("MeiEditor contextual accidental corrections", () => {
-  it("|(#)C C| in C Major: subsequent note's accid.ges cleared after source moves", () => {
+  it("|(#)C C| in C Major: immediately following note gets printed accidental to preserve pitch", () => {
     // C#4 (printed) followed by C4 carrying over the sharp (accid.ges="s", no <accid> child).
-    // After pitchUp(n1), n1 moves to D4 and n2 should revert to C♮4.
+    // After pitchUp(n1), n1 moves to D4. To preserve n2 as C#4, it now needs a printed sharp.
     const mf = MeiFriend.fromXmlString(
       makeMei(
         "0",
@@ -396,18 +396,19 @@ describe("MeiEditor contextual accidental corrections", () => {
          <note xml:id="n2" pname="c" oct="4" dur="4" accid.ges="s"/>`,
       ),
     );
-    const result = mf.api.editor.pitchUp("n1");
-    expect(result.note.getAttribute("pname")).toBe("d");
-    expect(result.accidentalCorrections).toHaveLength(1);
-    expect(result.accidentalCorrections[0].id).toBe("n2");
-    expect(
-      result.accidentalCorrections[0].element.getAttribute("accid.ges"),
-    ).toBeUndefined();
+    const [note, correction] = mf.api.editor.pitchUp("n1");
+    expect(note.getAttribute("pname")).toBe("d");
+    expect(correction).toBeDefined();
+    expect(correction.id).toBe("n2");
+    expect(correction.getChildElement("accid")?.getAttribute("accid")).toBe(
+      "s",
+    );
+    expect(correction.getAttribute("accid.ges")).toBe("s");
   });
 
-  it("|(#)D (♮)D| in C Major: cancellation accid removed from subsequent note", () => {
-    // D#4 (printed) followed by D♮4 (cancellation accid). After pitchUp(n1),
-    // n1 moves to E4 and n2's natural sign is redundant — remove it.
+  it("|(#)D (♮)D| in C Major: no correction needed when subsequent note already has printed accidental", () => {
+    // D#4 (printed) followed by D♮4 (printed natural). After pitchUp(n1),
+    // n1 moves to E4. n2 is still D♮4 and already has its printed natural.
     const mf = MeiFriend.fromXmlString(
       makeMei(
         "0",
@@ -420,18 +421,13 @@ describe("MeiEditor contextual accidental corrections", () => {
          </note>`,
       ),
     );
-    const result = mf.api.editor.pitchUp("n1");
-    expect(result.accidentalCorrections).toHaveLength(1);
-    expect(result.accidentalCorrections[0].id).toBe("n2");
-    expect(
-      result.accidentalCorrections[0].element.getChildElement("accid"),
-    ).toBeUndefined();
+    const elements = mf.api.editor.pitchUp("n1");
+    expect(elements).toHaveLength(1);
   });
 
   it("does not correct a note with an independent accidental", () => {
     // G Major (F#). n1 = F#4 (redundant courtesy sharp printed).
-    // n2 = F♮4 with printed natural — this is an independent accidental (♮ ≠ key F#),
-    // not a cancellation of n1's effect. After moving n1, n2 is left unchanged.
+    // n2 = F♮4 with printed natural. After moving n1, n2 is left unchanged.
     const mf = MeiFriend.fromXmlString(
       makeMei(
         "1s",
@@ -444,8 +440,8 @@ describe("MeiEditor contextual accidental corrections", () => {
          </note>`,
       ),
     );
-    const result = mf.api.editor.pitchUp("n1");
-    expect(result.accidentalCorrections).toHaveLength(0);
+    const elements = mf.api.editor.pitchUp("n1");
+    expect(elements).toHaveLength(1); // Just the moved note
   });
 
   it("returns no corrections when the source note has no printed <accid> child", () => {
@@ -459,8 +455,150 @@ describe("MeiEditor contextual accidental corrections", () => {
          <note xml:id="n2" pname="c" oct="4" dur="4"/>`,
       ),
     );
-    const result = mf.api.editor.pitchUp("n1");
-    expect(result.accidentalCorrections).toHaveLength(0);
+    const elements = mf.api.editor.pitchUp("n1");
+    expect(elements).toHaveLength(1); // Just the moved note
+  });
+
+  it("|(#)C C| in C Major: pitchDown also triggers contextual correction", () => {
+    // C#4 (printed) followed by C4 carry-over. pitchDown(n1) moves n1 to B3.
+    // n2 should get a printed sharp to stay C#4.
+    const mf = MeiFriend.fromXmlString(
+      makeMei(
+        "0",
+        "major",
+        `<note xml:id="n1" pname="c" oct="4" dur="4" accid.ges="s">
+           <accid xml:id="a1" accid="s"/>
+         </note>
+         <note xml:id="n2" pname="c" oct="4" dur="4" accid.ges="s"/>`,
+      ),
+    );
+    const [note, correction] = mf.api.editor.pitchDown("n1");
+    expect(note.getAttribute("pname")).toBe("b");
+    expect(note.getAttribute("oct")).toBe("3");
+    expect(correction).toBeDefined();
+    expect(correction.id).toBe("n2");
+    expect(correction.getChildElement("accid")?.getAttribute("accid")).toBe(
+      "s",
+    );
+  });
+});
+
+// ------------------------------------------------------------------ pitchOctaveUp
+
+describe("MeiEditor.pitchOctaveUp", () => {
+  it("moves C4 up to C5 in C Major (no accidental added)", () => {
+    const mf = MeiFriend.fromXmlString(
+      makeMei("0", "major", `<note xml:id="n1" pname="c" oct="4" dur="4"/>`),
+    );
+    mf.updateBatch(mf.api.editor.pitchOctaveUp("n1"));
+    const p = getPitch(mf, "n1");
+    expect(p.step.name).toBe("C");
+    expect(p.octave.value).toBe(5);
+    expect(p.alter.value).toBe(0);
+    expect(mf.getElementById("n1")?.getChildElement("accid")).toBeUndefined();
+  });
+
+  it("moves C#4 up to C#5 in C Major (printed accidental added)", () => {
+    const mf = MeiFriend.fromXmlString(
+      makeMei(
+        "0",
+        "major",
+        `<note xml:id="n1" pname="c" oct="4" dur="4" accid.ges="s">
+           <accid accid="s"/>
+         </note>`,
+      ),
+    );
+    mf.updateBatch(mf.api.editor.pitchOctaveUp("n1"));
+    const p = getPitch(mf, "n1");
+    expect(p.step.name).toBe("C");
+    expect(p.octave.value).toBe(5);
+    expect(p.alter.value).toBe(1);
+    expect(
+      mf.getElementById("n1")?.getChildElement("accid")?.getAttribute("accid"),
+    ).toBe("s");
+  });
+
+  it("moves C#4 up to C#5 in D Major (no printed accidental needed)", () => {
+    const mf = MeiFriend.fromXmlString(
+      makeMei(
+        "2s",
+        "major",
+        `<note xml:id="n1" pname="c" oct="4" dur="4" accid.ges="s"/>`,
+      ),
+    );
+    mf.updateBatch(mf.api.editor.pitchOctaveUp("n1"));
+    const p = getPitch(mf, "n1");
+    expect(p.step.name).toBe("C");
+    expect(p.octave.value).toBe(5);
+    expect(p.alter.value).toBe(1);
+    expect(mf.getElementById("n1")?.getChildElement("accid")).toBeUndefined();
+  });
+
+  it("removes printed accidental when moving to a position that follows key sig", () => {
+    // F♮4 (printed) in C Major (where F is natural) moved to F♮5
+    const mf = MeiFriend.fromXmlString(
+      makeMei(
+        "0",
+        "major",
+        `<note xml:id="n1" pname="f" oct="4" dur="4">
+           <accid accid="n"/>
+         </note>`,
+      ),
+    );
+    mf.updateBatch(mf.api.editor.pitchOctaveUp("n1"));
+    const p = getPitch(mf, "n1");
+    expect(p.step.name).toBe("F");
+    expect(p.octave.value).toBe(5);
+    expect(p.alter.value).toBe(0);
+    expect(mf.getElementById("n1")?.getChildElement("accid")).toBeUndefined();
+  });
+
+  it("triggers contextual corrections for subsequent notes", () => {
+    const mf = MeiFriend.fromXmlString(
+      makeMei(
+        "0",
+        "major",
+        `<note xml:id="n1" pname="c" oct="4" dur="4" accid.ges="s">
+           <accid accid="s"/>
+         </note>
+         <note xml:id="n2" pname="c" oct="4" dur="4" accid.ges="s"/>`,
+      ),
+    );
+    const [note, correction] = mf.api.editor.pitchOctaveUp("n1");
+    expect(note.getAttribute("oct")).toBe("5");
+    expect(correction).toBeDefined();
+    expect(correction.getChildElement("accid")?.getAttribute("accid")).toBe(
+      "s",
+    );
+  });
+});
+
+// ------------------------------------------------------------------ pitchOctaveDown
+
+describe("MeiEditor.pitchOctaveDown", () => {
+  it("moves C4 down to C3 in C Major", () => {
+    const mf = MeiFriend.fromXmlString(
+      makeMei("0", "major", `<note xml:id="n1" pname="c" oct="4" dur="4"/>`),
+    );
+    mf.updateBatch(mf.api.editor.pitchOctaveDown("n1"));
+    const p = getPitch(mf, "n1");
+    expect(p.step.name).toBe("C");
+    expect(p.octave.value).toBe(3);
+  });
+
+  it("moves Eb4 down to Eb3 in Bb Major (no accidental added)", () => {
+    const mf = MeiFriend.fromXmlString(
+      makeMei(
+        "2f",
+        "major",
+        `<note xml:id="n1" pname="e" oct="4" dur="4" accid.ges="f"/>`,
+      ),
+    );
+    mf.updateBatch(mf.api.editor.pitchOctaveDown("n1"));
+    const p = getPitch(mf, "n1");
+    expect(p.step.name).toBe("E");
+    expect(p.alter.value).toBe(-1);
+    expect(mf.getElementById("n1")?.getChildElement("accid")).toBeUndefined();
   });
 });
 

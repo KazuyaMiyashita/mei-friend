@@ -14,6 +14,10 @@ export interface ApplicationContextValue {
   redo: () => void;
   pitchUp: () => void;
   pitchDown: () => void;
+  pitchOctaveUp: () => void;
+  pitchOctaveDown: () => void;
+  pitchChromaticUp: () => void;
+  pitchChromaticDown: () => void;
   nextBeat: () => void;
   nextEvent: () => void;
   prevBeat: () => void;
@@ -86,11 +90,8 @@ export function ApplicationProvider({
     const selectionId = focusedState?.selectionId;
     if (!focusedMeiFriend || !selectionId) return;
     try {
-      const result = focusedMeiFriend.api.editor.pitchUp(selectionId);
-      focusedMeiFriend.updateBatch([
-        result.note,
-        ...result.accidentalCorrections.map((c) => c.element),
-      ]);
+      const elements = focusedMeiFriend.api.editor.pitchUp(selectionId);
+      focusedMeiFriend.updateBatch(elements);
     } catch {
       // Ignore if element is not pitchable
     }
@@ -100,11 +101,54 @@ export function ApplicationProvider({
     const selectionId = focusedState?.selectionId;
     if (!focusedMeiFriend || !selectionId) return;
     try {
-      const result = focusedMeiFriend.api.editor.pitchDown(selectionId);
-      focusedMeiFriend.updateBatch([
-        result.note,
-        ...result.accidentalCorrections.map((c) => c.element),
-      ]);
+      const elements = focusedMeiFriend.api.editor.pitchDown(selectionId);
+      focusedMeiFriend.updateBatch(elements);
+    } catch {
+      // Ignore if element is not pitchable
+    }
+  }, [focusedMeiFriend, focusedState?.selectionId]);
+
+  const pitchOctaveUp = useCallback(() => {
+    const selectionId = focusedState?.selectionId;
+    if (!focusedMeiFriend || !selectionId) return;
+    try {
+      const elements = focusedMeiFriend.api.editor.pitchOctaveUp(selectionId);
+      focusedMeiFriend.updateBatch(elements);
+    } catch {
+      // Ignore if element is not pitchable
+    }
+  }, [focusedMeiFriend, focusedState?.selectionId]);
+
+  const pitchOctaveDown = useCallback(() => {
+    const selectionId = focusedState?.selectionId;
+    if (!focusedMeiFriend || !selectionId) return;
+    try {
+      const elements = focusedMeiFriend.api.editor.pitchOctaveDown(selectionId);
+      focusedMeiFriend.updateBatch(elements);
+    } catch {
+      // Ignore if element is not pitchable
+    }
+  }, [focusedMeiFriend, focusedState?.selectionId]);
+
+  const pitchChromaticUp = useCallback(() => {
+    const selectionId = focusedState?.selectionId;
+    if (!focusedMeiFriend || !selectionId) return;
+    try {
+      const elements =
+        focusedMeiFriend.api.editor.pitchChromaticUp(selectionId);
+      focusedMeiFriend.updateBatch(elements);
+    } catch {
+      // Ignore if element is not pitchable
+    }
+  }, [focusedMeiFriend, focusedState?.selectionId]);
+
+  const pitchChromaticDown = useCallback(() => {
+    const selectionId = focusedState?.selectionId;
+    if (!focusedMeiFriend || !selectionId) return;
+    try {
+      const elements =
+        focusedMeiFriend.api.editor.pitchChromaticDown(selectionId);
+      focusedMeiFriend.updateBatch(elements);
     } catch {
       // Ignore if element is not pitchable
     }
@@ -189,6 +233,10 @@ export function ApplicationProvider({
         redo,
         pitchUp,
         pitchDown,
+        pitchOctaveUp,
+        pitchOctaveDown,
+        pitchChromaticUp,
+        pitchChromaticDown,
         nextBeat,
         nextEvent,
         prevBeat,

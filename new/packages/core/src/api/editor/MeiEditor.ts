@@ -2,33 +2,30 @@ import type { MeiElement } from "../../MeiElement.js";
 import type { MeiFriend } from "../../MeiFriend.js";
 import { MeiNote } from "../../mei/elements/events/MeiNote.js";
 import {
+  Interval,
+  IntervalNumber,
   IntervalStep,
   IPN,
-  type IPNAlter,
+  IPNAlter,
+  IPNStep,
   Key,
+  Octave,
   type Offset,
+  Pitch,
 } from "../../models/index.js";
 import type { EventModel } from "../../models/score.js";
 import type { MeiApi } from "../MeiApi.js";
 
-export interface AccidentalCorrection {
-  readonly id: string;
-  readonly element: MeiElement;
-}
-
-export interface PitchMoveResult {
-  readonly note: MeiElement;
-  readonly accidentalCorrections: ReadonlyArray<AccidentalCorrection>;
-}
-
 /**
  * Provides pitch-editing operations for `<note>` elements.
  *
- * All methods return a **`PitchMoveResult`** — they do not modify the document.
+ * All methods return an array of `MeiElement`s — they do not modify the document.
+ * The returned array contains the moved note and any notes that required
+ * contextual accidental corrections.
  * Apply the result with:
  * ```ts
- * const result = editor.pitchUp(noteId);
- * meiFriend.updateBatch([result.note, ...result.accidentalCorrections.map(c => c.element)]);
+ * const elements = editor.pitchUp(noteId);
+ * meiFriend.updateBatch(elements);
  * ```
  */
 export class MeiEditor {
@@ -40,10 +37,6 @@ export class MeiEditor {
   /**
    * Returns all events in the specified measure and staff whose diatonic staff
    * position equals `targetPos`, sorted by offset ascending.
-   *
-   * Unlike the former `ScoreModel.eventsAtStaffPosition`, this method fetches
-   * the staff position from the live MEI document via `meiFriend.getElementById`
-   * on each event, keeping ScoreModel free of note-specific computed fields.
    */
   private eventsAtPosition(
     measureIndex: number,
@@ -106,14 +99,13 @@ export class MeiEditor {
   }
 
   /**
-   * Finds subsequent notes in the same measure and staff that need their
-   * accidentals updated after the source note (which had a printed accidental)
-   * has been moved away from `oldPos`.
+   * Finds the immediately following note in the same measure and staff that
+   * may need an accidental added after the source note (which had a printed
+   * accidental) has been moved away from `oldPos`.
    *
-   * Returns corrections in temporal order.  Scanning stops as soon as an
-   * independent accidental is encountered — one whose alter differs from the
-   * key-signature default — because that note establishes a new accidental
-   * context for later notes.
+   * Only the immediately following note at `oldPos` is checked. If it has no
+   * printed accidental, and its current pitch differs from the key-signature
+   * default, a printed accidental is added to it to preserve its musical pitch.
    *
    * @param oldPos - The staff position the source note is leaving (IntervalStep from C4).
    * @param key    - The key signature in effect for the source note's staff.
@@ -123,7 +115,7 @@ export class MeiEditor {
     oldPos: IntervalStep,
     key: Key,
     pos: { measureIndex: number; staffN: number; offset: Offset },
-  ): AccidentalCorrection[] {
+  ): MeiElement[] {
     const keyAlter = key
       .diatonicScalePitch(oldPos)
       .internationalPitchNotation().alter;
@@ -134,44 +126,31 @@ export class MeiEditor {
       oldPos,
     ).filter((e) => e.offset.compareTo(pos.offset) > 0);
 
-    const corrections: AccidentalCorrection[] = [];
-    for (const event of candidates) {
-      const el = this.meiFriend.getElementById(event.id);
-      if (!el) continue;
-      const note = MeiNote.create(el);
-      if (!note) continue;
+    if (candidates.length === 0) return [];
 
-      if (!note.hasPrintedAccidental) {
-        // Was relying on carry-over from the moved note → revert to key sig
-        const corrected = this.meiFriend.produceElement(
-          el,
-          MeiNote.applyGesturalAccidRecipe(keyAlter),
-        );
-        corrections.push({ id: event.id, element: corrected });
-      } else {
-        // Has printed accidental — check if it cancels the moved note's effect
-        const pitch = note.pitch;
-        if (!pitch) break;
-        const intPitch = IPN.fromPitch(pitch);
-        if (intPitch.alter.value === keyAlter.value) {
-          // Cancellation accidental — now redundant, remove it
-          const corrected = this.meiFriend.produceElement(
-            el,
-            MeiNote.applyKeyDefaultAccidRecipe(keyAlter),
-          );
-          corrections.push({ id: event.id, element: corrected });
-          break;
-        } else {
-          // Independent accidental — establishes its own context, stop scanning
-          break;
-        }
-      }
+    const event = candidates[0];
+    const el = this.meiFriend.getElementById(event.id);
+    if (!el) return [];
+    const note = MeiNote.create(el);
+    if (!note || note.hasPrintedAccidental) return [];
+
+    const pitch = note.pitch;
+    if (!pitch) return [];
+    const ipn = IPN.fromPitch(pitch);
+
+    if (ipn.alter.value !== keyAlter.value) {
+      // Needs a printed accidental to maintain its pitch
+      const corrected = this.meiFriend.produceElement(
+        el,
+        MeiNote.applyPitchRecipe(ipn, ipn.alter),
+      );
+      return [corrected];
     }
 
-    return corrections;
+    return [];
   }
 
-  private transpose(noteId: string, step: IntervalStep): PitchMoveResult {
+  private transpose(noteId: string, step: IntervalStep): MeiElement[] {
     const element = this.meiFriend.getElementById(noteId);
     if (!element) throw new Error(`Element "${noteId}" not found`);
     const note = MeiNote.create(element);
@@ -216,11 +195,171 @@ export class MeiEditor {
 
     // TODO: If a note is tied to the next note, that note also moves.
 
-    return { note: updatedNote, accidentalCorrections };
+    return [updatedNote, ...accidentalCorrections];
+  }
+
+  private transposeByInterval(
+    noteId: string,
+    interval: Interval,
+  ): MeiElement[] {
+    const element = this.meiFriend.getElementById(noteId);
+    if (!element) throw new Error(`Element "${noteId}" not found`);
+    const note = MeiNote.create(element);
+    if (!note) throw new Error(`Element "${noteId}" is not a <note>`);
+    const currentPitch = note.pitch;
+    if (!currentPitch) throw new Error(`Note "${noteId}" has no pitch`);
+
+    // Staff positions: IntervalStep from C4 (C4=0, D4=1, …, B4=6, C5=7, B3=−1).
+    const sourcePos = currentPitch.asInterval().step();
+    const targetPitch = currentPitch.add(interval);
+    const targetPos = targetPitch.asInterval().step();
+    const targetIpn = targetPitch.internationalPitchNotation();
+
+    const scoreModel = this.meiFriend.getScoreModel();
+    const pos = scoreModel.getPositionById(noteId);
+    const key =
+      pos && "offset" in pos
+        ? this.meiApi.getKeyAt(pos)
+        : (this.meiApi.getInitialKeyForStaff(1) ?? Key.parse("C Major"));
+
+    const precedingAlter = this.findPrecedingAccid(targetPos, noteId);
+    const expectedAlter =
+      precedingAlter ??
+      key.diatonicScalePitch(targetPos).internationalPitchNotation().alter;
+
+    const needsPrintedAccid = targetIpn.alter.value !== expectedAlter.value;
+
+    const updatedNote = this.meiFriend.produceElement(
+      note,
+      MeiNote.applyPitchRecipe(
+        targetIpn,
+        needsPrintedAccid ? targetIpn.alter : undefined,
+      ),
+    );
+
+    // If the moving note had a printed accidental, subsequent notes in the
+    // measure may have been relying on its carry-over effect.
+    const accidentalCorrections =
+      note.hasPrintedAccidental && pos && "staffN" in pos && "offset" in pos
+        ? this.findContextualAccidUpdates(sourcePos, key, {
+            measureIndex: pos.measureIndex,
+            staffN: pos.staffN,
+            offset: pos.offset,
+          })
+        : [];
+
+    return [updatedNote, ...accidentalCorrections];
+  }
+
+  private transposeChromatic(
+    noteId: string,
+    direction: "up" | "down",
+  ): MeiElement[] {
+    const element = this.meiFriend.getElementById(noteId);
+    if (!element) throw new Error(`Element "${noteId}" not found`);
+    const note = MeiNote.create(element);
+    if (!note) throw new Error(`Element "${noteId}" is not a <note>`);
+    const currentPitch = note.pitch;
+    if (!currentPitch) throw new Error(`Note "${noteId}" has no pitch`);
+
+    const sourcePos = currentPitch.asInterval().step();
+
+    // 1. Calculate target PitchNumber
+    const stepVal = direction === "up" ? 1 : -1;
+    const targetNum = currentPitch.num().add(new IntervalNumber(stepVal));
+
+    // 2. Generate candidates with alter in [-1, 0, 1]
+    const candidates: Pitch[] = [];
+    for (const step of IPNStep.values()) {
+      for (const alterVal of [-1, 0, 1]) {
+        const noteName = IPN.toNoteName(step, new IPNAlter(alterVal));
+        const remainder = targetNum.value - noteName.value * 7;
+        if (remainder % 12 === 0) {
+          const octaveVal = remainder / 12;
+          candidates.push(new Pitch(new Octave(octaveVal), noteName));
+        }
+      }
+    }
+
+    if (candidates.length === 0) {
+      throw new Error(
+        `Could not find a valid enharmonic spelling for PitchNumber ${targetNum.value}`,
+      );
+    }
+
+    // 3. Select the best candidate based on rules
+    const scoreModel = this.meiFriend.getScoreModel();
+    const pos = scoreModel.getPositionById(noteId);
+    const key =
+      pos && "offset" in pos
+        ? this.meiApi.getKeyAt(pos)
+        : (this.meiApi.getInitialKeyForStaff(1) ?? Key.parse("C Major"));
+
+    const diatonicNoteNameValues = new Set(
+      Array.from(
+        { length: 7 },
+        (_, i) =>
+          Key.calculateScalePitch(key.tonic.value, key.mode.offset, i).fifth,
+      ),
+    );
+
+    let targetPitch: Pitch | undefined;
+
+    // Priority 1: Diatonic in key
+    targetPitch = candidates.find((p) =>
+      diatonicNoteNameValues.has(p.noteName.value),
+    );
+
+    // Priority 2: Natural
+    if (!targetPitch) {
+      targetPitch = candidates.find((p) => IPN.fromPitch(p).alter.value === 0);
+    }
+
+    // Priority 3: Sharp for UP, Flat for DOWN
+    if (!targetPitch) {
+      const preferredAlter = direction === "up" ? 1 : -1;
+      targetPitch = candidates.find(
+        (p) => IPN.fromPitch(p).alter.value === preferredAlter,
+      );
+    }
+
+    // Fallback: Just take the first one
+    if (!targetPitch) {
+      targetPitch = candidates[0];
+    }
+
+    const targetPos = targetPitch.asInterval().step();
+    const targetIpn = targetPitch.internationalPitchNotation();
+
+    const precedingAlter = this.findPrecedingAccid(targetPos, noteId);
+    const expectedAlter =
+      precedingAlter ??
+      key.diatonicScalePitch(targetPos).internationalPitchNotation().alter;
+
+    const needsPrintedAccid = targetIpn.alter.value !== expectedAlter.value;
+
+    const updatedNote = this.meiFriend.produceElement(
+      note,
+      MeiNote.applyPitchRecipe(
+        targetIpn,
+        needsPrintedAccid ? targetIpn.alter : undefined,
+      ),
+    );
+
+    const accidentalCorrections =
+      note.hasPrintedAccidental && pos && "staffN" in pos && "offset" in pos
+        ? this.findContextualAccidUpdates(sourcePos, key, {
+            measureIndex: pos.measureIndex,
+            staffN: pos.staffN,
+            offset: pos.offset,
+          })
+        : [];
+
+    return [updatedNote, ...accidentalCorrections];
   }
 
   /**
-   * Returns a `PitchMoveResult` with the pitch raised by one diatonic step
+   * Returns an array of `MeiElement`s with the pitch raised by one diatonic step
    * (e.g. C→D, E→F, B→C in the octave above).
    *
    * **Pitch of the resulting note**
@@ -241,29 +380,18 @@ export class MeiEditor {
    *    `<keySig>` within the staff's `<staffDef>`). For example, raising E4 in
    *    G major (one sharp) produces F♯4, because F is sharp in that key.
    *
-   * **No printed accidental on the result.**
-   * The returned note never contains a `<accid>` child element, and any
-   * `<accid>` child present on the original note is removed. The gestural
-   * accidental (`accid.ges`) is updated to reflect the resolved pitch when
-   * the note is not natural, and removed otherwise.
+   * Following these rules, the resulting note contains no printed accidental.
    *
-   * **Contextual accidental corrections.**
-   * If the source note carried a printed accidental (`<accid>` child), notes
-   * later in the same measure at the same staff position may have been relying
-   * on its carry-over effect. `accidentalCorrections` lists updated versions
-   * of those notes:
-   * - A note with no `<accid>` child (relying on carry-over) gets its
-   *   `accid.ges` reverted to the key-signature default.
-   * - A note whose printed accidental equals the key-signature default
-   *   (a cancellation that is now redundant) has its `<accid>` child removed.
-   * - Scanning stops at the first note with an independent accidental (one
-   *   whose alter differs from the key-signature default).
+   * Contextual accidental corrections:
+   * Only the moving note's pitch is modified. However, if the moving note had a printed
+   * accidental, the immediately following note at the same staff position in the measure
+   * may require a new accidental to be added. This correction is handled automatically.
    *
    * @param noteId - The `xml:id` of the `<note>` element to move.
-   * @returns A `PitchMoveResult` with the updated note and any contextual corrections.
+   * @returns An array of updated `MeiElement`s, including the moved note and any contextual corrections.
    * @throws If the element is not found or is not a `<note>` with a pitch.
    */
-  pitchUp(noteId: string): PitchMoveResult {
+  pitchUp(noteId: string): MeiElement[] {
     return this.transpose(noteId, new IntervalStep(1));
   }
 
@@ -273,10 +401,73 @@ export class MeiEditor {
    * All pitch-resolution, accidental, and contextual-correction rules are identical.
    *
    * @param noteId - The `xml:id` of the `<note>` element to move.
-   * @returns A `PitchMoveResult` with the updated note and any contextual corrections.
+   * @returns An array of updated `MeiElement`s, including the moved note and any contextual corrections.
    * @throws If the element is not found or is not a `<note>` with a pitch.
    */
-  pitchDown(noteId: string): PitchMoveResult {
+  pitchDown(noteId: string): MeiElement[] {
     return this.transpose(noteId, new IntervalStep(-1));
+  }
+
+  /**
+   * Returns an array of `MeiElement`s with the pitch raised by one octave
+   * (Perfect 8th).
+   *
+   * Unlike {@link pitchUp}, this operation preserves the original pitch's
+   * accidental alteration (e.g., C#4 → C#5). A printed accidental is added
+   * or removed as necessary based on the key signature and preceding notes
+   * at the target staff position.
+   *
+   * Contextual accidental corrections for subsequent notes are handled
+   * identically to {@link pitchUp}.
+   *
+   * @param noteId - The `xml:id` of the `<note>` element to move.
+   * @returns An array of updated `MeiElement`s, including the moved note and any contextual corrections.
+   * @throws If the element is not found or is not a `<note>` with a pitch.
+   */
+  pitchOctaveUp(noteId: string): MeiElement[] {
+    return this.transposeByInterval(noteId, Interval.P8);
+  }
+
+  /**
+   * Equivalent to {@link pitchOctaveUp}, but moves the note down by one octave
+   * (e.g., C#4 → C#3).
+   *
+   * @param noteId - The `xml:id` of the `<note>` element to move.
+   * @returns An array of updated `MeiElement`s, including the moved note and any contextual corrections.
+   * @throws If the element is not found or is not a `<note>` with a pitch.
+   */
+  pitchOctaveDown(noteId: string): MeiElement[] {
+    return this.transposeByInterval(noteId, Interval.P8.abs().mul(-1));
+  }
+
+  /**
+   * Returns an array of `MeiElement`s with the pitch raised chromatically
+   * (by one semitone).
+   *
+   * Enharmonic spelling is chosen based on:
+   * 1. The pitch being in the current key signature.
+   * 2. The pitch being natural (no accidental).
+   * 3. The pitch being sharp (since we are raising the pitch).
+   *
+   * @param noteId - The `xml:id` of the `<note>` element to move.
+   * @returns An array of updated `MeiElement`s, including the moved note and any contextual corrections.
+   * @throws If the element is not found or is not a `<note>` with a pitch.
+   */
+  pitchChromaticUp(noteId: string): MeiElement[] {
+    return this.transposeChromatic(noteId, "up");
+  }
+
+  /**
+   * Equivalent to {@link pitchChromaticUp}, but lowers the pitch chromatically
+   * (by one semitone).
+   *
+   * Enharmonic spelling prioritizes flat accidentals as a fallback instead of sharp.
+   *
+   * @param noteId - The `xml:id` of the `<note>` element to move.
+   * @returns An array of updated `MeiElement`s, including the moved note and any contextual corrections.
+   * @throws If the element is not found or is not a `<note>` with a pitch.
+   */
+  pitchChromaticDown(noteId: string): MeiElement[] {
+    return this.transposeChromatic(noteId, "down");
   }
 }

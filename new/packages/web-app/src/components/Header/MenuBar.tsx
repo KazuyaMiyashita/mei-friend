@@ -129,6 +129,10 @@ export default function MenuBar() {
     redo,
     pitchUp,
     pitchDown,
+    pitchOctaveUp,
+    pitchOctaveDown,
+    pitchChromaticUp,
+    pitchChromaticDown,
     nextBeat,
     nextEvent,
     prevBeat,
@@ -218,6 +222,15 @@ export default function MenuBar() {
       >
         {item("Pitch Up", "⌥ ↑", pitchUp, !hasFocusedNote)}
         {item("Pitch Down", "⌥ ↓", pitchDown, !hasFocusedNote)}
+        {item("Pitch Octave Up", "⌥ ⌘ ↑", pitchOctaveUp, !hasFocusedNote)}
+        {item("Pitch Octave Down", "⌥ ⌘ ↓", pitchOctaveDown, !hasFocusedNote)}
+        {item("Pitch Chromatic Up", "⌥ ⇧ ↑", pitchChromaticUp, !hasFocusedNote)}
+        {item(
+          "Pitch Chromatic Down",
+          "⌥ ⇧ ↓",
+          pitchChromaticDown,
+          !hasFocusedNote,
+        )}
       </Dropdown>
 
       <Dropdown
