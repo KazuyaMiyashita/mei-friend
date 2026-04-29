@@ -35,6 +35,12 @@ import { ROOT_WRAPPER_TAG, XmlSerde } from "./utils/XmlSerde.js";
  * This class encapsulates Yjs for real-time collaboration and undo/redo support.
  */
 export class MeiFriend {
+  /**
+   * A unique, in-memory identifier for this MeiFriend instance.
+   * This ID is used by applications to identify and track the instance across different
+   * contexts (e.g., UI panels, state management) and is not persisted within the MEI document itself.
+   */
+  public readonly meiFriendId: string;
   /** The underlying Yjs document. */
   private readonly doc: Y.Doc;
   /** Manager for undo/redo history. */
@@ -54,7 +60,12 @@ export class MeiFriend {
   /** Handles XML serialization and deserialization. */
   private readonly serde: XmlSerde;
 
-  constructor(doc?: Y.Doc, idGenerator?: IdGenerator) {
+  constructor(doc?: Y.Doc, idGenerator?: IdGenerator, meiFriendId?: string) {
+    this.meiFriendId =
+      meiFriendId ??
+      (typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).substring(2, 15));
     this.doc = doc ?? new Y.Doc();
     this.idGenerator = idGenerator ?? new IdGenerator();
     this.serde = new XmlSerde(this.idGenerator);
@@ -77,14 +88,16 @@ export class MeiFriend {
    * Creates a new MeiFriend instance from an MEI XML string.
    * @param xmlString The MEI XML string to parse.
    * @param idGenerator Optional custom ID generator.
+   * @param meiFriendId Optional custom in-memory ID.
    * @returns A new MeiFriend instance.
    * @throws {Error} If the provided XML string is not well-formed.
    */
   public static fromXmlString(
     xmlString: string,
     idGenerator?: IdGenerator,
+    meiFriendId?: string,
   ): MeiFriend {
-    const instance = new MeiFriend(undefined, idGenerator);
+    const instance = new MeiFriend(undefined, idGenerator, meiFriendId);
     instance.replaceXmlString(xmlString);
     // Clear undo history after initial load
     instance.undoManager.clear();

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useFocusedMeiFriend } from "../context/FocusContext";
+import { useFocusedMeiFriend } from "../context/MeiFriendRegistryContext";
 
 interface GlobalKeyboardProps {
   onSave?: () => void;
@@ -11,8 +11,12 @@ export function useGlobalKeyboard({
   onSave,
   onOpen,
   onNew,
-}: GlobalKeyboardProps = {}) {
-  const { focusedMeiFriend, canUndo, canRedo } = useFocusedMeiFriend();
+}: GlobalKeyboardProps) {
+  const {
+    meiFriend: focusedMeiFriend,
+    canUndo,
+    canRedo,
+  } = useFocusedMeiFriend();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

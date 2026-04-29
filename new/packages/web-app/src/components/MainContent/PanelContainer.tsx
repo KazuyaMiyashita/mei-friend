@@ -2,7 +2,6 @@ import { pointerIntersection } from "@dnd-kit/collision";
 import { useDroppable } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { useCallback, useState } from "react";
-import { useWorkspaceContext } from "../../context/WorkspaceContext";
 import ContextMenu, { type ContextMenuItem } from "../ui/ContextMenu";
 import styles from "./PanelContainer.module.css";
 import CodeMirrorPanel from "./panels/codemirror/CodeMirrorPanel";
@@ -20,21 +19,19 @@ function renderPanelContent(panel: Panel) {
   return <CodeMirrorPanel panelId={panel.id} meiFriendId={panel.meiFriendId} />;
 }
 
+import { useMeiFriend } from "../../context/MeiFriendRegistryContext";
+
 // ── PanelTabLabel ─────────────────────────────────────────────────────────
 
 function PanelTabLabel({ panel }: { panel: Panel }) {
-  const { workspace } = useWorkspaceContext();
+  const { state } = useMeiFriend(panel.meiFriendId);
 
   let fileName = "—";
-  if (panel.meiFriendId) {
-    if (panel.meiFriendId.source === "workspace") {
-      const entry = workspace.entries.find(
-        (e) => e.id === panel.meiFriendId?.id,
-      );
-      fileName = entry?.path.split("/").pop() ?? "—";
-    } else {
-      fileName = `Shared: ${panel.meiFriendId.id.slice(0, 8)}…`;
-    }
+  if (panel.meiFriendId && state) {
+    fileName =
+      state.source === "live-share" ? `Shared: ${state.name}` : state.name;
+  } else if (panel.imagePath) {
+    fileName = panel.imagePath.split("/").pop() ?? "Image";
   }
 
   if (panel.type === "verovio")
@@ -44,9 +41,16 @@ function PanelTabLabel({ panel }: { panel: Panel }) {
         {fileName}
       </>
     );
+  if (panel.type === "codemirror")
+    return (
+      <>
+        <span className={styles.tabTypeIcon}>&lt;/&gt;</span>
+        {fileName}
+      </>
+    );
   return (
     <>
-      <span className={styles.tabTypeIcon}>&lt;/&gt;</span>
+      <span className={styles.tabTypeIcon}>🖼️</span>
       {fileName}
     </>
   );

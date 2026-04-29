@@ -6,46 +6,53 @@ import {
   useEffect,
   useState,
 } from "react";
+import { useMeiFriendRegistry } from "./MeiFriendRegistryContext";
 import { useWorkspaceContext } from "./WorkspaceContext";
 
-interface SharedMeiFriend {
-  meiFriend: MeiFriend;
+interface SharedMeiFriendInfo {
+  meiFriendId: string;
   name: string;
 }
 
 interface LiveShareContextValue {
   currentRoomId: string | null;
-  sharedMeiFriends: Map<string, SharedMeiFriend>;
+  sharedMeiFriends: Map<string, SharedMeiFriendInfo>;
   joinRoom: (roomId: string) => Promise<void>;
   leaveRoom: () => void;
   sendToLiveShare: (meiFriend: MeiFriend, name: string) => Promise<string>;
   addToWorkspace: (id: string) => Promise<void>;
-  loadLiveShareMeiFriendIfNeeded: (id: string) => Promise<void>;
 }
 
 const LiveShareContext = createContext<LiveShareContextValue | null>(null);
 
 export function LiveShareProvider({ children }: { children: React.ReactNode }) {
   const { workspace } = useWorkspaceContext();
+  const { registerMeiFriend, registry } = useMeiFriendRegistry();
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [sharedMeiFriends, setSharedMeiFriends] = useState<
-    Map<string, SharedMeiFriend>
+    Map<string, SharedMeiFriendInfo>
   >(new Map());
 
-  const joinRoom = useCallback(async (roomId: string) => {
-    console.log(`Mock: Joining room ${roomId}`);
-    setCurrentRoomId(roomId);
+  const joinRoom = useCallback(
+    async (roomId: string) => {
+      console.log(`Mock: Joining room ${roomId}`);
+      setCurrentRoomId(roomId);
 
-    // Mock: if it's a specific mock ID, add a sample MeiFriend
-    if (roomId.startsWith("mock-")) {
-      const mf = MeiFriend.fromXmlString(
-        '<mei xmlns="http://www.music-encoding.org/ns/mei"></mei>',
-      );
-      setSharedMeiFriends(
-        new Map([[roomId, { meiFriend: mf, name: "Shared Score" }]]),
-      );
-    }
-  }, []);
+      // Mock: if it's a specific mock ID, add a sample MeiFriend
+      if (roomId.startsWith("mock-")) {
+        const mf = MeiFriend.fromXmlString(
+          '<mei xmlns="http://www.music-encoding.org/ns/mei"></mei>',
+        );
+        registerMeiFriend(mf, { name: "Shared Score", source: "live-share" });
+        setSharedMeiFriends(
+          new Map([
+            [roomId, { meiFriendId: mf.meiFriendId, name: "Shared Score" }],
+          ]),
+        );
+      }
+    },
+    [registerMeiFriend],
+  );
 
   // Mock: join room from URL parameter on mount
   useEffect(() => {
@@ -71,14 +78,18 @@ export function LiveShareProvider({ children }: { children: React.ReactNode }) {
       // In a real implementation, we would sync with y-websocket here.
       // For now, just add to local mock state.
       const copy = MeiFriend.fromXmlString(meiFriend.toXmlString());
+      registerMeiFriend(copy, { name, source: "live-share" });
       setSharedMeiFriends((prev) =>
-        new Map(prev).set(roomId, { meiFriend: copy, name }),
+        new Map(prev).set(roomId, {
+          meiFriendId: copy.meiFriendId,
+          name,
+        }),
       );
       setCurrentRoomId(roomId);
 
       return roomId;
     },
-    [],
+    [registerMeiFriend],
   );
 
   const addToWorkspace = useCallback(
@@ -86,22 +97,26 @@ export function LiveShareProvider({ children }: { children: React.ReactNode }) {
       const shared = sharedMeiFriends.get(id);
       if (!shared) return;
 
+      const sharedMf = registry.get(shared.meiFriendId);
+      if (!sharedMf) return;
+
       console.log(`Mock: Adding ${shared.name} to workspace`);
       const path = `shared/${shared.name}.mei`;
       workspace.addFile(path, "memory");
-      workspace.loadMeiContent(path, shared.meiFriend.toXmlString());
-    },
-    [sharedMeiFriends, workspace],
-  );
 
-  const loadLiveShareMeiFriendIfNeeded = useCallback(
-    async (id: string) => {
-      // In real implementation, this might fetch from server if not in Y.Doc
-      if (!sharedMeiFriends.has(id)) {
-        console.warn(`Mock: MeiFriend ${id} not found in Live Share`);
-      }
+      // Create a local copy for the workspace
+      const localMf = MeiFriend.fromXmlString(sharedMf.toXmlString());
+      registerMeiFriend(localMf, { name: shared.name, source: "workspace" });
+
+      workspace.updateEntry(path, {
+        meiFriendId: localMf.meiFriendId,
+      });
+
+      localMf.onUpdate(() => {
+        workspace.updateEntry(path, { isDirty: true });
+      });
     },
-    [sharedMeiFriends],
+    [sharedMeiFriends, workspace, registry, registerMeiFriend],
   );
 
   const value: LiveShareContextValue = {
@@ -111,7 +126,6 @@ export function LiveShareProvider({ children }: { children: React.ReactNode }) {
     leaveRoom,
     sendToLiveShare,
     addToWorkspace,
-    loadLiveShareMeiFriendIfNeeded,
   };
 
   return (

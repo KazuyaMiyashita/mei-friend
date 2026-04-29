@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useFocus } from "../../../context/FocusContext";
+import { useFocusedContent } from "../../../context/FocusedPanelContext";
 import {
   useWorkspace,
   useWorkspaceContext,
@@ -15,7 +15,7 @@ interface WorkspacePanelProps {
 export default function WorkspacePanel({ onOpenFile }: WorkspacePanelProps) {
   const { name, entries } = useWorkspace();
   const { workspaceStorage } = useWorkspaceContext();
-  const { focusedLocation } = useFocus();
+  const focusedContent = useFocusedContent();
 
   const handleFileClick = useCallback(
     (id: string) => {
@@ -24,8 +24,7 @@ export default function WorkspacePanel({ onOpenFile }: WorkspacePanelProps) {
     [onOpenFile],
   );
 
-  const activeId =
-    focusedLocation?.source === "workspace" ? focusedLocation.id : null;
+  const activeId = focusedContent?.id ?? null;
 
   return (
     <section

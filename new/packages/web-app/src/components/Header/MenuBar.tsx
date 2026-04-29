@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { useFocus, useFocusedMeiFriend } from "../../context/FocusContext";
-import { useLiveShare } from "../../context/LiveShareContext";
-import { useWorkspaceContext } from "../../context/WorkspaceContext";
+import { useApplication } from "../../context/ApplicationContext";
+import { useAppSettings } from "../../context/AppSettingsContext";
+import { useFocusedMeiFriend } from "../../context/MeiFriendRegistryContext";
 import styles from "./Header.module.css";
 
 function useDropdownState() {
@@ -111,75 +111,31 @@ function MenuLine() {
   return <hr className={styles.dropdownLine} />;
 }
 
-interface MenuBarProps {
-  onOpenFile?: () => void;
-  onOpenWorkspace?: () => void;
-  onSaveWorkspace?: () => void;
-}
-
-export default function MenuBar({
-  onOpenFile,
-  onOpenWorkspace,
-  onSaveWorkspace,
-}: MenuBarProps) {
+export default function MenuBar() {
   const { openId, handleClick, handleHover, close } = useDropdownState();
   const {
-    focusedMeiFriend,
-    focusedSelectionId,
-    focusedLocation,
+    meiFriend: focusedMeiFriend,
+    state: focusedState,
     canUndo,
     canRedo,
   } = useFocusedMeiFriend();
-  const { workspace } = useWorkspaceContext();
-  const { navigateEnabled, setNavigateEnabled } = useFocus();
+  const { navigateEnabled, setNavigateEnabled } = useAppSettings();
 
-  const { sendToLiveShare, addToWorkspace } = useLiveShare();
+  const {
+    openFilePicker,
+    openWorkspace,
+    saveWorkspace,
+    pitchUp,
+    pitchDown,
+    sendToLiveShare,
+    addToWorkspace,
+  } = useApplication();
 
+  const focusedSelectionId = focusedState?.selectionId;
   const hasFocusedNote = !!(focusedMeiFriend && focusedSelectionId);
 
-  const handlePitchUp = useCallback(() => {
-    if (!focusedMeiFriend || !focusedSelectionId) return;
-    try {
-      const result = focusedMeiFriend.api.editor.pitchUp(focusedSelectionId);
-      focusedMeiFriend.updateBatch([
-        result.note,
-        ...result.accidentalCorrections.map((c) => c.element),
-      ]);
-    } catch {
-      // ignore if element is not a note
-    }
-  }, [focusedMeiFriend, focusedSelectionId]);
-
-  const handlePitchDown = useCallback(() => {
-    if (!focusedMeiFriend || !focusedSelectionId) return;
-    try {
-      const result = focusedMeiFriend.api.editor.pitchDown(focusedSelectionId);
-      focusedMeiFriend.updateBatch([
-        result.note,
-        ...result.accidentalCorrections.map((c) => c.element),
-      ]);
-    } catch {
-      // ignore if element is not a note
-    }
-  }, [focusedMeiFriend, focusedSelectionId]);
-
-  const handleSendToLiveShare = useCallback(async () => {
-    if (focusedMeiFriend && focusedLocation?.source === "workspace") {
-      const entry = workspace.entries.find((e) => e.id === focusedLocation.id);
-      const name = entry?.path.split("/").pop() ?? "Untitled";
-      const roomId = await sendToLiveShare(focusedMeiFriend, name);
-      alert(
-        `Shared! Room ID: ${roomId}\nURL: ${window.location.origin}${window.location.pathname}?share=${roomId}`,
-      );
-    }
-  }, [focusedMeiFriend, focusedLocation, sendToLiveShare, workspace.entries]);
-
-  const handleAddToWorkspace = useCallback(async () => {
-    if (focusedLocation?.source === "live-share") {
-      await addToWorkspace(focusedLocation.id);
-      alert("Added to workspace!");
-    }
-  }, [focusedLocation, addToWorkspace]);
+  const isWorkspaceFile = focusedState?.source === "workspace";
+  const isSharedFile = focusedState?.source === "live-share";
 
   const item = (
     label: React.ReactNode,
@@ -208,11 +164,11 @@ export default function MenuBar({
         onClose={close}
       >
         {item("New file", "⌃N", () => {}, true)}
-        {item("Open files…", "⌘O", onOpenFile)}
-        {item("Open Workspace…", undefined, onOpenWorkspace)}
+        {item("Open files…", "⌘O", openFilePicker)}
+        {item("Open Workspace…", undefined, openWorkspace)}
         {item("Open URL…", undefined, () => {}, true)}
         <MenuLine />
-        {item("Save Workspace", "⌘S", onSaveWorkspace)}
+        {item("Save Workspace", "⌘S", saveWorkspace)}
         <MenuLine />
         {item("Public repertoire", undefined, () => {}, true)}
       </Dropdown>
@@ -249,8 +205,8 @@ export default function MenuBar({
         onHover={handleHover}
         onClose={close}
       >
-        {item("Pitch Up", "↑", handlePitchUp, !hasFocusedNote)}
-        {item("Pitch Down", "↓", handlePitchDown, !hasFocusedNote)}
+        {item("Pitch Up", "↑", pitchUp, !hasFocusedNote)}
+        {item("Pitch Down", "↓", pitchDown, !hasFocusedNote)}
       </Dropdown>
 
       <Dropdown
@@ -287,15 +243,10 @@ export default function MenuBar({
         {item(
           "Send to Live Share",
           undefined,
-          handleSendToLiveShare,
-          focusedLocation?.source !== "workspace",
+          sendToLiveShare,
+          !isWorkspaceFile,
         )}
-        {item(
-          "Add to Workspace",
-          undefined,
-          handleAddToWorkspace,
-          focusedLocation?.source !== "live-share",
-        )}
+        {item("Add to Workspace", undefined, addToWorkspace, !isSharedFile)}
       </Dropdown>
 
       <Dropdown

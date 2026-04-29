@@ -1,5 +1,5 @@
 import logoUrl from "../../assets/menu-logo.svg";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { usePersistedAppSettings } from "../../context/PersistedAppSettingsContext";
 import styles from "./Modals.module.css";
 
 interface SplashOverlayProps {
@@ -9,7 +9,7 @@ interface SplashOverlayProps {
 const VERSION = "6.0.0";
 
 export default function SplashOverlay({ onDismiss }: SplashOverlayProps) {
-  const { settings, updateSettings } = useAppSettings();
+  const { settings, updateSettings } = usePersistedAppSettings();
 
   return (
     <div className={styles.overlayBackdrop}>

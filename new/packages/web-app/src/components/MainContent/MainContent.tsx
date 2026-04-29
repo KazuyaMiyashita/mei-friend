@@ -1,6 +1,6 @@
 import { DragDropProvider } from "@dnd-kit/react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useFocus } from "../../context/FocusContext";
+import { useFocusedPanel } from "../../context/FocusedPanelContext";
 import { useWorkspaceContext } from "../../context/WorkspaceContext";
 import styles from "./MainContent.module.css";
 import SplitLayout from "./SplitLayout";
@@ -16,8 +16,8 @@ const INITIAL_STATE: LayoutState = {
 };
 
 export default function MainContent() {
-  const { registerPanelOpener, setFocusedLocation, setFocusedPanelId } =
-    useFocus();
+  const { registerPanelOpener, setFocusedPanelId, setPanelContent } =
+    useFocusedPanel();
   const { registerResetHandler } = useWorkspaceContext();
 
   const {
@@ -29,36 +29,48 @@ export default function MainContent() {
     movePanelToContainer,
     splitContainer,
     addNewPanelToContainer,
-    openOrActivateFile,
+    openOrActivateContent,
     openCodeMirrorForPanel,
   } = useLayout(INITIAL_STATE);
 
-  // Register the panel opener so WorkspacePanel can trigger it via context
+  // Register the panel opener so Sidebar panels can trigger it via context
   useEffect(() => {
-    const unregister = registerPanelOpener((location) => {
-      openOrActivateFile(location);
-      setFocusedLocation(location);
+    const unregister = registerPanelOpener((content) => {
+      openOrActivateContent(content);
     });
     return () => unregister();
-  }, [registerPanelOpener, openOrActivateFile, setFocusedLocation]);
+  }, [registerPanelOpener, openOrActivateContent]);
 
-  // When the workspace is replaced (Open Workspace), reset all panels and
-  // clear the focus so the UI starts from a clean slate.
+  // Sync FocusedPanelContext with our internal layout state
+  useEffect(() => {
+    setFocusedPanelId(layoutState.focusedPanelId);
+
+    // Sync all panel contents to context for other hooks (like useFocusedContent)
+    for (const [id, panel] of Object.entries(layoutState.panels)) {
+      if (panel.type === "verovio" || panel.type === "codemirror") {
+        setPanelContent(id, { type: "mei", id: panel.meiFriendId || "" });
+      } else if (panel.type === "image") {
+        setPanelContent(id, { type: "image", id: panel.imagePath || "" });
+      }
+    }
+  }, [
+    layoutState.focusedPanelId,
+    layoutState.panels,
+    setFocusedPanelId,
+    setPanelContent,
+  ]);
+
+  // When the workspace is replaced (Open Workspace), reset all panels
   useEffect(() => {
     const unregister = registerResetHandler(() => {
       setLayoutState(INITIAL_STATE);
-      setFocusedLocation(null);
     });
     return () => unregister();
-  }, [registerResetHandler, setLayoutState, setFocusedLocation]);
+  }, [registerResetHandler, setLayoutState]);
 
   // Synchronously update on render to prevent stale closures in DnD handlers
   const layoutStateRef = useRef(layoutState);
   layoutStateRef.current = layoutState;
-
-  useEffect(() => {
-    setFocusedPanelId(layoutState.focusedPanelId);
-  }, [layoutState.focusedPanelId, setFocusedPanelId]);
 
   // ── Panel DnD ────────────────────────────────────────────────────────────
 
@@ -74,12 +86,8 @@ export default function MainContent() {
   const handleActivate = useCallback(
     (panelId: string, containerId: string) => {
       setActivePanel(panelId, containerId);
-      const panel = layoutState.panels[panelId];
-      if (panel?.meiFriendId) {
-        setFocusedLocation(panel.meiFriendId);
-      }
     },
-    [setActivePanel, layoutState.panels, setFocusedLocation],
+    [setActivePanel],
   );
 
   // ── Callbacks ────────────────────────────────────────────────────────

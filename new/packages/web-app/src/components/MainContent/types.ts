@@ -1,11 +1,10 @@
-import type { MeiFriendLocation } from "../../context/FocusContext";
-
-export type PanelType = "verovio" | "codemirror";
+export type PanelType = "verovio" | "codemirror" | "image";
 
 export interface Panel {
   id: string;
   type: PanelType;
-  meiFriendId: MeiFriendLocation | null;
+  meiFriendId: string | null;
+  imagePath?: string;
 }
 
 export interface SplitLayoutNode {

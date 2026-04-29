@@ -1,8 +1,8 @@
-import { useAppSettings } from "../../../context/AppSettingsContext";
+import { usePersistedAppSettings } from "../../../context/PersistedAppSettingsContext";
 import panelStyles from "../Panel.module.css";
 
 export default function SettingsPanel() {
-  const { settings, updateSettings } = useAppSettings();
+  const { settings, updateSettings } = usePersistedAppSettings();
 
   return (
     <section className={panelStyles.panelContaioner} aria-label="Settings">

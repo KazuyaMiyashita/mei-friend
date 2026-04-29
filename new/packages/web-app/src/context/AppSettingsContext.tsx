@@ -1,30 +1,8 @@
-import { createContext, useCallback, useContext, useState } from "react";
-
-export type AppSettings = {
-  showSplash: boolean;
-};
-
-const DEFAULT_SETTINGS: AppSettings = { showSplash: true };
-const SETTINGS_KEY = "mei-friend:settings";
-
-function loadSettings(): AppSettings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw)
-      return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as AppSettings) };
-  } catch {
-    // Ignore malformed JSON — fall back to defaults.
-  }
-  return DEFAULT_SETTINGS;
-}
-
-function persistSettings(s: AppSettings): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-}
+import { createContext, useContext, useState } from "react";
 
 interface AppSettingsContextValue {
-  settings: AppSettings;
-  updateSettings: (patch: Partial<AppSettings>) => void;
+  navigateEnabled: boolean;
+  setNavigateEnabled: (enabled: boolean) => void;
 }
 
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
@@ -34,18 +12,12 @@ export function AppSettingsProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [settings, setSettings] = useState<AppSettings>(loadSettings);
-
-  const updateSettings = useCallback((patch: Partial<AppSettings>) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...patch };
-      persistSettings(next);
-      return next;
-    });
-  }, []);
+  const [navigateEnabled, setNavigateEnabled] = useState(false);
 
   return (
-    <AppSettingsContext.Provider value={{ settings, updateSettings }}>
+    <AppSettingsContext.Provider
+      value={{ navigateEnabled, setNavigateEnabled }}
+    >
       {children}
     </AppSettingsContext.Provider>
   );

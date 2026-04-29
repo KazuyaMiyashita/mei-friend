@@ -3,15 +3,11 @@ import {
   VerovioCanvas,
   type VerovioCanvasHandle,
 } from "@mei-friend/lib-verovio-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { VerovioOptions } from "verovio";
-import {
-  getLocationKey,
-  type MeiFriendLocation,
-  useFocus,
-  useFocusedMeiFriend,
-  useMeiFriend,
-} from "../../../../context/FocusContext";
+import { useAppSettings } from "../../../../context/AppSettingsContext";
+import { useFocusedPanel } from "../../../../context/FocusedPanelContext";
+import { useMeiFriend } from "../../../../context/MeiFriendRegistryContext";
 import { useVerovioKeyboard } from "../../../../hooks/useVerovioKeyboard";
 import styles from "./VerovioPanel.module.css";
 import { VerovioPanelFooter } from "./VerovioPanelFooter";
@@ -19,28 +15,17 @@ import { VerovioPanelHeader } from "./VerovioPanelHeader";
 
 interface Props {
   panelId: string;
-  meiFriendId: MeiFriendLocation | null;
+  meiFriendId: string | null;
 }
 
 export default function VerovioPanel({ panelId, meiFriendId }: Props) {
-  const { setFocusedLocation, setFocusedPanelId, selections, navigateEnabled } =
-    useFocus();
-  const { setFocusedSelectionId } = useFocusedMeiFriend();
+  const { setFocusedPanelId } = useFocusedPanel();
+  const { navigateEnabled } = useAppSettings();
 
-  const meiFriend = useMeiFriend(meiFriendId);
+  const { meiFriend, state, setSelection } = useMeiFriend(meiFriendId);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
-  const selectionState = useMemo(() => {
-    if (!meiFriendId) return { selectionId: null, origin: null };
-    return (
-      selections[getLocationKey(meiFriendId)] ?? {
-        selectionId: null,
-        origin: null,
-      }
-    );
-  }, [meiFriendId, selections]);
 
   const [cursor, setCursor] = useState<Cursor | null>(null);
   const [fitMode, setFitMode] = useState<"off" | "width" | "height">("width");
@@ -62,11 +47,11 @@ export default function VerovioPanel({ panelId, meiFriendId }: Props) {
 
   // React to external selection if Navigate is enabled
   useEffect(() => {
-    if (navigateEnabled) {
-      if (selectionState.selectionId) {
-        if (selectionState.origin !== "verovio") {
-          setVerovioHighlightId(selectionState.selectionId);
-          verovioCanvasRef.current?.scrollToElement(selectionState.selectionId);
+    if (navigateEnabled && state) {
+      if (state.selectionId) {
+        if (state.selectionOrigin !== "verovio") {
+          setVerovioHighlightId(state.selectionId);
+          verovioCanvasRef.current?.scrollToElement(state.selectionId);
         } else {
           setVerovioHighlightId(null);
         }
@@ -74,7 +59,7 @@ export default function VerovioPanel({ panelId, meiFriendId }: Props) {
     } else {
       setVerovioHighlightId(null);
     }
-  }, [navigateEnabled, selectionState]);
+  }, [navigateEnabled, state]);
 
   const handleSelectionChange = useCallback(
     (id: string | null) => {
@@ -83,32 +68,28 @@ export default function VerovioPanel({ panelId, meiFriendId }: Props) {
         if (newCursor) setCursor(newCursor);
       }
       if (meiFriendId) {
-        setFocusedLocation(meiFriendId);
-        setFocusedSelectionId(id, "verovio");
+        setSelection(id, "verovio");
       }
     },
-    [meiFriend, meiFriendId, setFocusedLocation, setFocusedSelectionId],
+    [meiFriend, meiFriendId, setSelection],
   );
 
   const handlePanelClick = useCallback(() => {
     if (meiFriendId) {
-      setFocusedLocation(meiFriendId);
       setFocusedPanelId(panelId);
     }
-  }, [meiFriendId, panelId, setFocusedLocation, setFocusedPanelId]);
+  }, [meiFriendId, panelId, setFocusedPanelId]);
 
   useVerovioKeyboard(panelId, meiFriendId, cursor, setCursor, (id) => {
-    if (meiFriendId) setFocusedSelectionId(id, "verovio");
+    if (meiFriendId) setSelection(id, "verovio");
   });
 
   if (!meiFriendId) {
     return <div className={styles.placeholder}>No file selected</div>;
   }
 
-  if (!meiFriend) {
-    return (
-      <div className={styles.placeholder}>Loading "{meiFriendId.id}"…</div>
-    );
+  if (!meiFriend || !state) {
+    return <div className={styles.placeholder}>Loading "{meiFriendId}"…</div>;
   }
 
   return (
@@ -133,7 +114,7 @@ export default function VerovioPanel({ panelId, meiFriendId }: Props) {
           options={vrvOptions}
           currentPage={currentPage}
           fitMode={fitMode}
-          selectedId={selectionState.selectionId}
+          selectedId={state.selectionId}
           highlightId={verovioHighlightId}
           cursor={cursor}
           onSelectionChange={handleSelectionChange}
@@ -142,7 +123,7 @@ export default function VerovioPanel({ panelId, meiFriendId }: Props) {
       </div>
       <VerovioPanelFooter
         cursor={cursor}
-        selectedId={selectionState.selectionId}
+        selectedId={state.selectionId}
         meiFriend={meiFriend}
       />
     </div>

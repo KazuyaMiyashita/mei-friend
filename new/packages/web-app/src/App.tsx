@@ -17,11 +17,17 @@ import MainContent from "./components/MainContent/MainContent";
 import DragOverlay from "./components/Modals/DragOverlay";
 import SplashOverlay from "./components/Modals/SplashOverlay";
 import {
-  AppSettingsProvider,
-  useAppSettings,
-} from "./context/AppSettingsContext";
-import { FocusProvider, useFocus } from "./context/FocusContext";
+  ApplicationProvider,
+  useApplication,
+} from "./context/ApplicationContext";
+import { AppSettingsProvider } from "./context/AppSettingsContext";
+import { FocusedPanelProvider } from "./context/FocusedPanelContext";
 import { LiveShareProvider } from "./context/LiveShareContext";
+import { MeiFriendRegistryProvider } from "./context/MeiFriendRegistryContext";
+import {
+  PersistedAppSettingsProvider,
+  usePersistedAppSettings,
+} from "./context/PersistedAppSettingsContext";
 import {
   useWorkspaceContext,
   WorkspaceProvider,
@@ -35,9 +41,9 @@ function AppContent() {
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
 
-  const { openMeiFriendInPanel } = useFocus();
+  const { openContent } = useApplication();
   const { addFilesFromFileList } = useWorkspaceContext();
-  const { settings } = useAppSettings();
+  const { settings } = usePersistedAppSettings();
   const [showSplash, setShowSplash] = useState(() => settings.showSplash);
 
   const toggleSidebar = useCallback((panel: SidebarPanel) => {
@@ -48,18 +54,11 @@ function AppContent() {
     setShowSplash(false);
   }, []);
 
-  const handleOpenWorkspaceFile = useCallback(
+  const handleOpenFile = useCallback(
     (id: string) => {
-      openMeiFriendInPanel({ source: "workspace", id });
+      openContent({ type: "mei", id });
     },
-    [openMeiFriendInPanel],
-  );
-
-  const handleOpenLiveShareFile = useCallback(
-    (id: string) => {
-      openMeiFriendInPanel({ source: "live-share", id });
-    },
-    [openMeiFriendInPanel],
+    [openContent],
   );
 
   useGlobalKeyboard({
@@ -106,8 +105,8 @@ function AppContent() {
       const addedEntries = await addFilesFromFileList(files);
       // Open the first MEI file added
       const firstMei = addedEntries.find((e) => e.type === "MEI");
-      if (firstMei) {
-        openMeiFriendInPanel({ source: "workspace", id: firstMei.id });
+      if (firstMei?.meiFriendId) {
+        openContent({ type: "mei", id: firstMei.meiFriendId });
       }
     };
 
@@ -121,7 +120,7 @@ function AppContent() {
       window.removeEventListener("dragover", onDragOver);
       window.removeEventListener("drop", onDrop as unknown as EventListener);
     };
-  }, [addFilesFromFileList, openMeiFriendInPanel]);
+  }, [addFilesFromFileList, openContent]);
 
   return (
     <>
@@ -146,10 +145,10 @@ function AppContent() {
                 maxSize={"40%"}
               >
                 {activeSidebar === "workspace" && (
-                  <WorkspacePanel onOpenFile={handleOpenWorkspaceFile} />
+                  <WorkspacePanel onOpenFile={handleOpenFile} />
                 )}
                 {activeSidebar === "live-share" && (
-                  <LiveSharePanel onOpenFile={handleOpenLiveShareFile} />
+                  <LiveSharePanel onOpenFile={handleOpenFile} />
                 )}
                 {activeSidebar === "settings" && <SettingsPanel />}
               </Panel>
@@ -169,14 +168,20 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AppSettingsProvider>
-      <WorkspaceProvider>
-        <LiveShareProvider>
-          <FocusProvider>
-            <AppContent />
-          </FocusProvider>
-        </LiveShareProvider>
-      </WorkspaceProvider>
-    </AppSettingsProvider>
+    <PersistedAppSettingsProvider>
+      <AppSettingsProvider>
+        <MeiFriendRegistryProvider>
+          <WorkspaceProvider>
+            <LiveShareProvider>
+              <FocusedPanelProvider>
+                <ApplicationProvider>
+                  <AppContent />
+                </ApplicationProvider>
+              </FocusedPanelProvider>
+            </LiveShareProvider>
+          </WorkspaceProvider>
+        </MeiFriendRegistryProvider>
+      </AppSettingsProvider>
+    </PersistedAppSettingsProvider>
   );
 }

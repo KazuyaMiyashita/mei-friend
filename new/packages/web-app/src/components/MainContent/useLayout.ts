@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { MeiFriendLocation } from "../../context/FocusContext";
+import type { PanelContent } from "../../context/FocusedPanelContext";
 import type {
   LayoutNode,
   LayoutState,
@@ -10,15 +10,6 @@ import type {
 
 export function uniqueId(prefix = "container"): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function locationsMatch(
-  a: MeiFriendLocation | null,
-  b: MeiFriendLocation | null,
-): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return a.source === b.source && a.id === b.id;
 }
 
 function mapLayout(
@@ -256,14 +247,19 @@ export function useLayout(initialState: LayoutState) {
     });
   }, []);
 
-  /** Opens a notation panel for the given location, or activates an existing one. */
-  const openOrActivateFile = useCallback((location: MeiFriendLocation) => {
+  /** Opens a panel for the given content, or activates an existing one. */
+  const openOrActivateContent = useCallback((content: PanelContent) => {
     setLayoutState((state) => {
-      // Look for an existing notation panel for this location
-      const existingPanelId = Object.entries(state.panels).find(
-        ([, p]) =>
-          locationsMatch(p.meiFriendId, location) && p.type === "verovio",
-      )?.[0];
+      // Look for an existing panel for this content
+      const existingPanelId = Object.entries(state.panels).find(([, p]) => {
+        if (content.type === "mei") {
+          return p.meiFriendId === content.id && p.type === "verovio";
+        }
+        if (content.type === "image") {
+          return p.imagePath === content.id && p.type === "image";
+        }
+        return false;
+      })?.[0];
 
       if (existingPanelId && state.layout) {
         const containerId = findContainerForPanel(
@@ -278,12 +274,13 @@ export function useLayout(initialState: LayoutState) {
         }
       }
 
-      // Create a new verovio panel
+      // Create a new panel
       const panelId = uniqueId("panel");
       const newPanel: Panel = {
         id: panelId,
-        type: "verovio",
-        meiFriendId: location,
+        type: content.type === "mei" ? "verovio" : "image",
+        meiFriendId: content.type === "mei" ? content.id : null,
+        imagePath: content.type === "image" ? content.id : undefined,
       };
       const panels = { ...state.panels, [panelId]: newPanel };
 
@@ -355,7 +352,7 @@ export function useLayout(initialState: LayoutState) {
     movePanelToContainer,
     splitContainer,
     addNewPanelToContainer,
-    openOrActivateFile,
+    openOrActivateContent,
     openCodeMirrorForPanel,
   };
 }

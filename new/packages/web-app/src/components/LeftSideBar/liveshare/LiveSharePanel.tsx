@@ -1,4 +1,4 @@
-import { useFocus } from "../../../context/FocusContext";
+import { useFocusedContent } from "../../../context/FocusedPanelContext";
 import { useLiveShare } from "../../../context/LiveShareContext";
 import panelStyles from "../Panel.module.css";
 import styles from "./LiveSharePanel.module.css";
@@ -9,7 +9,7 @@ interface LiveSharePanelProps {
 
 export default function LiveSharePanel({ onOpenFile }: LiveSharePanelProps) {
   const { currentRoomId, sharedMeiFriends, leaveRoom } = useLiveShare();
-  const { focusedLocation } = useFocus();
+  const focusedContent = useFocusedContent();
 
   return (
     <section className={panelStyles.panelContaioner} aria-label="Live Share">
@@ -51,9 +51,7 @@ export default function LiveSharePanel({ onOpenFile }: LiveSharePanelProps) {
             <div className={panelStyles.panelSectionContent}>
               <ul className={styles.fileList}>
                 {Array.from(sharedMeiFriends.entries()).map(([id, shared]) => {
-                  const isActive =
-                    focusedLocation?.source === "live-share" &&
-                    focusedLocation.id === id;
+                  const isActive = focusedContent?.id === id;
                   return (
                     // biome-ignore lint/a11y/useKeyWithClickEvents: file selection
                     <li

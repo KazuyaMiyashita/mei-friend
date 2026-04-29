@@ -1,12 +1,8 @@
 import type { EditorCursorInfo, SyncState } from "@mei-friend/lib-codemirror";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  getLocationKey,
-  type MeiFriendLocation,
-  useFocus,
-  useFocusedMeiFriend,
-  useMeiFriend,
-} from "../../../../context/FocusContext";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useAppSettings } from "../../../../context/AppSettingsContext";
+import { useFocusedPanel } from "../../../../context/FocusedPanelContext";
+import { useMeiFriend } from "../../../../context/MeiFriendRegistryContext";
 import { CodeMirrorEditor, type CodeMirrorEditorRef } from "./CodeMirrorEditor";
 import styles from "./CodeMirrorPanel.module.css";
 import { CodeMirrorPanelFooter } from "./CodeMirrorPanelFooter";
@@ -14,36 +10,24 @@ import { CodeMirrorPanelHeader } from "./CodeMirrorPanelHeader";
 
 interface Props {
   panelId: string;
-  meiFriendId: MeiFriendLocation | null;
+  meiFriendId: string | null;
 }
 
 export default function CodeMirrorPanel({ panelId, meiFriendId }: Props) {
-  const { setFocusedLocation, setFocusedPanelId, selections, navigateEnabled } =
-    useFocus();
-  const { setFocusedSelectionId } = useFocusedMeiFriend();
+  const { setFocusedPanelId } = useFocusedPanel();
+  const { navigateEnabled } = useAppSettings();
 
-  const meiFriend = useMeiFriend(meiFriendId);
+  const { meiFriend, state, setSelection } = useMeiFriend(meiFriendId);
 
   const [syncState, setSyncState] = useState<SyncState>({ status: "idle" });
   const [cursorInfo, setCursorInfo] = useState<EditorCursorInfo | null>(null);
   const editorRef = useRef<CodeMirrorEditorRef>(null);
 
-  const selectionState = useMemo(() => {
-    if (!meiFriendId) return { selectionId: null, origin: null };
-    return (
-      selections[getLocationKey(meiFriendId)] ?? {
-        selectionId: null,
-        origin: null,
-      }
-    );
-  }, [meiFriendId, selections]);
-
   const handleClick = useCallback(() => {
     if (meiFriendId) {
-      setFocusedLocation(meiFriendId);
       setFocusedPanelId(panelId);
     }
-  }, [meiFriendId, panelId, setFocusedLocation, setFocusedPanelId]);
+  }, [meiFriendId, panelId, setFocusedPanelId]);
 
   const handleApply = useCallback(() => {
     editorRef.current?.apply();
@@ -61,20 +45,19 @@ export default function CodeMirrorPanel({ panelId, meiFriendId }: Props) {
     (info: EditorCursorInfo) => {
       setCursorInfo(info);
       if (meiFriendId && info.xmlId) {
-        setFocusedLocation(meiFriendId);
-        setFocusedSelectionId(info.xmlId, "codemirror");
+        setSelection(info.xmlId, "codemirror");
       }
     },
-    [meiFriendId, setFocusedLocation, setFocusedSelectionId],
+    [meiFriendId, setSelection],
   );
 
   // React to external selection if Navigate is enabled
   useEffect(() => {
-    if (navigateEnabled) {
-      if (selectionState.selectionId) {
-        if (selectionState.origin !== "codemirror") {
-          editorRef.current?.highlightElement(selectionState.selectionId);
-          editorRef.current?.navigateTo(selectionState.selectionId);
+    if (navigateEnabled && state) {
+      if (state.selectionId) {
+        if (state.selectionOrigin !== "codemirror") {
+          editorRef.current?.highlightElement(state.selectionId);
+          editorRef.current?.navigateTo(state.selectionId);
         } else {
           editorRef.current?.highlightElement(null);
         }
@@ -82,7 +65,7 @@ export default function CodeMirrorPanel({ panelId, meiFriendId }: Props) {
     } else {
       editorRef.current?.highlightElement(null);
     }
-  }, [navigateEnabled, selectionState]);
+  }, [navigateEnabled, state]);
 
   if (!meiFriendId) {
     return (
@@ -92,11 +75,11 @@ export default function CodeMirrorPanel({ panelId, meiFriendId }: Props) {
     );
   }
 
-  if (!meiFriend) {
+  if (!meiFriend || !state) {
     return (
       <div className={styles.panel}>
         <div className={styles.welcomeContent}>
-          Loading MEI content for "{meiFriendId.id}"…
+          Loading MEI content for "{meiFriendId}"…
         </div>
       </div>
     );

@@ -11,7 +11,7 @@
  */
 
 import type { WorkspaceEntry, WorkspaceSnapshot } from "@mei-friend/core";
-import { MeiFriendWorkspace } from "@mei-friend/core";
+import { MeiFriend, MeiFriendWorkspace } from "@mei-friend/core";
 import {
   createContext,
   useCallback,
@@ -21,70 +21,18 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useMeiFriendRegistry } from "./MeiFriendRegistryContext";
 
 // ── Context interface ─────────────────────────────────────────────────────────
 
 interface WorkspaceContextValue {
   workspace: MeiFriendWorkspace;
-
-  /**
-   * Ensures MEI content is loaded for the given path.
-   * For "workspace" origin files this performs a lazy read from the FSA root
-   * directory. All other origins are loaded eagerly at add-time, so this is
-   * a no-op for them.
-   */
-  loadFileIfNeeded: (id: string) => Promise<void>;
-
-  /**
-   * Opens a native file picker (FSA showOpenFilePicker or <input> fallback).
-   * Files are added as "loose" origin — the originals are never overwritten.
-   * Content is loaded immediately since there is no directory handle for later.
-   */
-  addFilesFromPicker: () => Promise<void>;
-
-  /**
-   * Adds an array of File objects (e.g. from drag-drop) to the workspace.
-   * Files are registered as "loose" and their content is loaded immediately.
-   */
-  addFilesFromFileList: (files: File[]) => Promise<WorkspaceEntry[]>;
-
-  /**
-   * Opens a directory as the workspace via FSA showDirectoryPicker.
-   * If a workspace is already open and has unsaved changes, the user is prompted
-   * before discarding. On confirmation the existing workspace is closed (panels
-   * reset via the registered reset handler) before the new directory is loaded.
-   * Files are registered as "workspace" origin without loading content —
-   * content is lazy-loaded on first panel access via loadFileIfNeeded().
-   */
-  openWorkspaceFromDirectory: () => Promise<void>;
-
-  /**
-   * Saves all dirty entries to the workspace root directory.
-   *
-   * - Entries with origin "workspace" that have been edited are overwritten
-   *   in their original location within the directory.
-   * - Entries with other origins (loose / memory / remote) are written to the
-   *   root directory for the first time. After writing they are no longer dirty.
-   *
-   * If no root directory is set yet, the user is prompted to pick one via
-   * showDirectoryPicker before any writes occur.
-   */
-  saveWorkspace: () => Promise<void>;
-
-  /**
-   * Where the workspace is currently stored.
-   * - "memory"  No root directory — files live only in browser memory.
-   * - "local"   Backed by a FileSystemDirectoryHandle (local disk via FSA).
-   * Reserved: "remote" for future URL-workspace support.
-   */
   workspaceStorage: "memory" | "local";
-
-  /**
-   * Registers a callback that is invoked when the workspace is replaced
-   * (Open Workspace on an already-open workspace). Used by MainContent to
-   * reset the panel layout. Returns a cleanup function.
-   */
-  registerResetHandler: (fn: () => void) => () => void;
+  openWorkspaceFromDirectory: () => Promise<readonly WorkspaceEntry[]>;
+  saveWorkspace: () => Promise<void>;
+  addFilesFromPicker: () => Promise<readonly WorkspaceEntry[]>;
+  addFilesFromFileList: (files: File[]) => Promise<readonly WorkspaceEntry[]>;
+  registerResetHandler: (handler: () => void) => () => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -93,6 +41,8 @@ const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const workspaceRef = useRef(new MeiFriendWorkspace("New Workspace"));
+  const { registerMeiFriend, unregisterMeiFriend, registry } =
+    useMeiFriendRegistry();
 
   // The FSA root directory handle. When set, all file reads and writes
   // go through this handle instead of individual file handles.
@@ -126,48 +76,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
-  // ── Lazy loading ───────────────────────────────────────────────────────────
-
-  const loadFileIfNeeded = useCallback(
-    async (id: string): Promise<void> => {
-      const workspace = workspaceRef.current;
-      const entry = workspace.entries.find((e) => e.id === id);
-      if (!entry) return;
-
-      if (entry.meiFriend) return; // content already in memory
-
-      // Only "workspace" origin files can be read from the root directory handle.
-      // Loose / memory / remote files are always loaded at add-time.
-      const rootDir = rootDirHandle;
-      if (!rootDir || entry.origin !== "workspace") return;
-
-      try {
-        // Re-derive the file handle from the root — no need to store per-file handles.
-        const segments = entry.path.split("/");
-        const fileName = segments.pop();
-        if (!fileName) return;
-
-        let dir: FileSystemDirectoryHandle = rootDir;
-        for (const seg of segments) {
-          dir = await dir.getDirectoryHandle(seg);
-        }
-        const fileHandle = await dir.getFileHandle(fileName);
-        const file = await fileHandle.getFile();
-        workspace.loadMeiContent(entry.path, await file.text());
-      } catch (err) {
-        console.error(
-          `Failed to lazy-load "${entry.path}" from workspace directory:`,
-          err,
-        );
-      }
-    },
-    [rootDirHandle],
-  );
-
   // ── File add helpers ───────────────────────────────────────────────────────
 
   const addFilesFromFileList = useCallback(
-    async (files: File[]): Promise<WorkspaceEntry[]> => {
+    async (files: File[]): Promise<readonly WorkspaceEntry[]> => {
       const workspace = workspaceRef.current;
       const addedEntries: WorkspaceEntry[] = [];
       for (const file of files) {
@@ -177,7 +89,19 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           addedEntries.push(entry);
           if (entry.type === "MEI") {
             try {
-              workspace.loadMeiContent(file.name, await file.text());
+              const mf = MeiFriend.fromXmlString(
+                await file.text(),
+                undefined,
+                entry.meiFriendId,
+              );
+              registerMeiFriend(mf, { name: file.name, source: "workspace" });
+              workspace.updateEntry(entry.path, {
+                meiFriendId: mf.meiFriendId,
+              });
+
+              mf.onUpdate(() => {
+                workspace.updateEntry(entry.path, { isDirty: true });
+              });
             } catch (err) {
               console.error(`Failed to load "${file.name}":`, err);
             }
@@ -186,21 +110,28 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       }
       return addedEntries;
     },
-    [],
+    [registerMeiFriend],
   );
 
-  const addFilesFromPicker = useCallback(async (): Promise<void> => {
+  const addFilesFromPicker = useCallback(async (): Promise<
+    readonly WorkspaceEntry[]
+  > => {
     if (!("showOpenFilePicker" in window)) {
       // Fallback for browsers that do not support the File System Access API.
-      const input = document.createElement("input");
-      input.type = "file";
-      input.multiple = true;
-      input.accept = ".mei,.xml,.musicxml,.jpg,.jpeg,.png,.svg";
-      input.onchange = async () => {
-        if (input.files) await addFilesFromFileList(Array.from(input.files));
-      };
-      input.click();
-      return;
+      return new Promise<readonly WorkspaceEntry[]>((resolve) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.multiple = true;
+        input.accept = ".mei,.xml,.musicxml,.jpg,.jpeg,.png,.svg";
+        input.onchange = async () => {
+          if (input.files) {
+            resolve(await addFilesFromFileList(Array.from(input.files)));
+          } else {
+            resolve([]);
+          }
+        };
+        input.click();
+      });
     }
     try {
       // biome-ignore lint/suspicious/noExplicitAny: File System Access API not yet in TS lib
@@ -221,18 +152,21 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       // Intentionally NOT storing individual handles: the original files should
       // never be overwritten. On Save Workspace the content goes to rootDir.
       const files = await Promise.all(handles.map((h) => h.getFile()));
-      await addFilesFromFileList(files);
+      return await addFilesFromFileList(files);
     } catch (err) {
       if ((err as DOMException).name !== "AbortError") {
         console.error("Failed to open files:", err);
       }
+      return [];
     }
   }, [addFilesFromFileList]);
 
-  const openWorkspaceFromDirectory = useCallback(async (): Promise<void> => {
+  const openWorkspaceFromDirectory = useCallback(async (): Promise<
+    readonly WorkspaceEntry[]
+  > => {
     if (!("showDirectoryPicker" in window)) {
       alert("File System Access API is not supported in this browser.");
-      return;
+      return [];
     }
 
     const currentWorkspace = workspaceRef.current;
@@ -245,7 +179,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           "The current workspace has unsaved changes. Close it and open a new workspace anyway?",
         )
       ) {
-        return;
+        return [];
       }
     }
 
@@ -257,30 +191,60 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       if ((err as DOMException).name !== "AbortError") {
         console.error("Failed to open workspace directory:", err);
       }
-      return;
+      return [];
     }
 
     // Now that we have a new directory, discard the old workspace.
     // Reset the panel layout first, then destroy the workspace data.
     resetHandlerRef.current?.();
-    currentWorkspace.destroy();
+
+    for (const entry of currentWorkspace.entries) {
+      if (entry.meiFriendId) unregisterMeiFriend(entry.meiFriendId);
+    }
 
     const newWorkspace = new MeiFriendWorkspace(dirHandle.name);
     workspaceRef.current = newWorkspace;
     setRootDirHandle(dirHandle);
 
     // Recursively register all non-hidden files as "workspace" origin.
-    // Content is NOT loaded here — lazy-loaded on first panel access to
-    // avoid the cost of loading every file in a large directory upfront.
+    // Content is loaded immediately.
     async function collectFiles(
       handle: FileSystemDirectoryHandle,
       prefix: string,
     ) {
-      for await (const [name, entry] of handle.entries()) {
+      const entries: { name: string; handle: FileSystemHandle }[] = [];
+      // biome-ignore lint/suspicious/noExplicitAny: File System Access API not yet in TS lib
+      for await (const [name, entry] of (handle as any).entries()) {
         if (name.startsWith(".")) continue; // skip hidden files and directories
+        entries.push({ name, handle: entry });
+      }
+      entries.sort((a, b) => a.name.localeCompare(b.name));
+
+      for (const { name, handle: entry } of entries) {
         const filePath = prefix ? `${prefix}/${name}` : name;
         if (entry.kind === "file") {
-          newWorkspace.addFile(filePath, "workspace");
+          const addedEntry = newWorkspace.addFile(filePath, "workspace");
+          if (
+            addedEntry &&
+            addedEntry.type === "MEI" &&
+            addedEntry.meiFriendId
+          ) {
+            try {
+              const file = await (entry as FileSystemFileHandle).getFile();
+              const mf = MeiFriend.fromXmlString(
+                await file.text(),
+                undefined,
+                addedEntry.meiFriendId,
+              );
+              registerMeiFriend(mf, { name, source: "workspace" });
+
+              mf.onUpdate(() => {
+                newWorkspace.updateEntry(addedEntry.path, { isDirty: true });
+              });
+            } catch (err) {
+              console.error(`Failed to load "${filePath}":`, err);
+            }
+          }
         } else if (entry.kind === "directory") {
           await collectFiles(entry as FileSystemDirectoryHandle, filePath);
         }
@@ -289,10 +253,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
     try {
       await collectFiles(dirHandle, "");
+      // Trigger a re-render to reflect the new workspace
+      setRootDirHandle((prev) => prev); // force update
+      return newWorkspace.entries;
     } catch (err) {
       console.error("Failed to read workspace directory:", err);
+      return [];
     }
-  }, []);
+  }, [unregisterMeiFriend, registerMeiFriend]);
 
   // ── Save workspace ─────────────────────────────────────────────────────────
 
@@ -325,10 +293,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     const workspace = workspaceRef.current;
 
     for (const entry of workspace.entries) {
-      if (!entry.isDirty) continue; // up to date — skip
+      if (!entry.isDirty || !entry.meiFriendId) continue; // up to date or no content — skip
 
-      const mf = workspace.getMeiFriend(entry.path);
-      if (!mf) continue; // non-MEI or content not yet loaded — skip
+      const mf = registry.get(entry.meiFriendId);
+      if (!mf) continue; // content not found in registry — skip
 
       try {
         // Resolve nested path segments, creating intermediate directories if
@@ -350,13 +318,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         console.error(`Failed to save "${entry.path}":`, err);
       }
     }
-  }, [rootDirHandle]);
+  }, [rootDirHandle, registry.get]);
 
   // ── Context value ──────────────────────────────────────────────────────────
 
   const value: WorkspaceContextValue = {
     workspace: workspaceRef.current,
-    loadFileIfNeeded,
     addFilesFromPicker,
     addFilesFromFileList,
     openWorkspaceFromDirectory,
