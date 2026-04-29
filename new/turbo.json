@@ -33,6 +33,10 @@
       "dependsOn": ["build"],
       "cache": false,
       "persistent": true
+    },
+    "dev:server": {
+      "cache": false,
+      "persistent": true
     }
   }
 }

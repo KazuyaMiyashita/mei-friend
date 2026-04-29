@@ -18,7 +18,8 @@
     { "path": "./packages/lib-codemirror" },
     { "path": "./packages/lib-verovio-react" },
     { "path": "./packages/example-cli" },
-    { "path": "./packages/web-app" }
+    { "path": "./packages/web-app" },
+    { "path": "./packages/web-app-server" }
   ],
   "exclude": ["node_modules", "**/dist"]
 }

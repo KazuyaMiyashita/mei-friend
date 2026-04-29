@@ -17,6 +17,7 @@
     "test:e2e": "turbo run test:e2e",
     "test:e2e:ui": "turbo run test:e2e:ui",
     "preview": "turbo run preview --filter=@mei-friend/web-app",
+    "dev:server": "turbo run dev:server --filter=@mei-friend/web-app-server",
     "start:cli": "turbo run start --filter=@mei-friend/example-cli"
   },
   "devDependencies": {

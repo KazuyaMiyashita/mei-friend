@@ -1,0 +1,26 @@
+{
+  "name": "@mei-friend/web-app-server",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc -b",
+    "dev:server": "node --loader ts-node/esm src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -b --dry",
+    "clean": "tsc -b --clean",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write ."
+  },
+  "dependencies": {
+    "@hocuspocus/server": "^4.0.0",
+    "express": "^4.21.2",
+    "yjs": "^13.6.30"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "ts-node": "^10.9.2"
+  }
+}

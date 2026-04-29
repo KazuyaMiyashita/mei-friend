@@ -23,6 +23,8 @@
     "@codemirror/view": "^6.41.0",
     "@dnd-kit/collision": "^0.3.2",
     "@dnd-kit/react": "^0.3.2",
+    "@hocuspocus/provider": "^4.0.0",
+    "@hocuspocus/provider-react": "^4.0.0",
     "@mei-friend/core": "workspace:*",
     "@mei-friend/lib-codemirror": "workspace:*",
     "@mei-friend/lib-verovio-react": "workspace:*",
@@ -31,7 +33,8 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-resizable-panels": "^4.9.0",
-    "verovio": "^6.1.0"
+    "verovio": "^6.1.0",
+    "yjs": "^13.6.30"
   },
   "devDependencies": {
     "@types/verovio": "^5.1.0"

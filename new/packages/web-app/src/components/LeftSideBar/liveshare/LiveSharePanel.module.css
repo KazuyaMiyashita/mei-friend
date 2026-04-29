@@ -34,6 +34,57 @@
   background-color: var(--hoverColor, rgba(255, 255, 255, 0.1));
 }
 
+.roomUrlContainer {
+  margin-top: 12px;
+  width: 100%;
+}
+
+.roomUrlLabel {
+  font-size: 11px;
+  color: var(--textColor);
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.roomUrlInputGroup {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.roomUrlInput {
+  flex-grow: 1;
+  min-width: 0;
+  background-color: var(--backgroundColor);
+  border: 1px solid var(--borderColor);
+  color: var(--textColor);
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 3px;
+  cursor: text;
+}
+
+.roomUrlInput:focus {
+  outline: 1px solid var(--primaryColor, #007acc);
+  border-color: transparent;
+}
+
+.copyBtn {
+  background: none;
+  border: 1px solid var(--borderColor);
+  border-radius: 3px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--textColor);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.copyBtn:hover {
+  background-color: var(--hoverColor, rgba(255, 255, 255, 0.1));
+}
+
 .fileList {
   list-style: none;
   padding: 0;

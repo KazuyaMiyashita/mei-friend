@@ -34,10 +34,13 @@ import {
 } from "./context/WorkspaceContext";
 import { useGlobalKeyboard } from "./hooks/useGlobalKeyboard";
 
-function AppContent() {
-  const [activeSidebar, setActiveSidebar] = useState<SidebarPanel | null>(
-    "workspace",
-  );
+function AppContent({
+  activeSidebar,
+  setActiveSidebar,
+}: {
+  activeSidebar: SidebarPanel | null;
+  setActiveSidebar: (panel: SidebarPanel | null) => void;
+}) {
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
 
@@ -46,9 +49,12 @@ function AppContent() {
   const { settings } = usePersistedAppSettings();
   const [showSplash, setShowSplash] = useState(() => settings.showSplash);
 
-  const toggleSidebar = useCallback((panel: SidebarPanel) => {
-    setActiveSidebar((prev) => (prev === panel ? null : panel));
-  }, []);
+  const toggleSidebar = useCallback(
+    (panel: SidebarPanel) => {
+      setActiveSidebar(activeSidebar === panel ? null : panel);
+    },
+    [activeSidebar, setActiveSidebar],
+  );
 
   const handleDismissSplash = useCallback(() => {
     setShowSplash(false);
@@ -155,6 +161,10 @@ function AppContent() {
 }
 
 export default function App() {
+  const [activeSidebar, setActiveSidebar] = useState<SidebarPanel | null>(
+    "workspace",
+  );
+
   return (
     <PersistedAppSettingsProvider>
       <AppSettingsProvider>
@@ -162,8 +172,14 @@ export default function App() {
           <WorkspaceProvider>
             <LiveShareProvider>
               <FocusedPanelProvider>
-                <ApplicationProvider>
-                  <AppContent />
+                <ApplicationProvider
+                  activeSidebar={activeSidebar}
+                  setActiveSidebar={setActiveSidebar}
+                >
+                  <AppContent
+                    activeSidebar={activeSidebar}
+                    setActiveSidebar={setActiveSidebar}
+                  />
                 </ApplicationProvider>
               </FocusedPanelProvider>
             </LiveShareProvider>
